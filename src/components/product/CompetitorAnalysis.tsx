@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, FileText, ExternalLink, Plus, X, Edit, Check, ChevronDown, ChevronUp, BarChart, Loader2 } from 'lucide-react';
+import { Target, Plus, X, ChevronDown, ChevronUp, BarChart, Loader2 } from 'lucide-react';
 import { ProductAnalysis, CompetitorItem, CompetitorsData } from '../../types/product/types';
 import { CompetitorAnalysisButton } from '../CompetitorAnalysisButton';
 import toast from 'react-hot-toast';
@@ -443,15 +443,15 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                           e.stopPropagation();
                           handleRemoveCompetitor(type, index);
                         }}
-                        className="text-gray-400 hover:text-red-500 p-1"
+                        className="text-gray-100 hover:text-red-500 p-1"
                       >
-                        <X size={14} />
+                        <X className="text-gray-100" size={14} />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 italic mt-2 px-2">
+                <p className="text-sm text-white italic mt-2 px-2">
                   No {title.toLowerCase()} identified yet.
                 </p>
               )}
@@ -476,8 +476,8 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
         </h3>
         <CompetitorAnalysisButton 
           product={product} 
-          onAnalysisComplete={onUpdate}
-          onCompetitorsReceived={handleUpdateCompetitors}
+          onAnalysisComplete={onUpdate} 
+          onCompetitorsReceived={handleUpdateCompetitors} 
         />
       </div>
       
@@ -504,58 +504,54 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                 <h4 className="text-sm font-medium text-primary-400">Add New Competitor</h4>
                 <button 
                   onClick={() => setShowForm(false)}
-                  className="p-1 text-gray-400 hover:text-gray-300 rounded-full hover:bg-secondary-700"
-                >
-                  <X size={14} />
-                </button>
+                  className="p-1 text-gray-100 hover:text-black rounded-full hover:bg-secondary-700"
+                  >
+                    <X className="text-gray-100" size={14} />
+                  </button>
               </div>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Competitor Type</label>
+                  <label className="block text-xs text-gray-100 mb-1">Competitor Type</label>
                   <select 
                     value={newCompetitor.type}
                     onChange={(e) => setNewCompetitor({...newCompetitor, type: e.target.value as CompetitorType})}
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
-                    <option value="direct_competitors">Direct Competitor</option>
-                    <option value="niche_competitors">Niche Competitor</option>
-                    <option value="broader_competitors">Broader Competitor</option>
+                    <option value="direct">Direct</option>
+                    <option value="niche">Niche</option>
+                    <option value="broader">Broader</option>
                   </select>
                 </div>
-                
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Category/Segment</label>
+                  <label className="block text-xs text-gray-100 mb-1">Category/Segment</label>
                   <input
                     type="text"
                     value={newCompetitor.category}
                     onChange={(e) => setNewCompetitor({...newCompetitor, category: e.target.value})}
-                    placeholder="e.g. Enterprise, SMB, Consumer"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="e.g. Software as a Service"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Company Name</label>
+                  <label className="block text-xs text-gray-100 mb-1">Company Name</label>
                   <input
                     type="text"
                     value={newCompetitor.company_name}
                     onChange={(e) => setNewCompetitor({...newCompetitor, company_name: e.target.value})}
                     placeholder="e.g. Acme Inc."
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Product Name</label>
+                  <label className="block text-xs text-gray-100 mb-1">Product Name</label>
                   <input
                     type="text"
                     value={newCompetitor.product_name}
                     onChange={(e) => setNewCompetitor({...newCompetitor, product_name: e.target.value})}
                     placeholder="e.g. Acme Pro"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
@@ -564,7 +560,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                 <button
                   onClick={handleAddCompetitor}
                   disabled={!newCompetitor.company_name || !newCompetitor.product_name}
-                  className="px-3 py-1.5 text-xs bg-primary-500 text-secondary-900 font-medium rounded-lg hover:bg-primary-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className="px-3 py-1.5 text-xs bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                 >
                   <Plus size={14} />
                   Add
@@ -583,7 +579,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
             
             {/* Analyze Competitors Button */}
             <div className="mt-4">
-              <div className="text-xs text-gray-400 text-center mb-2">
+              <div className="text-xs text-white text-center mb-2">
                 Click below to perform deep analysis on all identified competitors.
               </div>
               <div className="flex justify-center">
@@ -593,7 +589,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                     (!product.competitors?.direct_competitors?.length && 
                      !product.competitors?.niche_competitors?.length && 
                      !product.competitors?.broader_competitors?.length)}
-                  className="w-full sm:w-auto px-4 py-2 bg-primary-500 text-secondary-900 font-medium rounded-lg hover:bg-primary-400 transition-colors shadow-glow hover:shadow-glow-strong flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-500 disabled:hover:shadow-none"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-colors duration-150 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-700 disabled:hover:shadow-none"
                 >
                   {isAnalyzing ? (
                     <>
@@ -615,7 +611,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
       
       {/* Remove the competitorAnalysisUrl section and only keep the 'no competitors' message */}
       {!product.competitors && (
-        <p className="text-sm text-gray-400 italic">
+        <p className="text-sm text-white italic">
           No competitor analysis available yet. Click the button above to generate one.
         </p>
       )}

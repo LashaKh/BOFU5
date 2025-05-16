@@ -139,7 +139,15 @@ export async function getApprovedProducts(): Promise<any[]> {
       .order('approved_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    
+    // Add research_result_id to each product's data
+    return (data || []).map(item => ({
+      ...item,
+      product_data: {
+        ...item.product_data,
+        research_result_id: item.research_result_id
+      }
+    }));
   } catch (error) {
     console.error('[research] Error fetching approved products:', error);
     throw error;

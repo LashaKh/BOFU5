@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Edit2, Plus, Trash2, CheckCircle, AlertCircle, X, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit2, Plus, Trash2, CheckCircle, AlertCircle, Save, Loader2 } from 'lucide-react';
 
 interface ProductSectionProps {
   title: string;
@@ -9,6 +9,7 @@ interface ProductSectionProps {
   isExpanded: boolean;
   toggleExpanded: () => void;
   sectionType: 'usps' | 'features' | 'painPoints';
+  isSaving?: boolean;
 }
 
 export function ProductSection({ 
@@ -17,11 +18,25 @@ export function ProductSection({
   onUpdate, 
   isExpanded, 
   toggleExpanded,
-  sectionType 
+  sectionType,
+  isSaving
 }: ProductSectionProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editedItems, setEditedItems] = React.useState(items);
   const [newItem, setNewItem] = React.useState('');
+
+  React.useEffect(() => {
+    // Sync editedItems with items prop if not editing or when items prop itself changes.
+    // This ensures that if the parent data changes, the view updates, and
+    // when edit mode is entered, it starts with the latest data.
+    console.log(`[ProductSection: ${title}] useEffect triggered. isEditing: ${isEditing}, items prop:`, JSON.parse(JSON.stringify(items)));
+    if (!isEditing) {
+      console.log(`[ProductSection: ${title}] Not editing. Syncing editedItems with items prop.`);
+      setEditedItems(items);
+    } else {
+      console.log(`[ProductSection: ${title}] Currently editing. Not syncing from prop.`);
+    }
+  }, [items, isEditing, title]);
   
   const getIcon = () => {
     switch (sectionType) {
@@ -56,13 +71,22 @@ export function ProductSection({
 
   const handleAddItem = () => {
     if (newItem.trim()) {
-      setEditedItems([...editedItems, newItem.trim()]);
+      const updatedItems = [...editedItems, newItem.trim()];
+      setEditedItems(updatedItems);
+      // onUpdate(updatedItems); // Optionally call onUpdate immediately or only on save
       setNewItem('');
     }
   };
 
   const handleRemoveItem = (index: number) => {
-    setEditedItems(editedItems.filter((_, i) => i !== index));
+    const updatedItems = editedItems.filter((_, i) => i !== index);
+    setEditedItems(updatedItems);
+    // onUpdate(updatedItems); // Optionally call onUpdate immediately or only on save
+  };
+
+  const handleEditItemChange = (index: number, value: string) => {
+    const updatedItems = editedItems.map((item, i) => (i === index ? value : item));
+    setEditedItems(updatedItems);
   };
 
   return (
@@ -98,9 +122,9 @@ export function ProductSection({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-2 overflow-hidden"
+            className="space-y-1 text-sm mt-1"
           >
+            {/* Render `items` prop directly when not editing */} 
             {items && items.length > 0 ? (
               items.map((item, i) => (
                 <div key={i} className="flex items-start">
@@ -109,7 +133,7 @@ export function ProductSection({
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 italic">No items available</p>
+              <p className="text-gray-800 dark:text-gray-100 italic">No items available</p>
             )}
           </motion.div>
         )}
@@ -126,7 +150,7 @@ export function ProductSection({
                 type="text"
                 value={newItem}
                 onChange={(e) => setNewItem(e.target.value)}
-                className="flex-1 px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="flex-1 px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Add new item..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newItem.trim()) {
@@ -145,10 +169,15 @@ export function ProductSection({
             <div className="space-y-2">
               {editedItems.map((item, i) => (
                 <div key={i} className="flex items-center justify-between group/item p-2 hover:bg-secondary-800 rounded-lg">
-                  <p className="text-gray-300">{item}</p>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => handleEditItemChange(i, e.target.value)}
+                    className="flex-1 px-2 py-1 bg-transparent border-b border-primary-500/50 text-gray-100 focus:outline-none focus:border-primary-500"
+                  />
                   <button
                     onClick={() => handleRemoveItem(i)}
-                    className="invisible group-hover/item:visible p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-full transition-colors"
+                    className="ml-2 invisible group-hover/item:visible p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-full transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -159,19 +188,31 @@ export function ProductSection({
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => {
-                  setEditedItems(items);
+                  // Reset editedItems from the canonical `items` prop when cancelling
+                  setEditedItems(items); 
                   setIsEditing(false);
                 }}
                 className="px-3 py-1.5 text-gray-400 hover:text-gray-300 hover:bg-secondary-800 rounded-lg transition-colors"
+                disabled={isSaving}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="px-3 py-1.5 bg-primary-500 text-secondary-900 rounded-lg hover:bg-primary-400 transition-colors flex items-center gap-1"
+                className={`px-3 py-1.5 bg-primary-500 text-secondary-900 rounded-lg hover:bg-primary-400 transition-colors flex items-center gap-1 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isSaving}
               >
-                <Save size={16} />
-                Save
+                {isSaving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-1" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Save
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
@@ -180,7 +221,7 @@ export function ProductSection({
       
       {!isExpanded && (
         <div className="mt-1 flex items-center">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-800 dark:text-gray-100">
             {items.length} {items.length === 1 ? 'item' : 'items'}
           </span>
           <button

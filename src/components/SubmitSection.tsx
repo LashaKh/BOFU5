@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Sparkles } from 'lucide-react';
 
@@ -8,12 +7,14 @@ interface SubmitSectionProps {
   onSubmit: () => void;
 }
 
-export function SubmitSection({ isDisabled, isSubmitting, onSubmit }: SubmitSectionProps) {
+export const SubmitSection: React.FC<SubmitSectionProps> = ({ onSubmit, isDisabled, isSubmitting }) => {
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="mt-10 text-center"
+    >
       <div>
         <h3 className="text-lg font-medium text-primary-400 mb-2">Generate AI Research Analysis</h3>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-white">
           Our AI will analyze your inputs to provide comprehensive bottom-of-funnel insights for your products.
         </p>
       </div>
@@ -42,9 +43,9 @@ export function SubmitSection({ isDisabled, isSubmitting, onSubmit }: SubmitSect
         )}
       </motion.button>
       
-      <div className="text-xs text-gray-400 text-center">
+      <div className="text-xs text-white text-center">
         Processing may take 1-2 minutes depending on the amount of input data.
       </div>
-    </div>
+    </motion.div>
   );
 }

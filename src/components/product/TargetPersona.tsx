@@ -49,8 +49,8 @@ export function TargetPersona({
           aria-label={isExpanded ? "Collapse target persona" : "Expand target persona"}
         >
           {isExpanded ? 
-            <ChevronUp className="text-gray-400" /> : 
-            <ChevronDown className="text-gray-400" />
+            <ChevronUp className="text-gray-800 dark:text-gray-100" /> : 
+            <ChevronDown className="text-gray-800 dark:text-gray-100" />
           }
         </button>
       </div>
@@ -95,7 +95,7 @@ export function TargetPersona({
             animate={{ opacity: 1 }}
             className="mt-1"
           >
-            <p className="text-sm text-gray-500 line-clamp-1">
+            <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-1">
               Primary audience: {safePersona.primaryAudience}
             </p>
             <button

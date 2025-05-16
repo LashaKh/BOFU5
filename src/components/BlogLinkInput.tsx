@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Plus, Trash2, X } from 'lucide-react';
+import { Link2, Plus, X } from 'lucide-react';
 
 interface BlogLinkInputProps {
   onBlogLinksChange: (links: string[]) => void;
@@ -51,7 +51,7 @@ export function BlogLinkInput({ onBlogLinksChange }: BlogLinkInputProps) {
   return (
     <div>
       <label className="block text-lg font-medium text-primary-400 mb-2">Blog URLs (Optional)</label>
-      <p className="text-sm text-gray-400 mb-4">
+      <p className="text-sm text-white mb-4">
         Add links to blog posts or articles that are relevant to your product research.
       </p>
 
@@ -69,7 +69,7 @@ export function BlogLinkInput({ onBlogLinksChange }: BlogLinkInputProps) {
                 if (error) setError('');
               }}
               placeholder="https://example.com/blog/article"
-              className="w-full pl-10 pr-4 py-2 border-2 border-primary-500/20 bg-secondary-800 text-gray-200 
+              className="w-full pl-10 pr-4 py-2 border-2 border-primary-500/20 bg-secondary-800 text-black 
                 rounded-l-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 placeholder-gray-500"
             />
           </div>

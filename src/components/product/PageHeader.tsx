@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, History, ClockIcon, Home } from 'lucide-react';
+import { Plus, History, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface PageHeaderProps {
@@ -47,7 +46,7 @@ export function PageHeader({
           transition={{ duration: 0.5 }}
         >
           <h2 
-            className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600 cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
+            className="text-3xl font-bold text-white cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
             onClick={() => handleNavigation('/')}
           >
             <Home className="h-5 w-5 text-primary-400" />

@@ -81,7 +81,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-secondary-900 border-2 border-primary-500/20 p-6 text-left align-middle shadow-glow transition-all">
                 <Dialog.Title
                   as="h3"
-                  className="text-lg font-medium leading-6 text-primary-400"
+                  className="text-lg font-medium leading-6 text-white"
                 >
                   Admin Login
                 </Dialog.Title>
@@ -105,7 +105,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           required
-                          className="mt-1 block w-full rounded-md bg-secondary-800 border-2 border-primary-500/20 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500/30 text-white py-2 px-3"
+                          className="mt-1 block w-full rounded-md bg-white border-2 border-primary-500/20 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500/30 text-black placeholder:text-gray-500 py-2 px-3"
                         />
                       </div>
                       
@@ -120,7 +120,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                           required
-                          className="mt-1 block w-full rounded-md bg-secondary-800 border-2 border-primary-500/20 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500/30 text-white py-2 px-3"
+                          className="mt-1 block w-full rounded-md bg-white border-2 border-primary-500/20 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500/30 text-black placeholder:text-gray-500 py-2 px-3"
                         />
                       </div>
                       
@@ -128,7 +128,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
                         <button
                           type="submit"
                           disabled={isLoading}
-                          className="w-full inline-flex justify-center items-center rounded-md border-2 border-primary-500/20 shadow-glow bg-secondary-800 py-2 px-4 text-sm font-medium text-primary-400 hover:bg-secondary-700 hover:shadow-glow-strong hover:border-primary-500/40 transition-all"
+                          className="w-full inline-flex justify-center items-center rounded-md border-2 border-primary-500/20 shadow-glow bg-primary-400 py-2 px-4 text-sm font-medium text-white hover:bg-primary-500 hover:shadow-glow-strong hover:border-primary-500/40 transition-all"
                         >
                           {isLoading ? (
                             <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -145,7 +145,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
                     <button
                       type="button"
                       onClick={onClose}
-                      className="text-sm text-primary-400 hover:text-primary-300"
+                      className="text-sm text-white hover:text-primary-300"
                     >
                       Back to regular login
                     </button>

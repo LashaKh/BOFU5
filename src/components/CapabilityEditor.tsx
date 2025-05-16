@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RichTextEditor } from './RichTextEditor';
-import { Edit2, Save, X, Plus, Trash2, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit2, Save, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Capability {
   title: string;
@@ -20,14 +20,12 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
   const [isEditing, setIsEditing] = useState(false);
   const [editedCapability, setEditedCapability] = useState(capability);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleImageUpload = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        setPreviewImage(result);
         resolve(result);
       };
       reader.onerror = reject;
@@ -55,7 +53,7 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
               type="text"
               value={editedCapability.title}
               onChange={(e) => setEditedCapability({ ...editedCapability, title: e.target.value })}
-              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="Enter capability title"
             />
           </div>
@@ -66,7 +64,7 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
               type="text"
               value={editedCapability.description}
               onChange={(e) => setEditedCapability({ ...editedCapability, description: e.target.value })}
-              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="Enter a brief description"
             />
           </div>

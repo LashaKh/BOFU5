@@ -48,7 +48,7 @@ export function ProductLineInput({ onProductLinesChange }: ProductLineInputProps
   return (
     <div>
       <label className="block text-lg font-medium text-primary-400 mb-2">Your Product Lines</label>
-      <p className="text-sm text-gray-400 mb-4">
+      <p className="text-sm text-white mb-4">
         Add the products or services you want to analyze and compare against the competition.
       </p>
 
@@ -66,7 +66,7 @@ export function ProductLineInput({ onProductLinesChange }: ProductLineInputProps
                 if (error) setError('');
               }}
               placeholder="Enter product name (e.g., Enterprise CRM)"
-              className="w-full pl-10 pr-4 py-2 border-2 border-primary-500/20 bg-secondary-800 text-gray-200 
+              className="w-full pl-10 pr-4 py-2 border-2 border-primary-500/20 bg-secondary-800 text-black 
                 rounded-l-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 placeholder-gray-500"
             />
           </div>

@@ -609,6 +609,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         onSave={(updatedProduct) => handleSaveProduct(updatedProduct, index)}
                         onApprove={(updatedProduct) => handleApproveProduct(updatedProduct, index)}
                         onUpdateSection={(productIndex, section, value) => updateProductSection(productIndex, section, value)}
+                        research_result_id={product.research_result_id}
                         updateProduct={(updatedProduct) => {
                           const productIndex = userProducts.findIndex(p => p.id === selectedProduct!.id);
                           if (productIndex !== -1 && selectedProduct) {
@@ -768,6 +769,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   onSave={handleSaveProduct}
                   onApprove={handleApproveProduct}
                   onUpdateSection={updateProductSection}
+                  research_result_id={selectedProduct!.research_result_id}
                   updateProduct={(updatedProduct) => {
                     // Find the product index
                     const index = userProducts.findIndex(p => p.id === selectedProduct!.id);

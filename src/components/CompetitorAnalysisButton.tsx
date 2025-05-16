@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Target, Loader2, ExternalLink } from 'lucide-react';
+import { Target, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ProductAnalysis, CompetitorsData } from '../types/product/types';
+import { CompetitorsData } from '../types/product/types';
 import { makeWebhookRequest } from '../utils/webhookUtils';
 import { parseProductData } from '../types/product';
 
@@ -334,22 +334,25 @@ export function CompetitorAnalysisButton({ product, onAnalysisComplete, onCompet
   };
 
   return (
-    <button
+    <motion.button
       onClick={handleCompetitorAnalysis}
       disabled={isLoading}
-      className="px-4 py-2 bg-primary-500 text-secondary-900 font-medium rounded-lg hover:bg-primary-400 transition-colors shadow-glow hover:shadow-glow-strong flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-500 disabled:hover:shadow-none"
+      className={`w-full bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-colors duration-150 ease-in-out flex items-center justify-center
+        ${isLoading ? 'opacity-75 cursor-not-allowed' : 'hover:bg-gray-600'}`}
+      whileHover={{ scale: isLoading ? 1 : 1.03 }}
+      whileTap={{ scale: isLoading ? 1 : 0.98 }}
     >
       {isLoading ? (
         <>
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="animate-spin h-5 w-5 mr-2" /> 
           Analyzing...
         </>
       ) : (
         <>
-          <Target className="w-4 h-4" />
-          Identify Competitors
+          <Target className="h-5 w-5 mr-2" /> 
+          Analyze Competitors
         </>
       )}
-    </button>
+    </motion.button>
   );
 }

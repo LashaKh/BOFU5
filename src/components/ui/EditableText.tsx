@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Save, X } from 'lucide-react';
+import { Edit2, Save } from 'lucide-react';
 
 interface EditableTextProps {
   value: string;
@@ -25,7 +25,7 @@ export function EditableText({ value, onUpdate, multiline, label }: EditableText
           <textarea
             value={editedValue}
             onChange={(e) => setEditedValue(e.target.value)}
-            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[100px]"
+            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[100px]"
             autoFocus
           />
         ) : (
@@ -33,7 +33,7 @@ export function EditableText({ value, onUpdate, multiline, label }: EditableText
             type="text"
             value={editedValue}
             onChange={(e) => setEditedValue(e.target.value)}
-            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             autoFocus
           />
         )}

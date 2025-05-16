@@ -88,7 +88,7 @@ export function ResearchHistory({
         >
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-100 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search by company or product name..."
@@ -98,10 +98,10 @@ export function ResearchHistory({
               />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-400">Sort:</span>
+              <span className="text-sm text-gray-100">Sort:</span>
               <button
                 onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                className="flex items-center gap-1 px-3 py-1.5 bg-secondary-800 border border-primary-500/30 text-gray-300 rounded-lg hover:bg-secondary-700 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-secondary-800 border border-primary-500/30 text-gray-100 rounded-lg hover:bg-secondary-700 transition-colors"
               >
                 {sortOrder === 'desc' ? (
                   <>
@@ -121,7 +121,7 @@ export function ResearchHistory({
       {/* Results count indicator */}
       {results.length > 0 && !isLoading && (
         <motion.div
-          className="mb-4 flex items-center gap-2 text-sm text-gray-400"
+          className="mb-4 flex items-center gap-2 text-sm text-gray-100"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -149,7 +149,7 @@ export function ResearchHistory({
               ease: 'linear',
             }}
           />
-          <p className="mt-4 text-gray-400">Loading research history...</p>
+          <p className="mt-4 text-gray-100">Loading research history...</p>
         </div>
       ) : results.length === 0 ? (
         <div className="text-center py-12">
@@ -159,7 +159,7 @@ export function ResearchHistory({
             </div>
           </div>
           <h3 className="mt-4 text-lg font-medium text-primary-400">No Research History</h3>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-100">
             Start your first research to begin building your history.
           </p>
           <button
@@ -205,13 +205,13 @@ export function ResearchHistory({
                   <h3 className="text-lg font-medium text-primary-400">
                     {result.data[0]?.companyName || 'Unknown Company'}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-400">
+                  <p className="mt-1 text-sm text-gray-100">
                     {result.data[0]?.productDetails?.name || 'Unknown Product'}
                   </p>
                   {/* Show type indicator - single vs collection */}
                   <div className="mt-2 flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${result.data.length === 1 ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-100">
                       {result.data.length === 1 ? 'Single Product' : 'Product Collection'}
                     </span>
                   </div>
@@ -222,13 +222,13 @@ export function ResearchHistory({
                     e.stopPropagation();
                     onDelete(result.id);
                   }}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-primary-400 hover:bg-secondary-800 transition-colors"
+                  className="p-1.5 rounded-lg text-gray-100 hover:text-white hover:bg-secondary-800 transition-colors"
                 >
                   <TrashIcon className="w-5 h-5" />
                 </button>
               </div>
-              <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
-                <CalendarIcon className="w-4 h-4" />
+              <div className="mt-4 flex items-center gap-2 text-xs text-gray-100">
+                <CalendarIcon className="w-4 h-4 text-gray-100" />
                 <span>
                   {new Date(result.created_at).toLocaleDateString('en-US', {
                     year: 'numeric',

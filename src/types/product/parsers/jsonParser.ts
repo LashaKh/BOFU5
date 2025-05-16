@@ -55,18 +55,18 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
       if (Array.isArray(usp)) {
         product.usps = usp
           .slice(0, 20)
-          .filter(item => typeof item === 'string' && item.trim())
-          .map(item => item.trim());
+          .filter((item: any) => typeof item === 'string' && item.trim())
+          .map((item: string) => item.trim());
       } else if (typeof usp === 'object') {
         // Extract from numbered properties (point_1, point_2, etc.)
         const points = extractNumberedProperties(usp, 'point_')
-          .filter(point => 
+          .filter((point: string) => 
             point !== '[Not Available in Provided Text]' && 
             point !== '[Not Available]' &&
             !point.includes('[Not Available') &&
             point.trim().length > 0
           )
-          .map(point => point.trim());
+          .map((point: string) => point.trim());
         product.usps = points.length > 0 ? points : [];
       }
     }
@@ -105,7 +105,7 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
     if (Array.isArray(data.pain_points_solved)) {
       product.painPoints = data.pain_points_solved
         .slice(0, 20) // Limit array size for safety
-        .filter(item => typeof item === 'string' && item.trim());
+        .filter((item: any) => typeof item === 'string' && item.trim());
     }
     
     // Parse features with safety checks
@@ -113,7 +113,7 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
       if (Array.isArray(data.features)) {
         product.features = data.features
           .slice(0, 30) // Limit array size for safety
-          .filter(item => typeof item === 'string' && item.trim());
+          .filter((item: any) => typeof item === 'string' && item.trim());
       } else if (typeof data.features === 'object') {
         product.features = extractNumberedProperties(data.features, 'feature_');
       } else if (typeof data.features === 'string') {
@@ -149,11 +149,11 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
           ? [solutions.direct_competitors]
           : Array.isArray(solutions.direct_competitors)
             ? solutions.direct_competitors.slice(0, 15) // Limit array size
-              .filter(item => typeof item === 'string' && item.trim())
+              .filter((item: any) => typeof item === 'string' && item.trim())
             : [],
         existingMethods: Array.isArray(solutions.existing_methods)
           ? solutions.existing_methods.slice(0, 15) // Limit array size
-            .filter(item => typeof item === 'string' && item.trim())
+            .filter((item: any) => typeof item === 'string' && item.trim())
           : []
       };
     }
@@ -161,19 +161,14 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
     // Parse capabilities with safety checks
     if (data.capabilities) {
       if (Array.isArray(data.capabilities)) {
-        // Remove duplicates and empty values
-        const uniqueCapabilities = [...new Set(data.capabilities)]
-          .filter(item => typeof item === 'string' && item.trim())
-          .map(item => item.trim());
-
-        product.capabilities = data.capabilities
+        product.capabilities = (data.capabilities as any[]) // Type assertion for item in filter/map
           .slice(0, 20) // Limit array size for safety
-          .filter((item, index, self) => 
+          .filter((item: any, index: number, self: any[]) => 
             typeof item === 'string' && 
             item.trim() && 
-            self.indexOf(item) === index
+            self.findIndex((el: any) => el === item) === index // ensure unique by value after trim
           )
-          .map((item, index) => ({
+          .map((item: string, index: number) => ({
             title: `Capability #${index + 1}`,
             description: item.split('.')[0]?.trim() || item, // Use first sentence as description
             content: item,
@@ -181,7 +176,7 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
           }));
       } else if (typeof data.capabilities === 'object') {
         const capabilities = extractNumberedProperties(data.capabilities, 'capability_');
-        product.capabilities = capabilities.map((cap, index) => ({
+        product.capabilities = capabilities.map((cap: string, index: number) => ({
           title: `Capability #${index + 1}`,
           description: cap.split('.')[0]?.trim() || cap,
           content: cap,
@@ -202,6 +197,37 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
       product.productDetails.name = product.companyName 
         ? `${product.companyName} Product`
         : 'Unnamed Product';
+    }
+
+    // Final explicit safety checks for array properties
+    if (!Array.isArray(product.usps)) product.usps = [];
+    if (!Array.isArray(product.features)) product.features = [];
+    if (!Array.isArray(product.painPoints)) product.painPoints = [];
+    if (!Array.isArray(product.capabilities)) {
+      product.capabilities = [];
+    } else {
+      product.capabilities.forEach(cap => {
+        if (cap && !Array.isArray(cap.images)) {
+          cap.images = [];
+        }
+      });
+    }
+
+    if (product.currentSolutions) {
+        if (!Array.isArray(product.currentSolutions.directCompetitors)) product.currentSolutions.directCompetitors = [];
+        if (!Array.isArray(product.currentSolutions.existingMethods)) product.currentSolutions.existingMethods = [];
+    } else {
+        // If currentSolutions itself is null/undefined, reinitialize from defaultProduct structure
+        product.currentSolutions = { directCompetitors: [], existingMethods: [] };
+    }
+
+    if (product.competitors) {
+        if (!Array.isArray(product.competitors.direct_competitors)) product.competitors.direct_competitors = [];
+        if (!Array.isArray(product.competitors.niche_competitors)) product.competitors.niche_competitors = [];
+        if (!Array.isArray(product.competitors.broader_competitors)) product.competitors.broader_competitors = [];
+    } else {
+        // If competitors itself is null/undefined, reinitialize from defaultProduct structure
+        product.competitors = { direct_competitors: [], niche_competitors: [], broader_competitors: [] };
     }
     
     return product;

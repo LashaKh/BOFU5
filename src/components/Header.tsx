@@ -1,14 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Target, BarChart, LineChart, Brain } from 'lucide-react';
-
-// Logo SVG component
-const Logo = () => (
-  <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="32" height="32" rx="8" fill="#FFE600" />
-    <path d="M18.5 5L7 17.5H14L12.5 27L24 14.5H17L18.5 5Z" fill="#0A0A0A" stroke="#0A0A0A" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
+import { Sparkles, Target, BarChart, LineChart } from 'lucide-react';
 
 export function Header() {
   return (
@@ -17,13 +8,13 @@ export function Header() {
         className="max-w-3xl space-y-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
       >
         <motion.h1
           className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 bg-clip-text text-transparent mb-3"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
         >
           BOFU ai Research Assistant
         </motion.h1>
@@ -36,10 +27,10 @@ export function Header() {
         />
         
         <motion.p
-          className="mx-auto max-w-2xl text-gray-300 text-lg leading-relaxed"
+          className="mx-auto max-w-2xl text-white text-lg leading-relaxed"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
         >
           Upload your research documents, add blog URLs, and specify your product lines to 
           generate comprehensive bottom-of-funnel analysis.

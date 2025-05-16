@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ProductAnalysis, CompetitorsData } from '../../types/product/types';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { ProductAnalysis } from '../../types/product/types';
+import { supabase } from '../../lib/supabase';
 import { ProductHeader } from './ProductHeader';
 import { ProductSection } from './ProductSection';
 import { CompetitorAnalysis } from './CompetitorAnalysis';
@@ -22,6 +23,7 @@ interface ProductCardProps {
   isMultipleProducts: boolean;
   isAdmin?: boolean;
   onClose?: () => void;
+  research_result_id?: string; // Added this field
 }
 
 function ProductCard({
@@ -32,10 +34,26 @@ function ProductCard({
   onApprove,
   onUpdateSection,
   updateProduct,
-  isMultipleProducts,
+  isMultipleProducts = false,
   isAdmin = false,
-  onClose
+  onClose,
+  research_result_id,
 }: ProductCardProps) {
+  // Cascade: Log product prop on re-render
+  console.log('[ProductCard] Rendering with product:', 
+    {
+      companyName: product.companyName,
+      productName: product.productDetails?.name, // Corrected path
+      usps: product.usps,
+      features: product.features,
+      painPoints: product.painPoints,
+      // Add other key parts of 'product' if needed for debugging
+      // Be mindful of logging very large objects to the console
+      competitorAnalysisUrl: product.competitorAnalysisUrl,
+      isApproved: product.isApproved
+    }
+  );
+
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
   const [originalApprovedProduct, setOriginalApprovedProduct] = React.useState<ProductAnalysis | null>(null);
@@ -169,11 +187,41 @@ function ProductCard({
 
   // Custom approve handler that handles re-approvals
   const handleApprove = async () => {
-    // Reset the original state to mark this as a fresh approval
-    resetOriginalState();
-    
-    // Call the parent's onApprove
-    await onApprove(product, index);
+    if (isActionLoading) return;
+
+    try {
+      // Get current user details from Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_name')
+        .eq('id', user?.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        toast.error('Error fetching user profile');
+        return;
+      }
+
+      console.log('User profile:', userProfile);
+
+      // Update product with user details
+      const productWithUser = {
+        ...product,
+        userUUID: user?.id,
+        userEmail: user?.email,
+        userCompanyName: userProfile?.company_name
+      };
+
+      console.log('Product with user details:', productWithUser);
+      await onApprove(productWithUser, index);
+    } catch (error) {
+      console.error('Error in handleApprove:', error);
+      toast.error('Error approving product');
+    }
   };
 
   const handleSendToAirOps = async () => {
@@ -183,7 +231,7 @@ function ProductCard({
         <div className="animate-pulse">🚀</div>
         <div>
           <p className="font-medium">Initiating AirOps Automation</p>
-          <p className="text-sm text-gray-400">Preparing your content brief...</p>
+          <p className="text-sm text-white dark:text-gray-100">Preparing your content brief...</p>
         </div>
       </div>
     );
@@ -220,8 +268,30 @@ function ProductCard({
       console.log('Sending to AirOps with Google Doc URL:', googleDocUrl);
       
       // Structure the data in the format expected by AirOps
+      // Get research_result_id from URL if available
+      let resultId = research_result_id;
+      
+      // Try to get from URL if not passed as prop
+      if (!resultId) {
+        // Try to extract from URL if available 
+        try {
+          const url = new URL(window.location.href);
+          const urlParams = new URLSearchParams(url.search);
+          const researchId = urlParams.get('research_id') || urlParams.get('research_result_id');
+          if (researchId) {
+            console.log('Found research_result_id in URL:', researchId);
+            resultId = researchId;
+          }
+        } catch (e) {
+          console.log('Could not extract research_result_id from URL');
+        }
+      }
+
+      console.log('Using research_result_id:', resultId);
+
       const preparedProduct = {
-        product_card_information: productForAirOps
+        product_card_information: productForAirOps,
+        research_result_Id: resultId // Note: Capital 'I' to match Airops input field
       };
       
       console.log('Sending to AirOps:', preparedProduct);
@@ -481,8 +551,8 @@ function ProductCard({
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary-600/30 to-primary-500/10 backdrop-blur-sm"></div>
         <div className="relative px-6 py-4">
-          <h1 className="text-2xl font-bold text-primary-400">Competitor Analysis Results</h1>
-          <p className="text-sm text-gray-400 mt-1">Comprehensive analysis of your product's market position</p>
+          <h1 className="text-2xl font-bold text-white dark:text-gray-100">Competitor Analysis Results</h1>
+          <p className="text-sm text-white dark:text-gray-100 mt-1">Comprehensive analysis of your product's market position</p>
         </div>
       </div>
 
@@ -507,29 +577,41 @@ function ProductCard({
           <ProductSection
             title="Unique Selling Points"
             items={product.usps || []}
-            onUpdate={(items) => onUpdateSection(index, 'usps', items)}
+            onUpdate={(updatedSectionItems) => {
+              console.log(`[ProductCard] onUpdate (for USPs) called with updatedSectionItems:`, JSON.parse(JSON.stringify(updatedSectionItems)));
+              onUpdateSection(index, 'usps', updatedSectionItems);
+            }}
             isExpanded={isSectionExpanded('usps')}
             toggleExpanded={() => toggleSection('usps')}
             sectionType="usps"
+            isSaving={isActionLoading}
           />
 
           <ProductSection
             title="Pain Points Solved"
             items={product.painPoints || []}
-            onUpdate={(items) => onUpdateSection(index, 'painPoints', items)}
+            onUpdate={(updatedSectionItems) => {
+              console.log(`[ProductCard] onUpdate (for PainPoints) called with updatedSectionItems:`, JSON.parse(JSON.stringify(updatedSectionItems)));
+              onUpdateSection(index, 'painPoints', updatedSectionItems);
+            }}
             isExpanded={isSectionExpanded('painPoints')}
             toggleExpanded={() => toggleSection('painPoints')}
             sectionType="painPoints"
+            isSaving={isActionLoading}
           />
         </div>
 
         <ProductSection
           title="Features"
           items={product.features || []}
-          onUpdate={(items) => onUpdateSection(index, 'features', items)}
+          onUpdate={(updatedSectionItems) => {
+            console.log(`[ProductCard] onUpdate (for Features) called with updatedSectionItems:`, JSON.parse(JSON.stringify(updatedSectionItems)));
+            onUpdateSection(index, 'features', updatedSectionItems);
+          }}
           isExpanded={isSectionExpanded('features')}
           toggleExpanded={() => toggleSection('features')}
           sectionType="features"
+          isSaving={isActionLoading}
         />
 
         <TargetPersona
@@ -770,7 +852,7 @@ function ProductCard({
           <button
             onClick={() => onSave(product, index)}
             disabled={isThisProductSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600/80 rounded-md text-white hover:bg-primary-500 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-md text-white hover:bg-gray-700 transition-colors"
           >
             {isThisProductSaving ? (
               <Loader2 className="animate-spin h-4 w-4" />

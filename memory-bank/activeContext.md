@@ -1,68 +1,25 @@
-# Active Context: BOFU AI
+# Active Context
 
 ## Current Work Focus
-The project appears to be a functional product research tool with core features implemented. The main focus is likely on:
-
-1. Refining the user experience for research submission and results review
-2. Enhancing the admin approval workflow
-3. Improving the processing of uploaded documents and blog links
-4. Optimizing the presentation of research results
-5. **Resolving database schema migration issues with Supabase**
+- Review, refinement, and potential finalization of the `ContentBriefEditorNew.fixed.tsx` component.
+- Ensuring overall stability and user experience of content brief features following recent major implementations and bug fixes.
 
 ## Recent Changes
-Based on the repository structure and content, recent work likely involved:
-
-1. Implementation of the multi-step research submission process
-2. Development of the admin dashboard functionality
-3. Integration of document upload and processing features
-4. Enhancement of user authentication flows for both regular and admin users
-5. **Creation of database migration scripts to separate user and admin profiles**
-
-## Active Decisions
-
-### User Experience
-- Balancing simplicity of research submission with thoroughness of inputs
-- Optimizing the presentation of AI-generated insights
-- Managing the history view for users to access past research
-
-### Technical Considerations
-- Performance optimization for document processing
-- Security enhancements for user data and uploaded materials
-- Database schema refinements for efficient data storage and retrieval
-- **Ensuring proper Supabase database schema migration and setup**
-- **Debugging and resolving database connection issues**
-
-### Feature Development
-- Potential expansion of analysis capabilities
-- Enhanced visualization of competitive insights
-- Advanced filtering and searching of research results
+- **Content Brief Editor UI (`ContentBriefEditorNew.tsx` and `ContentBriefEditorNew.fixed.tsx`):**
+    - A new, modern, card-based editor (`ContentBriefEditorNew.tsx`) was developed for content briefs.
+    - Key Features: Collapsible sections, custom color coding, full inline editing, specialized UI for array data types (Pain Points, USPs, etc.) with grid layouts, nested object support, raw JSON editing option, and direct Supabase integration.
+    - Technologies: React with TypeScript, framer-motion for animations, Lucide-react for icons, and Tailwind CSS for styling.
+    - Successfully integrated into the `EditContentBrief` page.
+    - Current attention is on `ContentBriefEditorNew.fixed.tsx`, possibly addressing further refinements or fixes based on the original implementation.
+- **`ContentBriefDisplay.tsx` Bug Fix:**
+    - Resolved a critical infinite update loop that was causing "Maximum update depth exceeded" errors.
+    - The root cause was identified as state updates within `updateContent()` which improperly triggered a cycle of parent `onContentChange` callbacks and component re-renders.
+    - The solution involved separating state updates from content synchronization logic, primarily by moving `updateContent` calls to a dedicated `useEffect` hook that runs specifically when section data changes, and adding conditions to prevent unnecessary updates, particularly on initial render.
 
 ## Next Steps
+- (User to define specific next tasks, e.g., further testing of `ContentBriefEditorNew.fixed.tsx`, addressing new feature requests, or moving to other parts of the application).
 
-### Near-Term Priorities
-1. **Complete Supabase database migration for user_profiles and admin_profiles tables**
-2. **Set up approved_products table for product review workflow**
-3. Enhance error handling throughout the application
-4. Optimize loading states and performance
-5. Improve feedback mechanisms for users during research processing
-6. Refine the admin approval interface
-
-### Medium-Term Goals
-1. Add additional data source options for research
-2. Implement more sophisticated analysis algorithms
-3. Develop export and sharing capabilities for research results
-4. Create more detailed user reporting features
-
-### Long-Term Vision
-1. Integration with additional third-party data sources
-2. Advanced customization of research parameters
-3. Implementation of collaborative research features
-4. Development of trend analysis across multiple research projects
-
-## Current Challenges
-1. **Database schema not properly set up in Supabase, causing 400 errors**
-2. **Migration needed for user_profiles and admin_profiles tables**
-3. Ensuring consistent processing of various document types
-4. Optimizing the performance of the research analysis
-5. Balancing the detail of results with clarity of presentation
-6. Managing the approval workflow efficiently 
+## Active Decisions and Considerations
+- Prioritizing a high-quality, intuitive user interface for content brief management.
+- Focusing on robust state management patterns in React to prevent bugs like the one fixed in `ContentBriefDisplay.tsx`.
+- Ensuring new components are well-integrated and performant.

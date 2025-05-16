@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { User } from '@supabase/supabase-js';
+import { toast } from 'react-hot-toast';
 
 // User registration
 export async function registerUser(email: string, password: string, companyName: string) {
@@ -129,4 +132,79 @@ export async function getAllAdmins() {
     console.error('Error fetching admins:', error);
     throw error;
   }
-} 
+}
+
+// Send password reset email
+export async function sendPasswordResetEmail(email: string) {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    if (error) throw error;
+    return { success: true, message: 'Password reset instructions sent to your email' };
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+}
+
+// Verify password reset token
+export async function verifyPasswordResetToken() {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    return { valid: !!data.user, user: data.user };
+  } catch (error) {
+    console.error('Error verifying reset token:', error);
+    return { valid: false, user: null };
+  }
+}
+
+// Update password with reset token
+export async function updatePassword(password: string) {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: password,
+    });
+
+    if (error) throw error;
+    return { success: true, message: 'Password updated successfully' };
+  } catch (error) {
+    console.error('Error updating password:', error);
+    throw error;
+  }
+}
+
+// Auth hook for managing authentication state
+export function useAuth() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return {
+    user,
+    loading,
+    signIn,
+    signOut,
+    getCurrentUser,
+    sendPasswordResetEmail,
+    updatePassword,
+    verifyPasswordResetToken,
+  };
+}

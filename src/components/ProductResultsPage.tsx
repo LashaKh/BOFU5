@@ -5,14 +5,14 @@ import { supabase } from '../lib/supabase';
 import { 
   saveResearchResults, 
   updateResearchResults, 
-  ResearchResult, 
   saveApprovedProduct 
 } from '../lib/research';
 import { ProductCard } from './product/ProductCard';
-import { PageHeader } from './product/PageHeader';
 import { ProductAnalysis } from '../types/product';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Home, Save, ArrowLeft, MessageSquare } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { MainHeader } from './MainHeader';
+import ChatWindow from './ChatWindow';
 
 export interface ProductResultsPageProps {
   products: ProductAnalysis[];
@@ -41,6 +41,7 @@ function ProductResultsPage({
   const [user, setUser] = useState<any>(null);
   const [hasSavedToHistory, setHasSavedToHistory] = useState(!!existingId);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const navigate = useNavigate();
   const params = useParams();
   
@@ -295,20 +296,111 @@ function ProductResultsPage({
   };
 
   // Handle updating a section of a product
-  const handleUpdateSection = (productIndex: number, section: keyof ProductAnalysis, value: any): void => {
-    const updatedProducts = [...editedProducts];
-    updatedProducts[productIndex] = {
-      ...updatedProducts[productIndex],
+  const handleUpdateSection = async (productIndex: number, section: keyof ProductAnalysis, value: any): Promise<void> => {
+    console.log(`ProductResultsPage.handleUpdateSection called for product index ${productIndex}, section ${String(section)}`, value);
+
+    const productToUpdate = editedProducts[productIndex];
+    const updatedProductData = {
+      ...productToUpdate,
       [section]: value
     };
-    
-    setEditedProducts(updatedProducts);
-    setHasUnsavedChanges(true);
-    sessionStorage.setItem('bofu_edited_products', JSON.stringify(updatedProducts));
+
+    // Optimistically update local state
+    setEditedProducts(prevProducts => {
+      const newProducts = [...prevProducts];
+      newProducts[productIndex] = updatedProductData;
+      sessionStorage.setItem('bofu_edited_products', JSON.stringify(newProducts)); // Also update session storage
+      return newProducts;
+    });
+
+    // If this is an existing historical record (i.e., we have an ID for the research result from the URL or props)
+    const currentRecordId = existingId || currentProductId; // Use existingId from props first, then from URL params
+
+    if (currentRecordId) {
+      setHasUnsavedChanges(false); // Assume we'll try to save, reset general unsaved flag for this section edit
+      setIsSaving(true); 
+      setActionLoadingIndex(productIndex);
+      try {
+        // Fetch the current full historical record from 'research_results' table
+        const { data: currentResearchResult, error: fetchError } = await supabase
+          .from('research_results')
+          .select('data')
+          .eq('id', currentRecordId)
+          .single();
+
+        if (fetchError) {
+          toast.error(`Failed to fetch history: ${fetchError.message}`);
+          setHasUnsavedChanges(true); // Save failed, so there are still unsaved changes
+          setIsSaving(false);
+          setActionLoadingIndex(null);
+          return;
+        }
+
+        if (!currentResearchResult || !Array.isArray(currentResearchResult.data)) {
+          toast.error('Invalid historical data format found.');
+          setHasUnsavedChanges(true);
+          setIsSaving(false);
+          setActionLoadingIndex(null);
+          return;
+        }
+        
+        // The 'data' field in research_results is an array of ProductAnalysis objects
+        const historicalProducts: ProductAnalysis[] = [...currentResearchResult.data]; // Create a mutable copy
+
+        // Ensure the productIndex is valid for the fetched historical data
+        if (productIndex < 0 || productIndex >= historicalProducts.length) {
+          toast.error('Product index out of bounds for historical data.');
+          setHasUnsavedChanges(true);
+          setIsSaving(false);
+          setActionLoadingIndex(null);
+          return;
+        }
+        
+        // Update the specific product's section within the historical data array
+        historicalProducts[productIndex] = {
+          ...historicalProducts[productIndex], // Preserve other fields of the historical product
+          [section]: value // Apply the new section value
+        };
+
+        // Save the entire modified 'data' array back to Supabase
+        const { error: updateError } = await supabase
+          .from('research_results')
+          .update({ data: historicalProducts, updated_at: new Date().toISOString() })
+          .eq('id', currentRecordId);
+
+        if (updateError) {
+          toast.error(`Failed to save section: ${updateError.message}`);
+          setHasUnsavedChanges(true); // Save failed
+        } else {
+          toast.success(`${String(section)} saved to history!`);
+          // setHasUnsavedChanges(false); // Already set optimistically, confirm here if needed or remove if main save button is still primary
+          // If onHistorySave is provided (from App.tsx), call it to refresh the history list
+          if (onHistorySave) {
+            await onHistorySave();
+          }
+        }
+      } catch (error: any) {
+        console.error('Error saving section update to history:', error);
+        toast.error(`Save error: ${error.message || 'Unexpected error'}`);
+        setHasUnsavedChanges(true); // Save failed
+      } finally {
+        setIsSaving(false);
+        setActionLoadingIndex(null);
+      }
+    } else {
+      // If not an existing historical record, the changes are just local until "Save to History" is clicked.
+      setHasUnsavedChanges(true); // Mark general unsaved changes for the main save button
+      console.log("Change is local as no existingRecordId. User needs to use 'Save to History'.");
+    }
   };
 
   // Update an entire product
-  const handleUpdateProduct = (updatedProduct: ProductAnalysis): void => {
+  const handleUpdateProduct = (updatedProductData: ProductAnalysis): void => {
+    setEditedProducts(prevProducts =>
+      prevProducts.map(p =>
+        p.research_result_id === updatedProductData.research_result_id ? updatedProductData : p
+      )
+    );
     setHasUnsavedChanges(true);
   };
 
@@ -389,126 +481,81 @@ function ProductResultsPage({
   }, [editedProducts]);
 
   return (
-    <div className="min-h-screen bg-gradient-dark bg-circuit-board">
-      {/* Header Section */}
-      <PageHeader 
-        companyName={editedProducts[0]?.companyName} 
-        productCount={editedProducts.length}
-        onStartNew={onStartNew}
-        showHistory={showHistory}
-        setShowHistory={(show) => {
-          console.log("Setting history state in ProductResultsPage:", show);
-          if (setShowHistory) {
-            setShowHistory(show);
-          }
-        }}
-        forceHistoryView={forceHistoryView}
-        hideHistoryButton={false}
-      />
-
-      {/* Instructions Panel */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-        <div className="bg-secondary-900/80 backdrop-blur-sm rounded-xl border-2 border-primary-500/20 shadow-glow p-6">
-          <div className="flex items-start space-x-4">
-            <div className="min-w-[24px] mt-1">
-              <div className="w-6 h-6 rounded-full bg-secondary-800 border border-primary-500/30 flex items-center justify-center">
-                <span className="text-sm font-semibold text-primary-400">i</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-primary-400 mb-2">How to Complete Your Analysis</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm text-gray-400">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-secondary-800 border border-primary-500/30 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary-400">1</span>
-                  </div>
-                  <p>Click <span className="font-medium text-primary-400">Identify Competitors</span> to let AI automatically discover and analyze your competitors</p>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-gray-400">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-secondary-800 border border-primary-500/30 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary-400">2</span>
-                  </div>
-                  <p>Optionally, use <span className="font-medium text-primary-400">Add Competitor Manually</span> to include additional competitors you know</p>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-gray-400">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-secondary-800 border border-primary-500/30 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary-400">3</span>
-                  </div>
-                  <p>Click <span className="font-medium text-primary-400">Analyze Competitors</span> to generate a detailed competitive analysis report</p>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-gray-400">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-secondary-800 border border-primary-500/30 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary-400">4</span>
-                  </div>
-                  <p>Finally, click <span className="font-medium text-primary-500">Save Analysis</span> to preserve your results</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className={`flex flex-col gap-6`}>
-          {/* Header with actions */}
-          <div className="flex items-center justify-between sticky top-0 z-20 pt-4 pb-2 bg-white dark:bg-gray-900">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              {editedProducts.length === 1 
-                ? 'Product Analysis' 
-                : `Product Analysis (${editedProducts.length})`}
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
+      <MainHeader 
+        user={user} 
+        showHistory={showHistory} 
+        setShowHistory={setShowHistory} 
+      /> 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-0"
+          >
+            <h2 
+              className="text-3xl font-bold text-white cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
+              onClick={onStartNew} 
+            >
+              <Home size={20} className="text-primary-400"/>
+              {editedProducts && editedProducts.length > 0 && editedProducts[0]?.companyName ? `${editedProducts[0].companyName}` : 'Product Analysis'}
+            </h2>
+            <p className="text-sm text-gray-400">
+              {editedProducts ? `${editedProducts.length} product${editedProducts.length === 1 ? '' : 's'} analyzed` : 'No products analyzed'}
+            </p>
+          </motion.div>
+          
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center gap-3"
+          >
+            {showHistory && setShowHistory && (
+              <button
+                onClick={() => setShowHistory(false)} 
+                className="px-4 py-2 rounded-lg transition-all flex items-center gap-2
+                           text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
+              >
+                <ArrowLeft size={18} />
+                Back to Analysis
+              </button>
+            )}
             
-            <div className="flex gap-2">
-              {/* Save to History Button - only show if unsaved or has changes */}
-              {(!hasSavedToHistory || hasUnsavedChanges) && (
-                <button
-                  onClick={handleSaveAllToHistory}
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {currentProductId ? 'Updating...' : 'Saving...'}
-                    </>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {currentProductId ? 'Update in History' : 'Save to History'}
-                    </>
-                  )}
-                </button>
-              )}
-              
-              {hasSavedToHistory && !hasUnsavedChanges && (
-                <div className="flex items-center text-sm text-green-600 dark:text-green-400 font-medium">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Saved to History
-                </div>
-              )}
-              
-              {/* Start New Button */}
+            {!showHistory && (
               <button 
                 onClick={onStartNew} 
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
+                className="px-4 py-2 rounded-lg transition-all flex items-center gap-2
+                           text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                Start New
+                <Plus size={18} className="text-primary-400"/>
+                New Analysis
               </button>
-            </div>
-          </div>
-          
-          {/* Status message */}
+            )}
+            
+            {editedProducts && editedProducts.length > 0 && (
+              <button 
+                onClick={handleSaveAllToHistory} 
+                disabled={isSaving || (!hasUnsavedChanges && hasSavedToHistory)}
+                className={`px-4 py-2.5 rounded-lg hover:bg-primary-400 transition-all 
+                            shadow-glow hover:shadow-glow-strong flex items-center gap-2 font-medium 
+                            ${isSaving || (!hasUnsavedChanges && hasSavedToHistory) ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-primary-500 text-secondary-900'}`}
+              >
+                {isSaving ? (
+                  <Loader2 size={18} className="animate-spin"/>
+                ) : (
+                  <Save size={18} />
+                )}
+                {isSaving ? 'Saving...' : (currentProductId || existingId ? 'Update in History' : 'Save to History')}
+              </button>
+            )}
+          </motion.div>
+        </div>
+
+        <div className="mt-0 pb-12">
+          {/* Warning for unsaved changes */}
           {hasUnsavedChanges && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded shadow-sm dark:bg-yellow-900/20 dark:border-yellow-600">
               <div className="flex">
@@ -587,6 +634,28 @@ function ProductResultsPage({
           </div>
         </div>
       </div>
+
+      {/* Floating Chat Button */}
+      <button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className="fixed bottom-6 right-6 bg-primary-500 hover:bg-primary-600 text-white p-4 rounded-full shadow-lg z-50 transition-transform duration-300 ease-in-out transform hover:scale-110"
+        aria-label={isChatOpen ? 'Close Chat' : 'Open Chat'}
+      >
+        <MessageSquare size={24} />
+      </button>
+
+      {/* Chat Window */}
+      {isChatOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          transition={{ duration: 0.3 }}
+          className="fixed bottom-20 right-6 z-40 w-full max-w-md h-3/4 max-h-[700px] bg-secondary-800 rounded-lg shadow-xl border border-secondary-700 flex flex-col"
+        >
+          <ChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        </motion.div>
+      )}
     </div>
   );
 }

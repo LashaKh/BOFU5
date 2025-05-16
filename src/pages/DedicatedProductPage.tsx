@@ -1,0 +1,1082 @@
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom'; 
+import { supabase } from '../lib/supabase'; 
+import { Product, ProductDocument, ProductAnalysis, defaultProduct } from '../types/product/types'; 
+import { toast } from 'react-hot-toast';
+import { makeWebhookRequest } from '../utils/webhookUtils';
+import { parseProductData } from '../types/product';
+import { ProductCard } from '../components/product/ProductCard';
+import { DocumentUploader, ProcessedDocument } from '../components/DocumentUploader'; 
+import AssociatedDocumentCard from '../components/product/AssociatedDocumentCard';
+import { scrapeBlogContent, ScrapedBlog } from '../utils/blogScraper';
+import { ChevronDown, ChevronUp, Loader2, FileText, Edit3, Trash2, Eye, PlusCircle, Link as LinkIcon, Search, Info, UploadCloud, AlertTriangle, CheckCircle, MessageSquareText } from 'lucide-react'; 
+import { MainHeader } from '../components/MainHeader'; 
+import ChatWindow from '../components/ChatWindow'; 
+
+// Define a local composite type for the product state on this page
+interface PageProductData extends Product { 
+  associatedDocuments: ProductDocument[];
+  generated_analysis_data?: ProductAnalysis | string | null;
+}
+
+export type ValidSupabaseDocumentType =
+  | 'pdf'
+  | 'docx'
+  | 'doc'
+  | 'pptx'
+  | 'blog_link'
+  | 'txt'
+  | 'google_doc';
+
+type SupabaseProductDocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'; // Updated to match memory
+
+const mapProcessedDocStatusToSupabaseStatus = (processedDocStatus?: ProcessedDocument['status']): SupabaseProductDocumentStatus => {
+  switch (processedDocStatus) {
+    case 'processed':
+      return 'completed'; // Mapped to 'completed'
+    case 'error':
+      return 'failed'; // Mapped to 'failed'
+    case 'processing':
+      return 'processing';
+    // 'pending_upload' was default, now maps to 'pending' or handled by DB default
+    default:
+      return 'pending'; // Added 'pending'
+  }
+};
+
+const callUploadProductDocumentEdgeFunction = async (
+  file: File,
+  vectorStoreId: string | undefined,
+  productId: string | undefined, // For logging/toast messages
+  documentName: string // For logging/toast messages
+): Promise<string | undefined> => { 
+  if (!vectorStoreId) {
+    const errorMsg = `OpenAI Vector Store ID is missing for product ${productId}. Cannot upload document: ${documentName}.`;
+    console.error(errorMsg);
+    toast.error(errorMsg, { duration: 7000 });
+    return undefined; 
+  }
+  if (!file) {
+    const errorMsg = `File object is missing for document: ${documentName}. Cannot upload to OpenAI.`;
+    console.error(errorMsg);
+    toast.error(errorMsg);
+    return undefined; 
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('vectorStoreId', vectorStoreId);
+
+  const toastId = toast.loading(`Uploading ${documentName} to OpenAI Vector Store...`);
+
+  try {
+    const { data: result, error: funcError } = await supabase.functions.invoke(
+      'uploadProductDocument', 
+      { body: formData }
+    );
+
+    if (funcError) {
+      throw funcError;
+    }
+
+    console.log('OpenAI Upload Result for', documentName, ':', result);
+    toast.success(`${documentName} uploaded to OpenAI successfully!`, { id: toastId });
+    return result?.uploadedFileId;
+
+  } catch (error: any) {
+    console.error(`Error uploading ${documentName} to OpenAI:`, error);
+    toast.error(`Failed to upload ${documentName} to OpenAI: ${error.message || 'Unknown error'}`, { id: toastId, duration: 7000 });
+    return undefined; 
+  }
+};
+
+const DedicatedProductPage: React.FC = () => {
+  const { productId } = useParams<{ productId: string }>();
+  const navigate = useNavigate(); 
+  const [product, setProduct] = useState<PageProductData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState<boolean>(false);
+  const [analysisResults, setAnalysisResults] = useState<any | null>(null); 
+  const [parsedAnalysisData, setParsedAnalysisData] = useState<ProductAnalysis | null>(null);
+  const [isCardActionLoading, setIsCardActionLoading] = useState(false); // Used by ProductSection
+  const [isDeletingAnalysis, setIsDeletingAnalysis] = useState<boolean>(false); // Added this line back
+  const [isSavingSection, setIsSavingSection] = useState<boolean>(false); // Page-level saving indicator
+
+  // State for blog URL processing
+  const [blogUrlInput, setBlogUrlInput] = useState<string>('');
+  const [isProcessingBlogUrl, setIsProcessingBlogUrl] = useState<boolean>(false);
+
+  // State for sorting and filtering documents
+  type SortableField = keyof ProductDocument | 'default';
+  const [sortConfig, setSortConfig] = useState<{ field: SortableField; direction: 'asc' | 'desc' }>({ field: 'created_at', direction: 'desc' });
+  const [filterTerm, setFilterTerm] = useState<string>('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  const [user, setUser] = useState<any>(null); // Add user state
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Changed default to false
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+      setUser(supabaseUser);
+    };
+    getUser();
+  }, []);
+
+  const saveAnalysisToSupabase = async (currentProductId: string, analysisData: ProductAnalysis | null) => {
+    if (!currentProductId) {
+      toast.error("Product ID is missing, cannot save analysis.");
+      return false;
+    }
+    try {
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ generated_analysis_data: analysisData })
+        .eq('id', currentProductId);
+      if (updateError) throw updateError;
+      toast.success(analysisData ? 'Analysis saved successfully!' : 'Analysis deleted successfully!');
+      return true;
+    } catch (err: any) {
+      console.error('Error saving/deleting analysis to Supabase:', err);
+      toast.error(`Failed to ${analysisData ? 'save' : 'delete'} analysis: ${err.message}`);
+      return false;
+    }
+  };
+
+  const fetchProductDetailsAndDocs = useCallback(async () => {
+    if (!productId) {
+      setError('Product ID is missing.');
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setProduct(null);
+
+    try {
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('*, generated_analysis_data') 
+        .eq('id', productId)
+        .single();
+
+      if (productError) throw productError;
+      if (!productData) throw new Error('Product not found.');
+      
+      const { data: docsData, error: docsError } = await supabase
+        .from('product_documents')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false });
+
+      if (docsError) throw docsError;
+
+      console.log('fetchProductDetailsAndDocs: Fetched documents from Supabase:', docsData);
+      console.log('fetchProductDetailsAndDocs: productData from Supabase:', productData);
+      setProduct({ 
+        ...productData, // Spreading Product from DB (includes generated_analysis_data)
+        associatedDocuments: docsData || [] 
+      } as PageProductData); // Asserting to our local composite type
+
+      if (productData.generated_analysis_data) {
+        try {
+          const savedAnalysis = typeof productData.generated_analysis_data === 'string'
+            ? JSON.parse(productData.generated_analysis_data)
+            : productData.generated_analysis_data;
+          if (savedAnalysis && typeof savedAnalysis === 'object' && savedAnalysis.companyName) {
+             setParsedAnalysisData(savedAnalysis as ProductAnalysis);
+             toast.success('Previously generated analysis loaded.');
+          }
+        } catch (parseError) {
+          console.error("Error parsing saved analysis data:", parseError);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching product details or documents:', err);
+      setError(err.message || 'Failed to fetch data.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [productId]);
+
+  useEffect(() => {
+    fetchProductDetailsAndDocs();
+  }, [fetchProductDetailsAndDocs]);
+
+  const determineSupabaseDocumentType = (
+    processedType: string, 
+    isGoogleDoc?: boolean,
+    originalFileMimeType?: string 
+  ): ValidSupabaseDocumentType => {
+    const typeLower = processedType?.toLowerCase() || '';
+    const originalMimeLower = originalFileMimeType?.toLowerCase() || '';
+
+    if (isGoogleDoc) return 'google_doc';
+
+    // Handle blog_post type specifically - map to 'blog_link'
+    if (typeLower === 'blog_post' || typeLower === 'link' || typeLower === 'blog_url') return 'blog_link';
+
+    // Determine the most relevant type string to check
+    const effectiveType = originalMimeLower || typeLower;
+
+    // Map based on common MIME parts or specific processed type strings to DB enum values
+    if (effectiveType.includes('pdf')) return 'pdf';
+    if (effectiveType.includes('vnd.openxmlformats-officedocument.wordprocessingml') || effectiveType.includes('docx')) return 'docx';
+    if (effectiveType.includes('msword') || effectiveType.includes('doc')) return 'doc'; 
+    if (effectiveType.includes('vnd.openxmlformats-officedocument.presentationml') || effectiveType.includes('pptx')) return 'pptx';
+    if (effectiveType.includes('plain') || effectiveType.includes('txt')) return 'txt';
+    
+    // If it's a google doc type but wasn't caught by isGoogleDoc flag for some reason (less likely now with explicit check above)
+    if (effectiveType.includes('google-apps.document')) return 'google_doc'; 
+    if (effectiveType.includes('google-apps.spreadsheet')) return 'google_doc'; // Or a different type if you have one for sheets
+    if (effectiveType.includes('google-apps.presentation')) return 'google_doc'; // Or a different type if you have one for slides
+
+    // Fallback for other website URLs if not 'blog_link' and if 'website_url' was a valid enum (it's not in the list)
+    // For now, other link-like types or unrecognized types will default to 'txt' or a more generic valid type.
+    if (typeLower === 'website_url') {
+        console.warn(`[DedicatedProductPage] 'website_url' is not a direct Supabase enum. Mapping to 'txt' as fallback.`);
+        return 'txt'; // Or 'blog_link' if that's more appropriate for generic URLs
+    }
+
+    console.warn(`[DedicatedProductPage] Unknown document type mapping for processedType: '${processedType}', originalMime: '${originalFileMimeType}'. Defaulting to 'txt'.`);
+    return 'txt'; // Safest fallback based on provided enum values
+  };
+
+  const handleDocumentsProcessed = async (processedDocs: ProcessedDocument[]) => {
+    if (!productId || !product) {
+      toast.error('Product details not loaded yet. Cannot save documents.');
+      return;
+    }
+
+    if (!user) {
+      toast.error('User not authenticated. Cannot save documents.');
+      return;
+    }
+
+    const savingToastId = toast.loading('Saving documents to Supabase...', { id: 'saving-documents' });
+
+    const newDocumentData = processedDocs.map(doc => ({
+      product_id: productId!,
+      user_id: user.id, 
+      file_name: doc.name,
+      document_type: determineSupabaseDocumentType(doc.type, doc.isGoogleDoc, doc.originalFile?.type),
+      extracted_text: doc.content,
+      raw_url: doc.rawUrl, 
+      file_url: doc.file_url,
+      status: mapProcessedDocStatusToSupabaseStatus(doc.status) as SupabaseProductDocumentStatus, 
+      is_google_doc: doc.isGoogleDoc,
+      used_ai_extraction: doc.usedAI,
+      error_message: doc.status === 'error' ? doc.error : undefined,
+    }));
+
+    try {
+      if (newDocumentData.length > 0) {
+        const { data: insertedSupabaseDocs, error: dbError } = await supabase
+          .from('product_documents')
+          .insert(newDocumentData) // Cast here
+          .select();
+
+        if (dbError) {
+          console.error('Error inserting documents to Supabase:', dbError);
+          toast.error(`Failed to save documents to Supabase: ${dbError.message}`, { id: savingToastId });
+        } else if (insertedSupabaseDocs) {
+          toast.success('Documents saved to Supabase successfully!', { id: savingToastId, duration: 3000 });
+          
+          // --- BEGIN OPENAI UPLOAD ---
+          if (product && product.openai_vector_store_id) {
+            for (const processedDoc of processedDocs) {
+              const matchingSupabaseDoc = insertedSupabaseDocs.find(sd => sd.file_name === processedDoc.name && sd.extracted_text === processedDoc.content);
+
+              if (matchingSupabaseDoc) { 
+                let fileToUpload: File | undefined;
+                if (processedDoc.originalFile) {
+                  fileToUpload = processedDoc.originalFile;
+                } else if (processedDoc.content) {
+                  fileToUpload = new File([processedDoc.content], processedDoc.name || "document.txt", { type: "text/plain" });
+                }
+
+                if (fileToUpload) {
+                  const openaiFileId = await callUploadProductDocumentEdgeFunction(
+                    fileToUpload,
+                    product.openai_vector_store_id,
+                    productId,
+                    processedDoc.name || "document"
+                  );
+
+                  if (openaiFileId && matchingSupabaseDoc) {
+                    const { error: updateError } = await supabase
+                      .from('product_documents')
+                      .update({ openai_vsf_id: openaiFileId, status: 'completed' as SupabaseProductDocumentStatus }) // Also mark as completed
+                      .eq('id', matchingSupabaseDoc.id);
+
+                    if (updateError) {
+                      console.error(`Failed to update document ${matchingSupabaseDoc.id} with openai_vsf_id:`, updateError);
+                      toast.error(`Failed to link OpenAI file ID for ${matchingSupabaseDoc.file_name}.`);
+                    } else {
+                      console.log(`Document ${matchingSupabaseDoc.id} updated with openai_vsf_id: ${openaiFileId}`);
+                    }
+                  } else if (!openaiFileId) {
+                    console.warn(`OpenAI file ID not received for ${matchingSupabaseDoc?.file_name}. Document status might remain as is or be marked as error if upload was critical.`);
+                  }
+                }
+              } else {
+                 console.error(`Could not find matching Supabase document for processed doc: ${processedDoc.name}. Skipping OpenAI upload.`);
+              }
+            }
+          } else {
+            const errorMsg = `OpenAI Vector Store ID not found for product ${productId}. Skipping OpenAI document uploads.`;
+            console.error(errorMsg);
+            toast.error(errorMsg, { duration: 7000 });
+          }
+          // --- END OPENAI UPLOAD ---
+
+          await fetchProductDetailsAndDocs(); 
+        } else {
+          toast.error('Failed to save documents to Supabase (no data returned).', { id: savingToastId });
+        }
+      } else {
+        toast.dismiss(savingToastId); 
+      }
+    } catch (err: any) {
+      toast.error(`Operation failed: ${err.message}`, { id: savingToastId });
+      console.error('Error in handleDocumentsProcessed:', err);
+    }
+  };
+
+  const handleGenerateAnalysis = async () => {
+    if (!product || !product.associatedDocuments.length) {
+      toast.error('Product details or associated documents are missing for analysis.');
+      return;
+    }
+    const textsForAnalysis = product.associatedDocuments.filter(doc => doc.extracted_text).map(doc => doc.extracted_text || '');
+    if (textsForAnalysis.length === 0) {
+      toast.error('No documents with extracted text available for analysis.');
+      return;
+    }
+
+    const payload = {
+      product_name: product.name, 
+      product_description: product.description, 
+      sources_texts: textsForAnalysis,
+    };
+
+    setIsGeneratingAnalysis(true);
+    setAnalysisResults(null);
+    setParsedAnalysisData(null);
+    toast.loading('Generating analysis...', { id: 'generating-analysis' });
+
+    try {
+      const results = await makeWebhookRequest(
+        'https://hook.us2.make.com/dmgxx97dencaquxi9vr9khxrr71kotpm',
+        payload,
+        {}
+      );
+      if (results) {
+        const parsedArray: ProductAnalysis[] = parseProductData(results);
+        if (parsedArray && parsedArray.length > 0) {
+          const analysisWithId = { 
+            ...parsedArray[0],
+            research_result_id: product?.id || parsedArray[0].research_result_id 
+          };
+          setParsedAnalysisData(analysisWithId);
+          if (productId) await saveAnalysisToSupabase(productId, analysisWithId);
+          setAnalysisResults(null);
+        } else {
+          toast.error('Failed to parse analysis data.');
+          setParsedAnalysisData(null);
+          setAnalysisResults(results);
+        }
+      } else {
+        toast.error('No results received from analysis service.');
+      }
+    } catch (err: any) {
+      console.error('Error generating analysis:', err);
+      toast.error(`Error generating analysis: ${err.message}`);
+    } finally {
+      setIsGeneratingAnalysis(false);
+      toast.dismiss('generating-analysis');
+    }
+  };
+
+  const handleSaveProduct = async (prod: ProductAnalysis) => {
+    if (!productId) {
+      toast.error("Product ID is missing for saving.");
+      return;
+    }
+    setIsCardActionLoading(true);
+    const success = await saveAnalysisToSupabase(productId, prod);
+    if (success) setParsedAnalysisData(prod);
+    setIsCardActionLoading(false);
+  };
+
+  const handleApproveProduct = async (prod: ProductAnalysis) => {
+    setIsCardActionLoading(true);
+    const updatedProd = { ...prod, isApproved: !prod.isApproved };
+    setParsedAnalysisData(updatedProd); 
+    toast.success(`Product approval toggled (local stub).`);
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+    setIsCardActionLoading(false);
+  };
+
+  const handleUpdateEntireProduct = (updatedProd: ProductAnalysis) => {
+    setParsedAnalysisData(updatedProd);
+    toast('Entire product update triggered (local stub).');
+  };
+
+  const handleDeleteAnalysis = async () => {
+    if (!productId || !parsedAnalysisData) {
+      toast.error(!productId ? "Product ID missing." : "No analysis to delete.");
+      return;
+    }
+    setIsDeletingAnalysis(true);
+    toast.loading('Deleting analysis...', { id: 'deleting-analysis' });
+    const success = await saveAnalysisToSupabase(productId, null);
+    if (success) {
+      setParsedAnalysisData(null);
+      setAnalysisResults(null);
+    }
+    setIsDeletingAnalysis(false);
+    toast.dismiss('deleting-analysis');
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
+
+    const documentToDelete = product?.associatedDocuments.find(doc => doc.id === documentId);
+    if (!documentToDelete) {
+      toast.error('Document not found in the current list.');
+      return;
+    }
+
+    let toastId = toast.loading('Preparing to delete document...');
+
+    try {
+      // Step 1: Attempt to remove from OpenAI Vector Store if applicable
+      if (product && product.openai_vector_store_id && documentToDelete.openai_vsf_id) {
+        toast.loading('Removing document from OpenAI Vector Store...', { id: toastId });
+        const { data: removalData, error: removalError } = await supabase.functions.invoke(
+          'removeDocumentFromVectorStore',
+          {
+            body: {
+              vector_store_id: product.openai_vector_store_id,
+              openai_vsf_id: documentToDelete.openai_vsf_id,
+            },
+          }
+        );
+
+        if (removalError) {
+          // Log the error but proceed to delete from Supabase as the primary concern is app data consistency
+          console.error('Supabase function invocation error for removeDocumentFromVectorStore:', removalError);
+          toast.error(`Error calling OpenAI removal: ${removalError.message}. Proceeding with local deletion.`, { id: toastId });
+        } else if (removalData && removalData.deletionDetails && removalData.deletionDetails.deleted) {
+          toast.success('Successfully removed from OpenAI Vector Store.', { id: toastId });
+          // Optionally, update a flag on the document in Supabase like 'is_removed_from_vector_store = true'
+          // For now, we just proceed to delete the record.
+        } else {
+          console.error('OpenAI did not confirm deletion or response was unexpected:', removalData);
+          toast.error('OpenAI Vector Store: File not found or an issue occurred during removal. Proceeding with local deletion.', { id: toastId });
+        }
+      } else {
+        toast.dismiss(toastId); // Dismiss initial toast if not calling the edge function
+        toastId = toast.loading('Deleting document from application...'); 
+        console.log('Skipping OpenAI Vector Store removal: IDs not found or product not loaded.');
+        // No OpenAI IDs, or product not loaded, proceed to delete from Supabase only
+      }
+
+      // Step 2: Delete from Supabase product_documents table
+      toast.loading('Deleting document from application database...', { id: toastId });
+      const { error: deleteError } = await supabase.from('product_documents').delete().eq('id', documentId);
+
+      if (deleteError) throw deleteError;
+
+      toast.success('Document deleted successfully from application!', { id: toastId });
+      setProduct(prev => ({ ...prev!, associatedDocuments: prev!.associatedDocuments.filter(doc => doc.id !== documentId) }));
+
+    } catch (err: any) {
+      toast.error(`Failed to delete document: ${err.message}`, { id: toastId });
+      console.error('Error in handleDeleteDocument:', err);
+    }
+  };
+
+  const handleViewDocument = (document: ProductDocument) => {
+    if (document.extracted_text) {
+      alert(`Extracted Text (first 500 chars):
+
+${document.extracted_text.substring(0, 500)}`);
+    } else if (document.source_url) {
+      window.open(document.source_url, '_blank');
+    } else {
+      toast.error('No content or link available.');
+    }
+  };
+
+  const handleProcessBlogUrl = async () => {
+    if (!productId) {
+      toast.error("Product ID is missing for blog processing.");
+      return;
+    }
+
+    if (!user) {
+      toast.error('User not authenticated. Cannot save blog content.');
+      return;
+    }
+
+    if (!blogUrlInput.trim()) {
+      toast.error("Please enter a blog URL.");
+      return;
+    }
+
+    let scrapedData: ScrapedBlog;
+    const processingToastId = toast.loading('Processing blog URL...');
+    try {
+      setIsProcessingBlogUrl(true);
+      scrapedData = await scrapeBlogContent(blogUrlInput);
+      toast.dismiss(processingToastId); // Dismiss after scraping succeeds
+    } catch (err: any) {
+      console.error('Error scraping blog content:', err);
+      toast.error(`Error scraping blog: ${err.message}`, {id: processingToastId});
+      setIsProcessingBlogUrl(false);
+      return;
+    }
+
+    if (!scrapedData) {
+      toast.error('Failed to retrieve scraped data.', {id: processingToastId});
+      setIsProcessingBlogUrl(false);
+      return;
+    }
+    
+    const savingToastId = toast.loading('Saving blog content to Supabase...');
+    try {
+      const newDocumentToInsert = {
+        product_id: productId!,
+        user_id: user.id,
+        file_name: scrapedData.title || blogUrlInput.substring(blogUrlInput.lastIndexOf('/') + 1) || 'Untitled Blog Post',
+        document_type: determineSupabaseDocumentType('blog_post'), 
+        extracted_text: scrapedData.content,
+        source_url: scrapedData.url, 
+        file_url: null, 
+        status: 'completed' as SupabaseProductDocumentStatus, // Directly set to 'completed' for scraped blogs
+        is_google_doc: false, 
+        used_ai_extraction: true, 
+      };
+
+      const { data: savedSupabaseDocument, error: saveError } = await supabase
+        .from('product_documents')
+        .insert(newDocumentToInsert) // Cast here
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+
+      if (savedSupabaseDocument) {
+        toast.success(`Blog content saved to Supabase for: ${scrapedData.url}`, { id: savingToastId, duration: 3000 });
+        
+        // --- BEGIN OPENAI UPLOAD ---
+        if (product && product.openai_vector_store_id && scrapedData.content) {
+            const fileToUpload = new File(
+                [scrapedData.content], 
+                savedSupabaseDocument.file_name || "scraped_blog_content.txt", 
+                { type: "text/plain" }
+            );
+            const openaiFileId = await callUploadProductDocumentEdgeFunction(
+                fileToUpload, 
+                product.openai_vector_store_id,
+                productId,
+                savedSupabaseDocument.file_name || "scraped blog"
+            );
+
+            if (openaiFileId) {
+              const { error: updateError } = await supabase
+                .from('product_documents')
+                .update({ openai_vsf_id: openaiFileId, status: 'completed' as SupabaseProductDocumentStatus }) // Also mark as completed
+                .eq('id', savedSupabaseDocument.id);
+
+              if (updateError) {
+                console.error(`Failed to update document ${savedSupabaseDocument.id} with openai_vsf_id:`, updateError);
+                toast.error(`Failed to link OpenAI file ID for ${savedSupabaseDocument.file_name}.`);
+              } else {
+                console.log(`Document ${savedSupabaseDocument.id} updated with openai_vsf_id: ${openaiFileId}`);
+              }
+            } else {
+              console.warn(`OpenAI file ID not received for ${savedSupabaseDocument?.file_name}. Document status might remain as is or be marked as error if upload was critical.`);
+            }
+        } else {
+            const errorMsg = `OpenAI Vector Store ID or blog content missing for product ${productId}. Skipping OpenAI upload for blog.`;
+            console.error(errorMsg);
+            if (product && !product.openai_vector_store_id) toast.error(errorMsg, {duration: 7000});
+        }
+        // --- END OPENAI UPLOAD ---
+
+        setProduct(prev => ({ ...prev!, associatedDocuments: [...prev!.associatedDocuments, savedSupabaseDocument] }));
+      } else {
+        toast.error('Failed to save the processed blog content to Supabase.', { id: savingToastId });
+      }
+    } catch (err: any) {
+      console.error('Error saving blog content:', err);
+      toast.error(`Failed to save blog content: ${err.message}`, { id: savingToastId });
+    } finally {
+      setIsProcessingBlogUrl(false);
+      setBlogUrlInput(''); 
+    }
+  };
+
+  // >> Filter and sort logic
+  const uniqueDocumentTypes = useMemo(() => 
+    Array.from(new Set(product?.associatedDocuments?.map(doc => doc.document_type).filter(Boolean) || [])) as string[], 
+    [product?.associatedDocuments]
+  );
+  const uniqueDocumentStatuses = useMemo(() => 
+    Array.from(new Set(product?.associatedDocuments?.map(doc => doc.status).filter(Boolean) || [])) as string[], 
+    [product?.associatedDocuments]
+  );
+
+  const displayedDocuments = useMemo(() => {
+    console.log('[DedicatedProductPage] useMemo for displayedDocuments. Input product.associatedDocuments:', product?.associatedDocuments);
+    
+    const currentAssociatedDocs = product?.associatedDocuments;
+    let docs: typeof currentAssociatedDocs = []; // Initialize as empty array
+
+    if (Array.isArray(currentAssociatedDocs)) {
+      docs = [...currentAssociatedDocs];
+    } else if (currentAssociatedDocs) {
+      // If it exists but is not an array (e.g., an empty object {}), log a warning and keep docs as [].
+      console.warn(
+        '[DedicatedProductPage] product.associatedDocuments was not an array. Value:', 
+        currentAssociatedDocs, 
+        'Type:', typeof currentAssociatedDocs
+      );
+      // docs remains [] which is safer than trying to spread an object.
+    }
+    // If currentAssociatedDocs is null or undefined, docs also remains []
+
+    console.log('[DedicatedProductPage] Docs after initial processing (length):', docs.length);
+
+    // Filtering
+    if (filterTerm) { 
+      console.log('[DedicatedProductPage] Filtering by term:', filterTerm);
+      docs = docs.filter(doc => doc && doc.file_name && typeof doc.file_name === 'string' && doc.file_name.toLowerCase().includes(filterTerm.toLowerCase()));
+      console.log('[DedicatedProductPage] after term filter: docs.length =', docs.length);
+    }
+    if (filterType !== 'all') {
+      console.log('[DedicatedProductPage] Filtering by type:', filterType);
+      docs = docs.filter(doc => doc && doc.document_type === filterType);
+      console.log('[DedicatedProductPage] after type filter: docs.length =', docs.length);
+    }
+    if (filterStatus !== 'all') {
+      console.log('[DedicatedProductPage] Filtering by status:', filterStatus);
+      docs = docs.filter(doc => doc && doc.status === filterStatus);
+      console.log('[DedicatedProductPage] after status filter: docs.length =', docs.length);
+    }
+    console.log('[DedicatedProductPage] after ALL filters: docs.length =', docs.length);
+
+    // Sorting logic
+    const currentSortField = sortConfig.field === 'default' ? 'created_at' : sortConfig.field;
+    console.log('[DedicatedProductPage] before sort block: currentSortField =', currentSortField, ', docs.length =', docs.length);
+
+    if (docs.length > 0 && docs[0] && typeof docs[0] === 'object' && currentSortField in docs[0]) {
+      console.log(`[DedicatedProductPage] Entering sort for field: ${currentSortField}. First doc to check field from:`, JSON.stringify(docs[0]));
+      docs.sort((a, b) => {
+        // Ensure a and b are objects before trying to access properties
+        const valA = (a && typeof a === 'object') ? a[currentSortField as keyof ProductDocument] : undefined;
+        const valB = (b && typeof b === 'object') ? b[currentSortField as keyof ProductDocument] : undefined;
+
+        console.log(`[DedicatedProductPage] Sorting by ${currentSortField}: valA =`, valA, `(${typeof valA}), valB =`, valB, `(${typeof valB})`);
+
+        let comparison = 0;
+        if (valA === null || valA === undefined) {
+          comparison = (valB === null || valB === undefined) ? 0 : 1;
+        } else if (valB === null || valB === undefined) {
+          comparison = -1;
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
+        } else if (typeof valA === 'number' && typeof valB === 'number') {
+          comparison = valA - valB;
+        } else {
+          try {
+            comparison = String(valA).localeCompare(String(valB));
+          } catch (e) {
+            console.error("[DedicatedProductPage] Error during sort comparison fallback:", e);
+            comparison = 0;
+          }
+        }
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+      });
+      console.log('[DedicatedProductPage] after sort execution: docs.length =', docs.length);
+    } else if (docs.length > 0) {
+      const firstDocString = docs[0] && typeof docs[0] === 'object' ? JSON.stringify(docs[0]) : String(docs[0]);
+      console.warn(`[DedicatedProductPage] Sort field '${currentSortField}' not found in document OR docs[0] is not a valid object for key checking. Skipping sort. docs[0]:`, firstDocString, `Field exists check: ${docs[0] && typeof docs[0] === 'object' ? (currentSortField in docs[0]) : 'N/A'}`);
+    } else {
+      console.log('[DedicatedProductPage] Skipping sort because docs.length is 0 before sort block.');
+    }
+
+    console.log('[DedicatedProductPage] useMemo END. docs before return: docs.length =', docs.length);
+    return docs;
+  }, [product?.associatedDocuments, sortConfig, filterTerm, filterType, filterStatus]);
+
+  console.log('[DedicatedProductPage] displayedDocuments after useMemo:', displayedDocuments);
+
+  const handleSortChange = (field: SortableField) => {
+    const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    setSortConfig({ field, direction });
+  };
+  // << End Filter and sort logic
+
+  const handleProductSectionUpdate = async (
+    _productIndex: number, // Unused on DedicatedProductPage, but part of the shared signature
+    sectionType: keyof ProductAnalysis,
+    newItems: string[] | Record<string, any> // This should be the edited items from ProductSection
+  ) => {
+    console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Initiating update. SectionType: '${sectionType}'. Received newItems:`, JSON.parse(JSON.stringify(newItems)));
+    if (!product?.id) {
+      toast.error('Product ID is missing. Cannot update section.');
+      console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error: Product or product.id is not available.');
+      return;
+    }
+    setIsSavingSection(true);
+
+    try {
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Fetching fresh product data from Supabase for product ID:', product.id);
+      const { data: freshProductFullRecord, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', product.id)
+        .single();
+
+      if (fetchError) {
+        console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error fetching product:', fetchError);
+        toast.error(`Failed to fetch product details: ${fetchError.message}`);
+        throw fetchError;
+      }
+
+      if (!freshProductFullRecord) {
+        const notFoundMsg = '[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Product not found in database.';
+        console.error(notFoundMsg);
+        toast.error(notFoundMsg);
+        throw new Error('Product not found');
+      }
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Successfully fetched fresh product data:', freshProductFullRecord);
+
+      let baseAnalysisData: ProductAnalysis;
+      if (typeof freshProductFullRecord.generated_analysis_data === 'string') {
+        try {
+          baseAnalysisData = JSON.parse(freshProductFullRecord.generated_analysis_data);
+          console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Parsed string generated_analysis_data into object:', baseAnalysisData);
+        } catch (parseError) {
+          console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Failed to parse string generated_analysis_data, using defaultProduct:', parseError);
+          baseAnalysisData = { ...defaultProduct }; // Fallback to defaultProduct if parsing fails
+        }
+      } else if (freshProductFullRecord.generated_analysis_data && typeof freshProductFullRecord.generated_analysis_data === 'object') {
+        baseAnalysisData = freshProductFullRecord.generated_analysis_data as ProductAnalysis;
+        console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Using object generated_analysis_data:', baseAnalysisData);
+      } else {
+        console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] generated_analysis_data is null or undefined, using defaultProduct.');
+        baseAnalysisData = { ...defaultProduct }; // Fallback to defaultProduct if null/undefined
+      }
+
+      const updatedAnalysisData: ProductAnalysis = {
+        ...baseAnalysisData,
+        [sectionType]: newItems,
+      };
+      // Ensure all array fields that might be null/undefined from bad data are defaulted to empty arrays
+      // This is a safeguard, ideally baseAnalysisData from parsing/defaulting should handle this.
+      (Object.keys(defaultProduct) as Array<keyof ProductAnalysis>).forEach(key => {
+        if (Array.isArray(defaultProduct[key]) && !Array.isArray(updatedAnalysisData[key])) {
+          (updatedAnalysisData as any)[key] = [];
+        }
+      });
+
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Constructed updatedAnalysisData:', updatedAnalysisData);
+
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ generated_analysis_data: updatedAnalysisData })
+        .eq('id', product.id);
+
+      if (updateError) {
+        console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update error:', updateError);
+        toast.error(`Failed to save updates for section ${String(sectionType)}: ${updateError.message}`);
+        throw updateError;
+      }
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update successful.');
+
+      // Update local state
+      // Create a new product object for state update to ensure React detects the change.
+      // Use the freshly fetched full record as the base, then implant the updated analysis data,
+      // and crucially, preserve the existing associatedDocuments.
+      const newProductDataForState: PageProductData = {
+        ...(freshProductFullRecord as Product), // Spread fields from the 'products' table record
+        generated_analysis_data: updatedAnalysisData, // Add the updated analysis data
+        associatedDocuments: product?.associatedDocuments || [], // Preserve existing documents
+      };
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] newProductDataForState before setting product state:', JSON.parse(JSON.stringify(newProductDataForState)));
+      setProduct(newProductDataForState);
+
+      toast.success(`Section '${String(sectionType)}' updated successfully!`);
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Section update process completed successfully.');
+    } catch (error: any) {
+      console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error in catch block:', error);
+      toast.error(`An unexpected error occurred: ${error.message}`);
+    } finally {
+      setIsSavingSection(false);
+      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] setIsSavingSection(false) in finally block.');
+    }
+  };
+
+  useEffect(() => {
+    if (product?.generated_analysis_data) {
+      try {
+        const data = typeof product.generated_analysis_data === 'string' 
+          ? JSON.parse(product.generated_analysis_data) 
+          : product.generated_analysis_data;
+        setAnalysisResults(data as ProductAnalysis); // Update analysisResults from DB data
+      } catch (e) {
+        console.error('Failed to parse generated_analysis_data:', e);
+        setAnalysisResults(defaultProduct); // Fallback on error
+      }
+    } else if (product) { // Product loaded, but no analysis data
+      setAnalysisResults(defaultProduct);
+    } else { // Product not loaded yet
+      setAnalysisResults(null); 
+    }
+  }, [product]);
+
+  useEffect(() => {
+    if (analysisResults) {
+      // analysisResults is already an object here (ProductAnalysis or 'any')
+      // It's set by Hook 1 or optimistically by handleProductSectionUpdate
+      setParsedAnalysisData(analysisResults as ProductAnalysis);
+    } else {
+      // If analysisResults is null (e.g., product not loaded, or error in Hook 1)
+      // then parsedAnalysisData should reflect that (could be null or defaultProduct via Hook 1)
+      setParsedAnalysisData(analysisResults); // Propagates null or defaultProduct
+    }
+  }, [analysisResults]);
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="loader">Loading product details...</div></div>;
+  if (error && !product) {
+    return (
+      <div className="container mx-auto p-4 text-center text-red-500">
+        <h1 className="text-2xl font-bold">Error</h1>
+        <p>{error}</p>
+        <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600">
+          Go Back
+        </button>
+      </div>
+    );
+  }
+  if (!product) return <div className="container mx-auto p-4">Product not found or still loading.</div>;
+
+  return (
+    <>
+      <MainHeader />
+      <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-gray-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center mb-8">
+              {product.logo_url && (
+                <img src={product.logo_url} alt={`${product.name} logo`} className="h-16 w-16 mr-6 rounded-md object-contain" />
+              )}
+              <div>
+                <h1 className="text-4xl font-bold text-gray-100">{product.name}</h1>
+                <p className="text-sm text-gray-400">ID: {product.id}</p>
+              </div>
+            </div>
+            <p className="text-gray-300 mb-6 whitespace-pre-line">{product.description}</p>
+
+            <div className="bg-gray-800/40 backdrop-blur-sm shadow-xl rounded-lg p-6 md:p-8 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-100 mb-6 border-b border-gray-700/50 pb-3">Upload & Associate Documents</h2>
+              <DocumentUploader onDocumentsProcessed={handleDocumentsProcessed} />
+            </div>
+
+            <div className="bg-gray-800/40 backdrop-blur-sm shadow-xl rounded-lg p-6 md:p-8 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-100 mb-6 border-b border-gray-700/50 pb-3">Process Blog URL</h2>
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex-grow">
+                  <label htmlFor="blogUrl" className="block text-sm font-medium text-gray-300 mb-1">Blog Post URL</label>
+                  <input 
+                    type="url" 
+                    id="blogUrl" 
+                    value={blogUrlInput} 
+                    onChange={(e) => setBlogUrlInput(e.target.value)} 
+                    placeholder="https://example.com/blog-post" 
+                    className="w-full px-4 py-2.5 bg-secondary-700 border border-secondary-600 rounded-lg text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <button 
+                  onClick={handleProcessBlogUrl} 
+                  disabled={isProcessingBlogUrl || !blogUrlInput.trim()} 
+                  className="px-6 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center sm:w-auto w-full"
+                >
+                  {isProcessingBlogUrl ? (
+                  <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Processing...</>
+                  ) : 'Process URL'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 p-6 bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-2xl font-semibold text-primary-400">Product Analysis</h2>
+                 <div className="flex flex-row gap-4 items-center">
+  <button
+    onClick={handleGenerateAnalysis}
+    disabled={isGeneratingAnalysis || product?.associatedDocuments.filter(doc => doc.extracted_text).length === 0}
+    className="px-6 py-3 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+  >
+    {isGeneratingAnalysis ? (
+      <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Generating...</>
+    ) : 'Generate Analysis'}
+  </button>
+  {parsedAnalysisData && !isGeneratingAnalysis && (
+    <button
+      onClick={handleDeleteAnalysis}
+      disabled={isDeletingAnalysis || isCardActionLoading}
+      className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+    >
+      {isDeletingAnalysis ? (
+        <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Deleting...</>
+      ) : 'Delete Analysis'}
+    </button>
+  )}
+</div>
+              </div>
+
+              {parsedAnalysisData && (
+                <ProductCard
+                  product={parsedAnalysisData} // Pass the parsed analysis data
+                  index={0} // Since it's a single product view
+                  isActionLoading={isGeneratingAnalysis || isSavingSection || isCardActionLoading} // Combine loading states
+                  onSave={(updatedProduct) => handleSaveProduct(updatedProduct as ProductAnalysis)} // Type assertion
+                  onApprove={(approvedProduct) => handleApproveProduct(approvedProduct as ProductAnalysis)} // Type assertion
+                  onUpdateSection={handleProductSectionUpdate}
+                  updateProduct={(updatedData) => {
+                    // When ProductCard internally updates, reflect it in parsedAnalysisData and product state
+                    setParsedAnalysisData(updatedData as ProductAnalysis); 
+                    if (product) {
+                      setProduct({...product, generated_analysis_data: updatedData });
+                    }
+                  }}
+                  isMultipleProducts={false} // It's a single product page
+                  isAdmin={false} // Pass isAdmin status
+                  onClose={() => navigate('/dashboard/products')} // Example: navigate back on close
+                  research_result_id={product?.id} // Pass the research_result_id (product.id)
+                />
+              )}
+              {analysisResults && !parsedAnalysisData && (
+                <div className="mt-4 p-4 bg-gray-700 rounded">
+                  <h3 className="text-xl font-medium mb-2 text-yellow-300">Raw Analysis Results (Parsing Failed):</h3>
+                  <pre className="whitespace-pre-wrap break-all text-sm">{JSON.stringify(analysisResults, null, 2)}</pre>
+                </div>
+              )}
+              {isGeneratingAnalysis && !parsedAnalysisData && !analysisResults && (
+                <div className="mt-4 text-center"><p>Loading analysis...</p></div>
+              )}
+            </div>
+
+            <div className="bg-gray-800/40 backdrop-blur-sm shadow-xl rounded-lg p-6 md:p-8 mt-8">
+                <h2 className="text-2xl font-semibold text-gray-100 mb-6 border-b border-gray-700/50 pb-3">Associated Documents</h2>
+                
+                {/* Filtering and Sorting Controls */}
+                {product?.associatedDocuments.length > 0 && (
+                  <div className="mb-6 p-4 bg-secondary-700/50 rounded-lg flex flex-wrap gap-4 items-center">
+                    <div className='flex-1 min-w-[150px]'>
+                      <label htmlFor="filterTerm" className="block text-xs font-medium text-gray-400 mb-1">Filter by Term</label>
+                      <input 
+                        type="text" 
+                        id="filterTerm" 
+                        value={filterTerm} 
+                        onChange={(e) => setFilterTerm(e.target.value)} 
+                        placeholder="Search documents" 
+                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    <div className='flex-1 min-w-[150px]'>
+                      <label htmlFor="filterType" className="block text-xs font-medium text-gray-400 mb-1">Filter by Type</label>
+                      <select 
+                        id="filterType" 
+                        value={filterType} 
+                        onChange={(e) => setFilterType(e.target.value)} 
+                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="all">All Types</option>
+                        {uniqueDocumentTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                      </select>
+                    </div>
+                    <div className='flex-1 min-w-[150px]'>
+                      <label htmlFor="filterStatus" className="block text-xs font-medium text-gray-400 mb-1">Filter by Status</label>
+                      <select 
+                        id="filterStatus" 
+                        value={filterStatus} 
+                        onChange={(e) => setFilterStatus(e.target.value)} 
+                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="all">All Statuses</option>
+                        {uniqueDocumentStatuses.map(status => <option key={status} value={status}>{status}</option>)}
+                      </select>
+                    </div>
+                    <div className='flex-1 min-w-[150px]'>
+                      <label htmlFor="sortBy" className="block text-xs font-medium text-gray-400 mb-1">Sort by</label>
+                      <div className="flex">
+                        <select 
+                          id="sortBy" 
+                          value={sortConfig.field} 
+                          onChange={(e) => handleSortChange(e.target.value as SortableField)} 
+                          className="flex-grow px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-l-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value="created_at">Date Added</option>
+                          <option value="file_name">Name</option>
+                          <option value="document_type">Type</option>
+                          <option value="status">Status</option>
+                        </select>
+                        <button 
+                          onClick={() => handleSortChange(sortConfig.field)} 
+                          className="px-3 py-2 bg-secondary-600 border border-l-0 border-secondary-500 rounded-r-md text-gray-300 hover:bg-secondary-500"
+                          title={`Sort ${sortConfig.direction === 'asc' ? 'Descending' : 'Ascending'}`}
+                        >
+                          {sortConfig.direction === 'asc' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isGeneratingAnalysis && <p>Loading documents...</p>}
+                {!isGeneratingAnalysis && displayedDocuments.length === 0 && product?.associatedDocuments.length > 0 && (
+                    <p className="text-gray-400">No documents match the current filter criteria.</p>
+                )}
+                {!isGeneratingAnalysis && product?.associatedDocuments.length === 0 && (
+                    <p className="text-gray-400">No documents are currently associated with this product.</p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {displayedDocuments.map((doc) => (
+                    <AssociatedDocumentCard 
+                        key={doc.id} 
+                        document={doc} 
+                        onDelete={handleDeleteDocument} 
+                        onView={handleViewDocument} 
+                    />
+                    ))}
+                </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      {!isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-full shadow-2xl transition-all duration-300 ease-in-out transform hover:scale-105 z-50 flex items-center space-x-2"
+          aria-label="Open AI Chat"
+        >
+          <MessageSquareText size={24} />
+        </button>
+      )}
+      {isChatOpen && <ChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
+    </>
+  );
+};
+
+export default DedicatedProductPage;

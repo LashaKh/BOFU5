@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileUp, File, X, CheckCircle, AlertTriangle, Image, Upload, Trash2 } from 'lucide-react';
+import { File, X, CheckCircle, AlertTriangle, Image, Upload, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as PDFJS from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
@@ -14,7 +14,7 @@ import '../pdf-worker.js';
 // Note: We no longer need to set the worker source here, as it's done in the pdf-worker.js file
 
 interface DocumentUploaderProps {
-  onDocumentsProcessed: (documents: ProcessedDocument[]) => void;
+  onDocumentsProcessed: (documents: ProcessedDocument[], forceUpdate: boolean) => void;
 }
 
 export interface ProcessedDocument {
@@ -25,11 +25,15 @@ export interface ProcessedDocument {
   error?: string;
   isGoogleDoc?: boolean;
   usedAI?: boolean;
+  originalFile?: File;
+  rawUrl?: string;
+  file_url?: string;
 }
 
 export function DocumentUploader({ onDocumentsProcessed }: DocumentUploaderProps) {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isOverallProcessing, setIsOverallProcessing] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(false);
 
   const extractTextFromPDF = async (file: File): Promise<{ content: string; usedAI: boolean }> => {
     try {
@@ -235,72 +239,69 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    setIsProcessing(true);
-    
-    const newDocuments: ProcessedDocument[] = [];
-    
+    if (acceptedFiles.length === 0) return;
+    setIsOverallProcessing(true);
+    // Reset documents state for new batch or append as preferred
+    // For now, let's assume we process a new batch clearing old ones from current UI processing list if not yet fully submitted
+    // setDocuments([]); 
+
+    const currentBatchProcessedDocuments: ProcessedDocument[] = [];
+
     for (const file of acceptedFiles) {
-      const doc: ProcessedDocument = {
+      const tempDoc: ProcessedDocument = {
         name: file.name,
-        type: file.type,
+        type: file.type || 'unknown',
         content: '',
-        status: 'processing'
+        status: 'processing',
+        originalFile: file,
       };
-      
-      newDocuments.push(doc);
-    }
-    
-    setDocuments(prev => [...prev, ...newDocuments]);
-    
-    const processedDocs = [...documents];
-    
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      const file = acceptedFiles[i];
-      const index = documents.length + i;
-      
+      // Add to UI immediately with 'processing' state
+      setDocuments(prev => [...prev, tempDoc]); 
+      currentBatchProcessedDocuments.push(tempDoc); // Keep a reference to docs in this batch
+
       try {
-        const result = await extractTextFromDocument(file);
-        
-        processedDocs[index] = {
-          ...processedDocs[index],
-          content: result.content,
-          status: 'processed',
-          isGoogleDoc: result.isGoogleDoc,
-          usedAI: result.usedAI
-        };
-        
-        if (result.isGoogleDoc) {
-          toast.success(`Google Docs file information extracted. Note: This is not the full document content.`);
-        } else if (result.usedAI) {
-          toast.success(`Successfully extracted text from ${file.name} using AI processing`);
-        } else {
-          toast.success(`Successfully extracted text from ${file.name}`);
+        const { content, isGoogleDoc, usedAI } = await extractTextFromDocument(file);
+        // Update the specific document in the main 'documents' state and in our batch reference
+        setDocuments(prev => prev.map(d => 
+          (d.originalFile === file && d.name === file.name && d.status === 'processing') ? 
+          { ...d, content, status: 'processed', isGoogleDoc, usedAI } : d
+        ));
+        const batchDocIndex = currentBatchProcessedDocuments.findIndex(d => d.originalFile === file && d.name === file.name);
+        if (batchDocIndex > -1) {
+          currentBatchProcessedDocuments[batchDocIndex] = {
+            ...currentBatchProcessedDocuments[batchDocIndex],
+            content,
+            status: 'processed',
+            isGoogleDoc,
+            usedAI
+          };
         }
-        
-        setDocuments([...processedDocs]);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
-        processedDocs[index] = {
-          ...processedDocs[index],
-          status: 'error',
-          error: errorMessage
-        };
-        
-        toast.error(`Error processing ${file.name}: ${errorMessage}`);
-        setDocuments([...processedDocs]);
+      } catch (error: any) {
+        console.error('Error processing file:', file.name, error);
+        setDocuments(prev => prev.map(d => 
+          (d.originalFile === file && d.name === file.name && d.status === 'processing') ? 
+          { ...d, status: 'error', error: error.message || 'Failed to process' } : d
+        ));
+        const batchDocIndex = currentBatchProcessedDocuments.findIndex(d => d.originalFile === file && d.name === file.name);
+        if (batchDocIndex > -1) {
+          currentBatchProcessedDocuments[batchDocIndex] = {
+            ...currentBatchProcessedDocuments[batchDocIndex],
+            status: 'error',
+            error: error.message || 'Failed to process'
+          };
+        }
       }
     }
     
-    setIsProcessing(false);
-    onDocumentsProcessed(processedDocs);
-  }, [documents, onDocumentsProcessed]);
+    onDocumentsProcessed(currentBatchProcessedDocuments, forceUpdate);
+    setIsOverallProcessing(false);
+  }, [forceUpdate, onDocumentsProcessed]); // Removed 'documents' from deps, as we use setDocuments(prev => ...)
 
   const removeDocument = (index: number) => {
     const newDocuments = [...documents];
     newDocuments.splice(index, 1);
     setDocuments(newDocuments);
-    onDocumentsProcessed(newDocuments);
+    // DO NOT call onDocumentsProcessed here, this is a local UI removal
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -388,21 +389,21 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
           
           <motion.h3 
             className={`text-xl font-medium mb-2 transition-colors duration-300 ${
-              isDragActive ? 'text-primary-300' : 'text-primary-400/90'
-            } hover:text-primary-300`}
+              isDragActive ? 'text-primary-300' : 'text-white'
+            }`}
           >
             {isDragActive ? 'Drop files here' : 'Drag & drop your files'}
           </motion.h3>
           
           <motion.p 
-            className="text-sm text-gray-400 max-w-md mb-4 hover:text-gray-300 transition-colors duration-300"
+            className="text-sm text-white mt-2 max-w-xs"
           >
             Supports PDF, Word, PowerPoint, or text files. We'll automatically extract and process the content.
           </motion.p>
           
           <motion.button 
             type="button"
-            className="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-yellow-500 text-secondary-900 font-medium rounded-lg hover:shadow-glow transition-all"
+            className="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-yellow-500 text-white font-medium rounded-lg hover:shadow-glow transition-all"
             whileHover={{ scale: 1.03, y: -2 }}
             whileTap={{ scale: 0.97, y: 0 }}
           >
@@ -419,12 +420,12 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
           animate="show"
         >
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-primary-300">Uploaded Documents</h3>
+            <h3 className="text-lg font-medium text-white">Uploaded Documents</h3>
             {documents.length > 1 && (
               <motion.button 
                 onClick={() => {
                   setDocuments([]);
-                  onDocumentsProcessed([]);
+                  // DO NOT call onDocumentsProcessed here, this clears the local UI list
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:text-red-300 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors"
                 whileHover={{ scale: 1.05 }}
@@ -461,7 +462,7 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
                     <File size={18} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-200 truncate">
+                    <p className="font-medium text-white truncate">
                       {doc.name}
                     </p>
                     <div className="flex items-center">
@@ -470,7 +471,7 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
                       )}
                       {doc.status === 'processed' && doc.isGoogleDoc && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Google Docs
+                          Google Docs Link
                         </span>
                       )}
                       {doc.status === 'processed' && doc.usedAI && (
@@ -492,10 +493,14 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
                         </span>
                       )}
                       
-                      <span className="text-xs text-gray-500 ml-2 truncate">
-                        {doc.status === 'processing' && 'Processing...'}
-                        {doc.status === 'error' && doc.error}
+                      <span className="text-sm text-white truncate" title={doc.name}>
+                        {doc.name}
                       </span>
+                      {doc.originalFile && (
+                        <span className="text-xs text-white ml-2 shrink-0">
+                          ({(doc.originalFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -510,6 +515,52 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
           </AnimatePresence>
         </motion.div>
       )}
+      
+      {isOverallProcessing && (
+        <div className="mt-4 flex items-center justify-center text-sm text-white">
+          <div className="w-4 h-4 rounded-full border-2 border-primary-500 border-t-transparent animate-spin mr-2"></div>
+          Processing documents...
+        </div>
+      )}
+
+      {documents.length > 0 && !isOverallProcessing && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={() => { 
+              if (!isOverallProcessing) {
+                setDocuments([]);
+                toast.success('Cleared all pending documents.');
+              }
+            }}
+            className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 shadow-md flex items-center justify-center mx-auto ${documents.length > 0 && !isOverallProcessing ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 focus:ring-4 focus:ring-primary-300/50' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+            disabled={documents.length === 0 || isOverallProcessing}
+            whileHover={{ scale: documents.length > 0 && !isOverallProcessing ? 1.03 : 1.0 }}
+            whileTap={{ scale: documents.length > 0 && !isOverallProcessing ? 0.97 : 1.0 }}
+          >
+            <Upload size={16} className="mr-2" />
+            Clear List 
+          </motion.button>
+        </div>
+      )}
+
+      {documents.length === 0 && !isOverallProcessing && (
+        <p className="mt-4 text-center text-sm text-white">
+          No documents uploaded yet.
+        </p>
+      )}
+      
+      <div className="mt-4 flex items-center">
+        <input
+          type="checkbox"
+          id="forceUpdateCheckbox"
+          checked={forceUpdate}
+          onChange={(e) => setForceUpdate(e.target.checked)}
+          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mr-2"
+        />
+        <label htmlFor="forceUpdateCheckbox" className="text-sm text-white">
+          Replace existing document if a duplicate (by URL or content) is found.
+        </label>
+      </div>
     </div>
   );
 }

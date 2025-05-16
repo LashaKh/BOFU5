@@ -3,10 +3,26 @@ import { ProductAnalysis } from '../types/product/types';
 // AirOps API credentials
 const AIROPS_API_KEY = 'RupciXDLDcCZN3lemLVvxS3TYqtL-KJ5YVr_qubvTX0t9fiPlonZ54yxNYns';
 const WORKFLOW_UUID = 'a02357db-32c6-40f5-845a-615cee68bc56';
+const CONTENT_BRIEF_WORKFLOW_UUID = 'da46d3a1-af19-42d2-9b1d-67e430bcc1e0';
+
+// Define the structures expected by AirOps API
+
+interface ContentBriefInput {
+  contentBrief: string;
+  internalLinks: string;
+  articleTitle: string;
+  contentFramework: string;
+}
 
 // Define the structure expected by AirOps API
 interface AirOpsProductInput {
-  product_card_information: ProductAnalysis & { google_doc: string };
+  product_card_information: ProductAnalysis & { 
+    google_doc: string;
+    userUUID?: string;
+    userEmail?: string;
+    userCompanyName?: string;
+  };
+  research_result_Id?: string; // Note: Capital 'I' to match Airops input field
 }
 
 /**
@@ -64,6 +80,46 @@ function formatGoogleDocUrl(url: string): string {
 /**
  * Sends product data to AirOps via direct API call
  */
+export async function approveContentBrief(briefData: ContentBriefInput) {
+  try {
+    console.log('Sending content brief to AirOps...');
+    
+    const response = await fetch(`https://api.airops.com/public_api/airops_apps/${CONTENT_BRIEF_WORKFLOW_UUID}/execute`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AIROPS_API_KEY}`
+      },
+      body: JSON.stringify({
+        inputs: {
+          content_brief: briefData.contentBrief,
+          internal_links: briefData.internalLinks,
+          article_title: briefData.articleTitle,
+          content_framework: briefData.contentFramework
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      
+      // Check for the specific free tier limitation error
+      if (errorText.includes("free tier") || errorText.includes("Contact AirOps support")) {
+        throw new Error('ACCOUNT_LIMITATION: Your AirOps account requires an upgrade. Please contact AirOps support for access to this feature.');
+      }
+      
+      throw new Error(`AirOps API error (${response.status}): ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('AirOps content brief response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in AirOps content brief integration:', error);
+    throw error;
+  }
+}
+
 export async function sendToAirOps(productData: AirOpsProductInput) {
   try {
     console.log('Sending data to AirOps...');
@@ -113,6 +169,16 @@ export async function sendToAirOps(productData: AirOpsProductInput) {
       console.log('Added default Google Doc URL:', defaultUrl);
     }
     
+    // Log what we're sending
+    console.log('================================');
+    console.log('Research Result ID to be sent:', formattedProductData.research_result_Id);
+    console.log('Full request payload:', {
+      inputs: {
+        product_card_information: formattedProductData.product_card_information,
+        research_result_Id: formattedProductData.research_result_Id || ''
+      }
+    });
+    console.log('================================');
     safeLog('Product data being sent to AirOps', formattedProductData);
     
     // Direct API call
@@ -128,7 +194,10 @@ export async function sendToAirOps(productData: AirOpsProductInput) {
         // Important: do not include credentials for cross-origin calls to third-party APIs
         credentials: 'omit',
         body: JSON.stringify({
-          inputs: formattedProductData
+          inputs: {
+            product_card_information: formattedProductData.product_card_information,
+            research_result_Id: formattedProductData.research_result_Id || ''  // Send to the dedicated text input field
+          }
         })
       }
     );

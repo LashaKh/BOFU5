@@ -1,0 +1,219 @@
+# Product Requirements Document: AI-Powered Product Management & Chat
+
+## Overview
+This document outlines the requirements for a new "Products" feature within the user platform. This feature will allow users to manage a list of their company products, associate relevant documents (local files, blog links) with each product, and leverage AI for in-depth product research and contextual chat. The core value lies in centralizing product information, streamlining research workflows through existing automation, and enabling intelligent conversations about specific products via a dedicated AI assistant. This is targeted at users like content strategists, marketers, and product managers who need to quickly access, understand, and discuss product details.
+
+## Core Features
+
+1.  **Product Profile Management**
+    *   **What it does:** Allows users to create, view, and list their company products. Each product will have a name and a description.
+    *   **Why it's important:** Provides a central repository for all product information, forming the foundation for document association and AI interactions.
+    *   **How it works at a high level:**
+        *   A new "Products" button in the main header navigates to a dedicated `/products` page.
+        *   The `/products` page displays a list of product cards (showing name and description).
+        *   Users can create new products (initially just name and description).
+        *   Clicking a product card navigates to a dedicated product page (`/products/:product_id`).
+
+2.  **Product-Specific Document Management**
+    *   **What it does:** Enables users to upload and associate various documents (DOCX, TXT, PDF, blog links) with specific products. The system will extract text from these documents.
+    *   **Why it's important:** Consolidates all relevant information for a product in one place and prepares content for AI vector stores.
+    *   **How it works at a high level:**
+        *   On the dedicated product page (`/products/:product_id`), the existing `DocumentUploader.tsx` component will be utilized.
+        *   Supports `.pdf`, `.docx`, `.doc`, `.pptx`, and blog links.
+        *   Reuses existing client-side text extraction logic (including AI OCR for scanned PDFs).
+        *   Extracted text is saved in a new Supabase table, linked to the product and the original document.
+        *   Uploaded physical documents (if applicable) are stored in a Supabase bucket.
+        *   Deduplication logic prevents adding the same document/link or identical text content multiple times for the same product.
+        *   Uploaded documents for the selected product are displayed as "nicely formatted cards."
+
+3.  **AI-Powered Product Research (Reuse Existing Workflow)**
+    *   **What it does:** Allows users to trigger an in-depth research analysis for a selected product, reusing the platform's existing multi-step Make.com webhook process.
+    *   **Why it's important:** Automates the research process, providing users with structured insights, competitor identification, and analysis directly within the product context.
+    *   **How it works at a high level:**
+        *   On the dedicated product page (`/products/:product_id`), a mechanism will trigger the existing research workflow using the specified Make.com webhooks:
+            1.  Product research: `https://hook.us2.make.com/dmgxx97dencaquxi9vr9khxrr71kotpm`
+            2.  Competitors identification: `https://hook.us2.make.com/n4kuyrqovr1ndwj9nsodio7th70wbm6i`
+            3.  Competitors analysis: `https://hook.us2.make.com/qjbyl0g1d1ailgmnn2p9pjmcu888xe43`
+        *   Research results will be displayed using the existing "Product Analysis card" style with collapsible sections.
+
+4.  **Product-Specific AI Chat**
+    *   **What it does:** Provides a chat interface where users can select a product and have a contextual conversation with a universal AI assistant. The assistant will be dynamically connected to that product's specific information (via its vector store and description).
+    *   **Why it's important:** Enables users to quickly get answers, generate content ideas, or discuss specific aspects of a product with AI support.
+    *   **How it works at a high level:**
+        *   The chat window will be located on the main products list page (`/products`).
+        *   A dropdown menu in the chat UI will list all created products.
+        *   When a product is selected from the dropdown:
+            *   The pre-configured universal AI assistant (ID to be provided by the user) is connected to the selected product's dedicated OpenAI vector store.
+            *   The selected product's description and relevant context are injected into the assistant's system prompt.
+        *   The user can then interact with the assistant regarding the chosen product.
+
+5.  **OpenAI Vector Store Management**
+    *   **What it does:** Creates and manages dedicated OpenAI vector stores for each product, populated with the content of its associated documents.
+    *   **Why it's important:** Provides the knowledge base for the AI assistant to have informed conversations about specific products.
+    *   **How it works at a high level:**
+        *   An OpenAI vector store is created when a new product profile is first created. The ID of this vector store is stored with the product in Supabase.
+        *   When a new document is uploaded and processed for a product, its extracted text is added to that product's existing vector store.
+        *   If a document linked to a product is updated (implying its content changes) or deleted, the entire vector store for that product is deleted and recreated with the updated set of documents.
+
+## User Experience
+
+*   **User Personas:**
+    *   **Content Strategists/Marketers:** Utilize the feature to research products, understand their selling points and competitive landscape, and generate content ideas with AI assistance.
+    *   **Product Managers:** Employ it to consolidate product information, track associated documents, and quickly get answers to product-specific questions.
+*   **Key User Flows:**
+    1.  **Creating a Product & Initial Setup:**
+        *   User navigates to the "Products" page via the main header.
+        *   User clicks a "Create New Product" button.
+        *   User enters the product name and description.
+        *   The system creates the product record in Supabase and an empty OpenAI vector store, associating its ID with the product.
+    2.  **Adding Documents to a Product:**
+        *   User navigates to the "Products" list page and clicks on a specific product card.
+        *   User is taken to the dedicated page for that product.
+        *   User utilizes the `DocumentUploader.tsx` to add files or blog links.
+        *   The system extracts text, saves it to Supabase (with a hash for deduplication), links it to the product, and adds the text to the product's OpenAI vector store. Uploaded documents appear as cards.
+    3.  **Initiating Product Research:**
+        *   User is on a dedicated product page.
+        *   User clicks a "Start Research" (or similar) button.
+        *   The system triggers the sequence of Make.com webhooks.
+        *   Results are displayed in the `ProductAnalysis` card format on the page.
+    4.  **Chatting about a Product:**
+        *   User is on the "Products" list page.
+        *   User opens the chat window.
+        *   User selects a product from the dropdown menu within the chat interface.
+        *   The system dynamically configures the universal AI assistant with the selected product's description and connects it to the product's vector store.
+        *   User types a query and interacts with the AI assistant about the selected product.
+*   **UI/UX Considerations:**
+    *   **Consistency:** Leverage existing UI patterns (e.g., `UserDashboardLayout`, card styles from `UserContentBriefs.tsx`, `ProductAnalysis` card style) for a familiar and cohesive experience.
+    *   **Clarity:** Clearly indicate the currently selected product context, especially when uploading documents or interacting with the chat. Provide clear visual feedback during processing states (uploads, research, vector store updates).
+    *   **Efficiency:** Implement simple name-based filtering for the product list. Ensure intuitive navigation between the product list and individual product pages.
+    *   **Responsiveness:** Design UI elements to adapt gracefully to various screen sizes.
+
+# Technical Architecture
+
+*   **System Components (Frontend - React/TypeScript):**
+    *   **New Pages:**
+        *   `ProductsListPage.tsx`: Displays product cards, implements name filtering, and hosts the chat window.
+        *   `DedicatedProductPage.tsx`: Displays detailed information for a single product, including research results, the list of associated documents, and the document uploader.
+    *   **Modified Components:**
+        *   `MainHeader.tsx`: Add a new navigation button for "Products."
+    *   **Reused Components:**
+        *   `UserDashboardLayout.tsx`: Provides the overall page structure (header, sidebar, content area) for the new product pages.
+        *   `DocumentUploader.tsx`: For handling file and blog link uploads and text extraction.
+        *   `ProductAnalysis` card component (or its structural/styling equivalent): For displaying research results.
+    *   **New Components:**
+        *   `ProductCard.tsx`: A reusable component for displaying individual products in the list on `ProductsListPage.tsx`.
+        *   `DocumentCard.tsx`: A reusable component for displaying details of uploaded documents on `DedicatedProductPage.tsx`.
+        *   `ChatWindow.tsx`: A component for the chat interface, including the product selection dropdown and message
+*   **Data Models (Supabase):**
+    *   **`products` Table:**
+        *   `id` (uuid, primary key)
+        *   `user_id` (uuid, foreign key to `users.id`)
+        *   `name` (text, not null)
+        *   `description` (text)
+        *   `openai_vector_store_id` (text)
+        *   `created_at` (timestamp with time zone)
+        *   `updated_at` (timestamp with time zone)
+    *   **`product_documents` Table:**
+        *   `id` (uuid, primary key)
+        *   `product_id` (uuid, foreign key to `products.id`)
+        *   `user_id` (uuid, foreign key to `users.id`)
+        *   `file_name` (text) - Original name of the uploaded file or a title derived from a blog link.
+        *   `document_type` (enum: 'pdf', 'docx', 'doc', 'pptx', 'blog_link', 'txt', etc.)
+        *   `source_url` (text, nullable) - For blog links.
+        *   `storage_path` (text, nullable) - Path in Supabase storage if it's a physical file.
+        *   `extracted_text` (text) - Full extracted text content.
+        *   `content_hash` (text) - MD5 or SHA256 hash of `extracted_text` for deduplication purposes.
+        *   `status` (enum: 'processing', 'processed', 'error')
+        *   `error_message` (text, nullable)
+        *   `created_at` (timestamp with time zone)
+        *   `updated_at` (timestamp with time zone)
+*   **APIs and Integrations:**
+    *   **Supabase:** For user authentication, data storage (products, product documents), and potentially file storage.
+    *   **OpenAI API:**
+        *   Vector Store API: To create, manage (add files, delete/recreate), and associate vector stores with products.
+        *   Assistants API: To interact with the pre-configured universal assistant, dynamically providing it with product context (description) and connecting it to the relevant vector store ID.
+    *   **Make.com Webhooks (Existing):**
+        *   Product research: `https://hook.us2.make.com/dmgxx97dencaquxi9vr9khxrr71kotpm`
+        *   Competitors identification: `https://hook.us2.make.com/n4kuyrqovr1ndwj9nsodio7th70wbm6i`
+        *   Competitors analysis: `https://hook.us2.make.com/qjbyl0g1d1ailgmnn2p9pjmcu888xe43`
+*   **Infrastructure Requirements:**
+    *   Existing Supabase project.
+    *   Access to OpenAI API with necessary permissions for Assistants and Vector Stores.
+    *   Environment variables to securely store API keys (OpenAI) and other configurations (universal assistant ID).
+
+# Development Roadmap
+
+*   **Phase 1: Foundation & Core Product Management (MVP)**
+    1.  **Supabase Schema:** Create `products` and `product_documents` tables.
+    2.  **Navigation & Routing:**
+        *   Add "Products" button to `MainHeader.tsx`.
+        *   Define routes for `/products` and `/products/:product_id` in `App.tsx`.
+        *   Create basic `ProductsListPage.tsx` and `DedicatedProductPage.tsx` components wrapped in `UserDashboardLayout`.
+    3.  **Product Creation & Listing:**
+        *   Implement UI on `ProductsListPage.tsx` to create new products (name, description).
+        *   On product creation, also create an empty OpenAI vector store and save its ID.
+        *   Display created products as cards (name, description) on `ProductsListPage.tsx`.
+        *   Implement navigation from product card to `DedicatedProductPage.tsx`.
+    4.  **Basic Product Detail View:**
+        *   On `DedicatedProductPage.tsx`, display the selected product's name and description.
+*   **Phase 2: Document Upload & Basic Vector Store Integration**
+    1.  **Document Upload UI:** Integrate `DocumentUploader.tsx` onto `DedicatedProductPage.tsx`.
+    2.  **Text Extraction & Supabase Storage:**
+        *   Implement logic to save extracted text and document metadata (including `content_hash`) to the `product_documents` table, linking to the product.
+        *   Store physical files in Supabase storage (if applicable).
+    3.  **Basic Vector Store Population:**
+        *   When a document is successfully processed, add its extracted text to the product's OpenAI vector store.
+    4.  **Display Uploaded Documents:** Show uploaded documents as cards on `DedicatedProductPage.tsx`.
+    5.  **Deduplication:** Implement basic deduplication for documents based on `content_hash` for the same product.
+*   **Phase 3: Product Research Integration**
+    1.  **Trigger Research:** Add UI elements on `DedicatedProductPage.tsx` to initiate the product research workflow.
+    2.  **Webhook Calls:** Implement logic to call the three Make.com webhooks sequentially.
+    3.  **Display Results:** Integrate/reuse the `ProductAnalysis` card component to display research findings on `DedicatedProductPage.tsx`.
+*   **Phase 4: Chat Functionality & Advanced Vector Store Management**
+    1.  **Chat UI:** Develop the `ChatWindow.tsx` component with product selection dropdown on `ProductsListPage.tsx`.
+    2.  **Assistant Integration:**
+        *   On product selection in chat, dynamically connect the universal assistant ID to the product's vector store ID.
+        *   Inject the product's description into the assistant's system prompt.
+    3.  **Advanced Vector Store Management:**
+        *   Implement logic to delete and recreate the vector store if a linked document is updated (content changes) or deleted.
+        *   Ensure adding new documents only appends to the existing store (if no deletion/recreation is triggered).
+*   **Phase 5: Refinements & Polish**
+    1.  Implement simple name-based filtering on `ProductsListPage.tsx`.
+    2.  Thorough testing of all user flows.
+    3.  UI/UX polishing, error handling, and performance optimization.
+    4.  Ensure consistent styling and responsiveness.
+
+# Logical Dependency Chain
+
+1.  **Backend Setup (Supabase):** Tables `products`, `product_documents`. (Phase 1)
+2.  **Core Navigation & Page Structure:** Header button, routes, basic `ProductsListPage`, `DedicatedProductPage`. (Phase 1)
+3.  **Product CRUD (Create/Read):** Ability to create a product, see it listed, and view its basic detail page. OpenAI vector store placeholder created. (Phase 1)
+4.  **Document Upload & Text Extraction:** Integrate `DocumentUploader`, save extracted text to Supabase. (Phase 2)
+5.  **Initial Vector Store Population:** Add extracted text from new documents to the product's vector store. (Phase 2)
+6.  **Product Research Flow:** Trigger webhooks and display results. (Phase 3)
+7.  **Chat UI & Basic Interaction:** Develop chat window, product dropdown, basic message display. (Phase 4)
+8.  **Dynamic Assistant Connection:** Link selected product's vector store to the universal assistant. (Phase 4)
+9.  **Full Vector Store Management:** Implement update/delete/recreate logic. (Phase 4)
+10. **UI Enhancements:** Filtering, display polish. (Phase 5)
+
+This order prioritizes getting a visible frontend with core data management capabilities first, then layering on the AI and advanced features.
+
+# Risks and Mitigations
+
+*   **Technical Challenges:**
+    *   **OpenAI API Quotas/Rate Limits:** Monitor usage, implement retries or queuing if necessary. Mitigation: Start with conservative usage patterns, optimize API calls.
+    *   **Vector Store Management Complexity:** Deleting/recreating stores can be slow or costly. Mitigation: Carefully design the conditions for full recreation vs. appending. Explore OpenAI API options for more granular updates if available and suitable. For MVP, full recreation on significant change is acceptable.
+    *   **Deduplication Robustness:** Simple content hash might not catch all semantic duplicates. Mitigation: For MVP, content hash is sufficient. Future enhancements could explore semantic similarity if needed.
+*   **Figuring out the MVP that we can build upon:**
+    *   The roadmap (Phases 1 & 2) defines a clear MVP focusing on product creation, document upload, and basic vector store population. Mitigation: Stick to this defined MVP scope to ensure timely delivery of core functionality.
+*   **Resource Constraints:**
+    *   **Development Time:** This is a feature-rich addition. Mitigation: Phased development allows for iterative progress and potential adjustments.
+    *   **API Costs (OpenAI, Make.com):** Monitor usage to manage costs. Mitigation: Optimize the frequency of webhook calls or AI interactions where possible without degrading user experience.
+
+# Appendix
+
+*   **Research Findings:** Existing codebase analysis has identified reusable components like `MainHeader.tsx`, `UserDashboardLayout.tsx`, `DocumentUploader.tsx`, and patterns for Supabase interaction and `react-router-dom` usage.
+*   **Technical Specifications:**
+    *   **OpenAI Assistant ID:** To be provided by the user/stakeholder.
+    *   **OpenAI API Version:** Use the latest stable version that supports the required Vector Store and Assistant functionalities.
+    *   **Text Extraction Libraries:** Continue using `pdfjs-dist`, `mammoth`, `jszip` as currently implemented in `DocumentUploader.tsx`.

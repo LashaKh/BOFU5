@@ -25,3 +25,13 @@ dist-ssr
 
 # Environment variables
 .env
+
+# Added by Claude Task Master
+dev-debug.log
+# Dependency directories
+node_modules/
+.vscode
+# OS specific
+# Task files
+tasks.json
+tasks/ 

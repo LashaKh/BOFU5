@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { DocumentUploader, ProcessedDocument } from './components/DocumentUploader';
 import { BlogLinkInput } from './components/BlogLinkInput';
 import { ProductLineInput } from './components/ProductLineInput';
@@ -16,11 +17,19 @@ import { parseProductData } from './types/product';
 import { ProductAnalysis } from './types/product/types';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { EmptyHistoryState } from './components/EmptyHistoryState';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { AuthModal } from './components/auth/AuthModal';
 import { ScrapedBlog } from './utils/blogScraper';
+import { notify } from './utils/notificationUtils.tsx';
+import UserDashboard from './pages/UserDashboard';
+import UserContentBriefs from './pages/UserContentBriefs';
+import EditContentBrief from './pages/EditContentBrief';
+import ApprovedContent from './pages/ApprovedContent';
+import { ResetPassword } from './components/auth/ResetPassword';
+import { ToastProvider } from './contexts/ToastContext';
+import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
+import DedicatedProductPage from './pages/DedicatedProductPage'; // Added import
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -58,10 +67,10 @@ function App() {
       // Immediately show auth modal after sign out
       setShowAuthModal(true);
       
-      toast.success('Signed out successfully');
+      notify('success', 'Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
-      toast.error('Failed to sign out');
+      notify('error', 'Failed to sign out');
     }
   };
 
@@ -208,12 +217,12 @@ function App() {
   const handleSubmit = async () => {
     // Basic validation
     if (productLines.length === 0) {
-      alert("Please enter at least one product line");
+      notify('error', 'Please enter at least one product line');
       return;
     }
     
     if (documents.length === 0 && blogLinks.length === 0) {
-      alert("Please upload documents or enter blog links");
+      notify('error', 'Please upload documents or enter blog links');
       return;
     }
 
@@ -309,7 +318,7 @@ function App() {
       }
     } catch (error) {
       console.error('Error during research submission:', error);
-      alert(`An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      notify('error', `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
       setIsProcessing(false);
@@ -414,7 +423,7 @@ function App() {
           <div className="container mx-auto px-4 py-12">
             <div className="max-w-md mx-auto bg-secondary-800 rounded-xl p-8 border-2 border-primary-500/20 shadow-glow">
               <h2 className="text-xl font-semibold text-primary-400 mb-4">Admin Access Required</h2>
-              <p className="text-gray-300 mb-6">
+              <p className="text-white mb-6">
                 Please log in with an admin account to access the dashboard.
               </p>
               <button
@@ -432,7 +441,7 @@ function App() {
     // History view
     if (isHistoryPath) {
       return (
-        <div className="min-h-screen bg-gradient-dark bg-circuit-board">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
           <MainHeader 
             user={user} 
             onShowAuthModal={() => setShowAuthModal(true)} 
@@ -440,11 +449,8 @@ function App() {
             setShowHistory={(show) => {
               if (!show) {
                 navigate('/', { replace: true });
+                resetForm();
               }
-            }}
-            onStartNew={() => {
-              resetForm();
-              navigate('/', { replace: true });
             }}
             onSignOut={handleSignOut}
           />
@@ -454,7 +460,7 @@ function App() {
             
             {!user && (
               <div className="bg-secondary-800 border-2 border-primary-500/20 rounded-xl p-6 mb-8 shadow-glow">
-                <p className="text-gray-300 mb-4">
+                <p className="text-white mb-4">
                   Sign in to access your research history.
                 </p>
                 <button
@@ -513,7 +519,7 @@ function App() {
         <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading product data...</p>
+            <p className="text-white">Loading product data...</p>
           </div>
         </div>
       );
@@ -521,7 +527,7 @@ function App() {
     
     // Home/default view (research form)
     return (
-      <div className="min-h-screen bg-secondary-900">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
         <MainHeader 
           user={user} 
           onShowAuthModal={() => setShowAuthModal(true)}
@@ -553,8 +559,10 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <Toaster
+    <ToastProvider>
+      <ErrorBoundary>
+        <div className="App">
+        <Toaster
         position="top-center"
         toastOptions={{
           duration: 4000,
@@ -583,6 +591,17 @@ function App() {
           <Route path="/history" element={renderMainContent()} />
           <Route path="/product/:id" element={renderMainContent()} />
           <Route path="/admin" element={renderMainContent()} />
+          <Route path="/dashboard" element={<UserDashboard />} />
+          <Route path="/dashboard/content-briefs" element={<UserContentBriefs />} />
+          <Route path="/dashboard/content-briefs/:id/edit" element={<EditContentBrief />} />
+          <Route path="/dashboard/approved-content" element={<ApprovedContent />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/user-dashboard" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/user-dashboard/content-briefs" element={<Navigate to="/dashboard/content-briefs" replace />} />
+          <Route path="/dashboard/products" element={<ProductsListPage />} />
+          <Route path="/dashboard/products/:productId" element={<DedicatedProductPage />} />
+          <Route path="/products" element={<ProductsListPage />} />
+          <Route path="/products/:productId" element={<DedicatedProductPage />} />
         </Routes>
       </AnimatePresence>
       
@@ -602,10 +621,13 @@ function App() {
         onClose={() => setShowAdminAuthModal(false)}
         onAdminAuthenticated={() => {
           setIsAdminAuthenticated(true);
+          notify('success', 'Admin login successful');
           navigate('/admin', { replace: true });
         }}
       />
     </div>
+    </ErrorBoundary>
+    </ToastProvider>
   );
 }
 
