@@ -928,8 +928,8 @@ export function ContentBriefEditorNew({ initialContent, onUpdate, briefId }: Con
                     aria-label={isExpanded ? "Collapse section" : "Expand section"}
                   >
                     {isExpanded ? 
-                      <ChevronUp className="text-gray-600" /> : 
-                      <ChevronDown className="text-gray-600" />}
+                      <ChevronUp className="w-5 h-5 text-gray-700 dark:text-gray-400" /> : 
+                      <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-400" />}
                   </button>
                 </div>
               </div>

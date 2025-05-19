@@ -30,6 +30,7 @@ import { ResetPassword } from './components/auth/ResetPassword';
 import { ToastProvider } from './contexts/ToastContext';
 import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
 import DedicatedProductPage from './pages/DedicatedProductPage'; // Added import
+import LandingPage from './pages/LandingPage'; // Import the new LandingPage
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -50,10 +51,26 @@ function App() {
   
   // Initialize the path-based router state
   // We'll use the path to determine what to show
-  const isHomePath = location.pathname === '/';
+  // Define path booleans based on location
   const isHistoryPath = location.pathname === '/history';
   const isProductPath = location.pathname.startsWith('/product/');
   const isAdminPath = location.pathname === '/admin';
+
+  // Function to load research history (defined early)
+  const loadResearchHistory = useCallback(async () => {
+    if (!user) return;
+    
+    setIsHistoryLoading(true);
+    try {
+      const results = await getResearchResults();
+      console.log(`Loaded ${results.length} research results`);
+      setHistoryResults(results);
+    } catch (error) {
+      console.error('Error loading research history:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [user]);
 
   // Handle sign out and show auth modal
   const handleSignOut = async () => {
@@ -108,10 +125,8 @@ function App() {
         // Reset admin authentication state
         setIsAdminAuthenticated(false);
         
-        // If not on home page, redirect to home
-        if (!isHomePath) {
-          navigate('/', { replace: true });
-        }
+        // Redirect to home (Landing Page)
+        navigate('/', { replace: true });
         
         // Show the authentication modal immediately
         setShowAuthModal(true);
@@ -166,37 +181,15 @@ function App() {
     };
   }, []);
   
-  // Load history results when the user changes
+  // This effect runs when the user state changes or loadResearchHistory callback changes
   useEffect(() => {
     if (user) {
       loadResearchHistory();
     } else {
-      setHistoryResults([]);
+      // Clear history results if user logs out
+      setHistoryResults([]); 
     }
-  }, [user]);
-  
-  // Load history when navigating to history page
-  useEffect(() => {
-    if (isHistoryPath && user) {
-      loadResearchHistory();
-    }
-  }, [isHistoryPath, user]);
-  
-  // Function to load research history
-  const loadResearchHistory = useCallback(async () => {
-    if (!user) return;
-    
-    setIsHistoryLoading(true);
-    try {
-      const results = await getResearchResults();
-      console.log(`Loaded ${results.length} research results`);
-      setHistoryResults(results);
-    } catch (error) {
-      console.error('Error loading research history:', error);
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [user]);
+  }, [user, loadResearchHistory]);
   
   // Handle document processing
   const handleDocumentsProcessed = (processedDocs: ProcessedDocument[]) => {
@@ -400,7 +393,7 @@ function App() {
   }, [location.pathname]);
 
   // Determine what to show based on the current URL path
-  const renderMainContent = () => {
+  const renderMainContent = (isAppRoute = false) => {
     // Admin dashboard
     if (isAdminPath) {
       return isAdminAuthenticated ? (
@@ -489,23 +482,61 @@ function App() {
       );
     }
     
-    // Product results page
-    if (isProductPath) {
-      return researchResults.length > 0 ? (
+    // Product results page or loading state for product path
+    if (isProductPath && !isHistoryPath && !isAdminPath) {
+      if (researchResults.length > 0) {
+        return (
+          <ProductResultsPage 
+            products={researchResults}
+            onStartNew={() => {
+              resetForm();
+              navigate('/app', { replace: true }); // Go to /app for new research
+            }}
+            existingId={currentHistoryId}
+            showHistory={isHistoryPath} // This will be false here
+            setShowHistory={(show) => {
+              if (show) {
+                navigate('/history', { replace: true });
+              } else {
+                navigate('/app', { replace: true }); // Back to /app
+              }
+            }}
+            forceHistoryView={() => navigate('/history', { replace: true })}
+            onHistorySave={loadResearchHistory}
+            onSaveComplete={(newId) => {
+              setCurrentHistoryId(newId);
+              loadResearchHistory();
+            }}
+          />
+        );
+      } else {
+        // If we don't have results but are on a product path, show loading
+        return (
+          <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+              <p className="text-white">Loading product data...</p>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // If on /app route and have results, show ProductResultsPage (this handles results after a submission on /app)
+    if (isAppRoute && researchResults.length > 0 && !isHistoryPath && !isAdminPath) {
+      return (
         <ProductResultsPage 
           products={researchResults}
           onStartNew={() => {
             resetForm();
-            navigate('/', { replace: true });
+            // researchResults should clear or navigate('/app') will show results again
+            setResearchResults([]); // Clear results for a truly new start on /app
+            navigate('/app', { replace: true });
           }}
-          existingId={currentHistoryId}
-          showHistory={isHistoryPath}
-          setShowHistory={(show) => {
-            if (show) {
-              navigate('/history', { replace: true });
-            } else {
-              navigate('/', { replace: true });
-            }
+          existingId={currentHistoryId} // This might be from a previous load or undefined
+          showHistory={false} // Not showing history view on /app results page itself
+          setShowHistory={(show) => { // Allow navigation to history
+            if (show) navigate('/history', { replace: true });
           }}
           forceHistoryView={() => navigate('/history', { replace: true })}
           onHistorySave={loadResearchHistory}
@@ -514,48 +545,62 @@ function App() {
             loadResearchHistory();
           }}
         />
-      ) : (
-        // If we don't have results but are on a product path, show loading or redirect
-        <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-            <p className="text-white">Loading product data...</p>
+      );
+    }
+    
+    // App view (research form) - rendered for /app or if no other specific content matches on other routes handled by renderMainContent
+    // Only render the main app layout if isAppRoute is true
+    if (isAppRoute) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
+          <MainHeader 
+            user={user} 
+            onShowAuthModal={() => setShowAuthModal(true)}
+            showHistory={false} // This might need to be dynamic based on /app's sub-routes if any evolve
+            setShowHistory={(show) => {
+              if (show) {
+                navigate('/history', { replace: true }); // or /app/history if that becomes a thing
+              }
+            }}
+            onSignOut={handleSignOut}
+          />
+          
+          <div className="container mx-auto px-4 py-8">
+            <Header /> {/* This is the BOFU AI Research Assistant header, specific to this page */}
+            
+            <div className="max-w-3xl mx-auto space-y-10">
+              <DocumentUploader onDocumentsProcessed={handleDocumentsProcessed} />
+              <BlogLinkInput onBlogLinksChange={handleBlogLinksChange} />
+              <ProductLineInput onProductLinesChange={handleProductLinesChange} />
+              <SubmitSection 
+                isDisabled={productLines.length === 0 || (documents.length === 0 && blogLinks.length === 0)}
+                isSubmitting={isSubmitting}
+                onSubmit={handleSubmit}
+              />
+            </div>
           </div>
         </div>
       );
     }
+    // Fallback for other paths that might call renderMainContent without isAppRoute=true, 
+    // though routing should primarily handle this.
+    // Or, if called for non-app routes that still need some common wrapper not provided by LandingPage etc.
+    // For now, returning null if not isAppRoute and no other condition in renderMainContent matched.
+    // This part of the logic might need refinement based on how other routes using renderMainContent behave.
+    if (!isHistoryPath && !isProductPath && !isAdminPath && !isAppRoute) {
+        // This case should ideally be handled by a specific component route like <LandingPage />
+        // If renderMainContent is called for '/' without isAppRoute=true, it means we want the landing page.
+        // However, the direct routing to <LandingPage /> is preferred.
+        // This log helps identify if renderMainContent is being called unexpectedly for the root path.
+        console.log("renderMainContent called for root path without isAppRoute, should be handled by <LandingPage /> route directly.");
+        return null; 
+    }
     
-    // Home/default view (research form)
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
-        <MainHeader 
-          user={user} 
-          onShowAuthModal={() => setShowAuthModal(true)}
-          showHistory={false}
-          setShowHistory={(show) => {
-            if (show) {
-              navigate('/history', { replace: true });
-            }
-          }}
-          onSignOut={handleSignOut}
-        />
-        
-        <div className="container mx-auto px-4 py-8">
-          <Header />
-          
-          <div className="max-w-3xl mx-auto space-y-10">
-            <DocumentUploader onDocumentsProcessed={handleDocumentsProcessed} />
-            <BlogLinkInput onBlogLinksChange={handleBlogLinksChange} />
-            <ProductLineInput onProductLinesChange={handleProductLinesChange} />
-            <SubmitSection 
-              isDisabled={productLines.length === 0 || (documents.length === 0 && blogLinks.length === 0)}
-              isSubmitting={isSubmitting}
-              onSubmit={handleSubmit}
-            />
-          </div>
-        </div>
-      </div>
-    );
+    // If none of the above conditions are met (e.g., it's /history, /product/:id, /admin and content for those is generated above this block)
+    // or if it's /app but researchResults.length > 0 (handled by ProductResultsPage condition)
+    // this return might not be hit if all paths are covered. Adding a fallback or ensuring all paths are covered is key.
+    // The existing logic for history, product, admin already returns specific components.
+    return null; // Fallback if no other content is rendered by this function for the given path/state.
   };
 
   return (
@@ -587,7 +632,8 @@ function App() {
       
       <AnimatePresence mode="wait">
         <Routes>
-          <Route path="/" element={renderMainContent()} />
+          <Route path="/" element={<LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />} />
+          <Route path="/app" element={renderMainContent(true)} />
           <Route path="/history" element={renderMainContent()} />
           <Route path="/product/:id" element={renderMainContent()} />
           <Route path="/admin" element={renderMainContent()} />

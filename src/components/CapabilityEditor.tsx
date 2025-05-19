@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RichTextEditor } from './RichTextEditor';
+import TextareaAutosize from 'react-textarea-autosize';
 import { Edit2, Save, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Capability {
@@ -49,23 +50,23 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-primary-400 mb-1">Title</label>
-            <input
-              type="text"
+            <TextareaAutosize
               value={editedCapability.title}
               onChange={(e) => setEditedCapability({ ...editedCapability, title: e.target.value })}
-              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="Enter capability title"
+              minRows={1}
             />
           </div>
           
           <div>
             <label className="block text-sm font-medium text-primary-400 mb-1">Brief Description</label>
-            <input
-              type="text"
+            <TextareaAutosize
               value={editedCapability.description}
               onChange={(e) => setEditedCapability({ ...editedCapability, description: e.target.value })}
-              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="Enter a brief description"
+              minRows={2}
             />
           </div>
           
@@ -153,9 +154,9 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
             className="mt-2 text-sm text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors"
           >
             {isExpanded ? (
-              <>Show Less <ChevronUp size={16} /></>
+              <>Show Less <ChevronUp size={16} className="text-gray-600 dark:text-gray-400" /></>
             ) : (
-              <>See More <ChevronDown size={16} /></>
+              <>See More <ChevronDown size={16} className="text-gray-600 dark:text-gray-400" /></>
             )}
           </button>
         </div>

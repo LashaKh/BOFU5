@@ -1,6 +1,6 @@
 import React, { Fragment } from 'react';
 import { motion } from 'framer-motion';
-import { LogIn, Book, Briefcase } from 'lucide-react';
+import { LogIn, Book, Briefcase, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
@@ -123,54 +123,62 @@ export function MainHeader({
             <motion.div 
               className="flex-shrink-0 flex items-center cursor-pointer"
               onClick={() => handleNavigation('/')}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
+              whileHover={{ scale: 1.05 }}
+              transition={{ duration: 0.2 }}
             >
               <Logo />
-              <span className="ml-2 text-xl font-semibold text-gray-100">
+              <span className="ml-3 text-xl font-bold text-yellow-500 hover:text-yellow-400 transition-colors">
                 BOFU ai
               </span>
             </motion.div>
+            <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
+              <button
+                onClick={() => handleNavigation('/app')}
+                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-medium py-2 px-4 rounded-md text-sm inline-flex items-center transition-colors"
+              >
+                <Search size={18} className="mr-2" />
+                Analyze Products
+              </button>
+              {user && (
+                <motion.button
+                  onClick={() => handleNavigation('/user-dashboard')}
+                  className="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
+                  whileHover={{ y: -1 }}
+                  whileTap={{ y: 1 }}
+                >
+                  <Book className="h-5 w-5" />
+                  Dashboard
+                </motion.button>
+              )}
+              {showHistory !== undefined && setShowHistory && (
+                <motion.button
+                  onClick={() => handleNavigation('/history')}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2
+                    ${showHistory 
+                      ? 'bg-gradient-to-r from-secondary-800 to-secondary-700 text-primary-300 border border-primary-500/30 shadow-glow hover:shadow-glow-strong' 
+                      : 'text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70'
+                    }`}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ y: 1 }}
+                >
+                  <ClockIcon className="h-5 w-5" />
+                  History
+                </motion.button>
+              )}
+              {user && (
+                <motion.button
+                  onClick={() => handleNavigation('/products')}
+                  className="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
+                  whileHover={{ y: -1 }}
+                  whileTap={{ y: 1 }}
+                >
+                  <Briefcase className="h-5 w-5" />
+                  Products
+                </motion.button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {user && (
-              <motion.button
-                onClick={() => handleNavigation('/user-dashboard')}
-                className="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
-                whileHover={{ y: -1 }}
-                whileTap={{ y: 1 }}
-              >
-                <Book className="h-5 w-5" />
-                Dashboard
-              </motion.button>
-            )}
-            {showHistory !== undefined && setShowHistory && (
-              <motion.button
-                onClick={() => handleNavigation('/history')}
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2
-                  ${showHistory 
-                    ? 'bg-gradient-to-r from-secondary-800 to-secondary-700 text-primary-300 border border-primary-500/30 shadow-glow hover:shadow-glow-strong' 
-                    : 'text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70'
-                  }`}
-                whileHover={{ y: -1 }}
-                whileTap={{ y: 1 }}
-              >
-                <ClockIcon className="h-5 w-5" />
-                History
-              </motion.button>
-            )}
-            {user && (
-              <motion.button
-                onClick={() => handleNavigation('/products')}
-                className="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
-                whileHover={{ y: -1 }}
-                whileTap={{ y: 1 }}
-              >
-                <Briefcase className="h-5 w-5" />
-                Products
-              </motion.button>
-            )}
+          <div className="flex items-center">
             {user ? (
               <Menu as="div" className="relative">
                 <Menu.Button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all">

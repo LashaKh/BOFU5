@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Edit2, Plus, Trash2, CheckCircle, AlertCircle, Save, Loader2 } from 'lucide-react';
+import TextareaAutosize from 'react-textarea-autosize';
 
 interface ProductSectionProps {
   title: string;
@@ -109,8 +110,8 @@ export function ProductSection({
             aria-label={isExpanded ? "Collapse section" : "Expand section"}
           >
             {isExpanded ? 
-              <ChevronUp className="text-gray-400" /> : 
-              <ChevronDown className="text-gray-400" />
+              <ChevronUp size={18} className="text-gray-700 dark:text-gray-400" /> : 
+              <ChevronDown className="text-gray-700 dark:text-gray-400" size={18} />
             }
           </button>
         </div>
@@ -150,7 +151,7 @@ export function ProductSection({
                 type="text"
                 value={newItem}
                 onChange={(e) => setNewItem(e.target.value)}
-                className="flex-1 px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="flex-1 px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Add new item..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newItem.trim()) {
@@ -169,15 +170,16 @@ export function ProductSection({
             <div className="space-y-2">
               {editedItems.map((item, i) => (
                 <div key={i} className="flex items-center justify-between group/item p-2 hover:bg-secondary-800 rounded-lg">
-                  <input
-                    type="text"
+                  <TextareaAutosize
                     value={item}
                     onChange={(e) => handleEditItemChange(i, e.target.value)}
-                    className="flex-1 px-2 py-1 bg-transparent border-b border-primary-500/50 text-gray-100 focus:outline-none focus:border-primary-500"
+                    className="flex-1 px-2 py-1 bg-transparent border-b border-primary-500/50 text-white dark:text-gray-100 focus:outline-none focus:border-primary-500 resize-none w-full min-h-[30px] overflow-y-hidden"
+                    minRows={1}
+                    maxRows={6}
                   />
                   <button
                     onClick={() => handleRemoveItem(i)}
-                    className="ml-2 invisible group-hover/item:visible p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-full transition-colors"
+                    className="ml-2 invisible group-hover/item:visible p-1 text-gray-600 dark:text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-full transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>

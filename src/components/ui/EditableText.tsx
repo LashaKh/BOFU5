@@ -1,5 +1,6 @@
 import React from 'react';
 import { Edit2, Save } from 'lucide-react';
+import TextareaAutosize from 'react-textarea-autosize';
 
 interface EditableTextProps {
   value: string;
@@ -22,18 +23,19 @@ export function EditableText({ value, onUpdate, multiline, label }: EditableText
       <div className="space-y-2">
         {label && <h4 className="font-medium text-primary-400">{label}</h4>}
         {multiline ? (
-          <textarea
+          <TextareaAutosize
             value={editedValue}
             onChange={(e) => setEditedValue(e.target.value)}
-            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[100px]"
+            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[100px]"
             autoFocus
+            minRows={3}
           />
         ) : (
           <input
             type="text"
             value={editedValue}
             onChange={(e) => setEditedValue(e.target.value)}
-            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-black placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-secondary-800 border border-primary-500/30 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             autoFocus
           />
         )}

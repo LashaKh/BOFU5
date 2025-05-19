@@ -9,7 +9,7 @@ import { ProductCard } from '../components/product/ProductCard';
 import { DocumentUploader, ProcessedDocument } from '../components/DocumentUploader'; 
 import AssociatedDocumentCard from '../components/product/AssociatedDocumentCard';
 import { scrapeBlogContent, ScrapedBlog } from '../utils/blogScraper';
-import { ChevronDown, ChevronUp, Loader2, FileText, Edit3, Trash2, Eye, PlusCircle, Link as LinkIcon, Search, Info, UploadCloud, AlertTriangle, CheckCircle, MessageSquareText } from 'lucide-react'; 
+import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'; 
 import { MainHeader } from '../components/MainHeader'; 
 import ChatWindow from '../components/ChatWindow'; 
 
@@ -99,6 +99,7 @@ const DedicatedProductPage: React.FC = () => {
   
   const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState<boolean>(false);
   const [analysisResults, setAnalysisResults] = useState<any | null>(null); 
+  const [analysisParsingError, setAnalysisParsingError] = useState<string | null>(null); 
   const [parsedAnalysisData, setParsedAnalysisData] = useState<ProductAnalysis | null>(null);
   const [isCardActionLoading, setIsCardActionLoading] = useState(false); // Used by ProductSection
   const [isDeletingAnalysis, setIsDeletingAnalysis] = useState<boolean>(false); // Added this line back
@@ -366,6 +367,7 @@ const DedicatedProductPage: React.FC = () => {
     setIsGeneratingAnalysis(true);
     setAnalysisResults(null);
     setParsedAnalysisData(null);
+    setAnalysisParsingError(null); // Clear previous parsing errors
     toast.loading('Generating analysis...', { id: 'generating-analysis' });
 
     try {
@@ -382,12 +384,16 @@ const DedicatedProductPage: React.FC = () => {
             research_result_id: product?.id || parsedArray[0].research_result_id 
           };
           setParsedAnalysisData(analysisWithId);
+          setAnalysisParsingError(null); // Clear any previous error
           if (productId) await saveAnalysisToSupabase(productId, analysisWithId);
-          setAnalysisResults(null);
+          setAnalysisResults(null); // Clear raw results as parsing was successful
         } else {
-          toast.error('Failed to parse analysis data.');
+          const errorMsg = 'Failed to parse analysis data. The structure might be incorrect.';
+          toast.error(errorMsg);
           setParsedAnalysisData(null);
-          setAnalysisResults(results);
+          setAnalysisParsingError(errorMsg + " Raw response logged to console. Original response available if needed for debugging.");
+          setAnalysisResults(results); // Keep raw results for potential debug display or logging
+          console.error("Raw analysis response that failed parsing:", results);
         }
       } else {
         toast.error('No results received from analysis service.');
@@ -437,6 +443,7 @@ const DedicatedProductPage: React.FC = () => {
     if (success) {
       setParsedAnalysisData(null);
       setAnalysisResults(null);
+      setAnalysisParsingError(null); // Clear parsing error when analysis is deleted
     }
     setIsDeletingAnalysis(false);
     toast.dismiss('deleting-analysis');
@@ -831,28 +838,28 @@ ${document.extracted_text.substring(0, 500)}`);
         const data = typeof product.generated_analysis_data === 'string' 
           ? JSON.parse(product.generated_analysis_data) 
           : product.generated_analysis_data;
-        setAnalysisResults(data as ProductAnalysis); // Update analysisResults from DB data
+        setParsedAnalysisData(data as ProductAnalysis); // Directly set parsed data
+        setAnalysisParsingError(null); // Clear any parsing error
       } catch (e) {
-        console.error('Failed to parse generated_analysis_data:', e);
-        setAnalysisResults(defaultProduct); // Fallback on error
+        console.error('Failed to parse generated_analysis_data from database:', e);
+        setParsedAnalysisData(null); // Set to null on error
+        setAnalysisParsingError('Error: Could not load previously saved analysis data. It might be corrupted.');
+        setAnalysisResults(product.generated_analysis_data); // Keep raw potentially problematic data for inspection if needed
       }
-    } else if (product) { // Product loaded, but no analysis data
-      setAnalysisResults(defaultProduct);
-    } else { // Product not loaded yet
-      setAnalysisResults(null); 
+    } else if (product && !product.generated_analysis_data) { // Product loaded, but no analysis data
+      setParsedAnalysisData(null); // No data to parse
+      setAnalysisParsingError(null);
+    } else if (!product) { // Product not loaded yet
+      setParsedAnalysisData(null); 
+      setAnalysisParsingError(null);
     }
   }, [product]);
 
   useEffect(() => {
-    if (analysisResults) {
-      // analysisResults is already an object here (ProductAnalysis or 'any')
-      // It's set by Hook 1 or optimistically by handleProductSectionUpdate
-      setParsedAnalysisData(analysisResults as ProductAnalysis);
-    } else {
-      // If analysisResults is null (e.g., product not loaded, or error in Hook 1)
-      // then parsedAnalysisData should reflect that (could be null or defaultProduct via Hook 1)
-      setParsedAnalysisData(analysisResults); // Propagates null or defaultProduct
-    }
+    // This useEffect is no longer needed as the one above directly sets parsedAnalysisData
+    // and handles the fallback/error states for product.generated_analysis_data.
+    // If analysisResults is set by handleGenerateAnalysis due to a parsing error of the webhook response,
+    // that will be handled by the rendering logic checking analysisParsingError first.
   }, [analysisResults]);
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="loader">Loading product details...</div></div>;
@@ -919,32 +926,49 @@ ${document.extracted_text.substring(0, 500)}`);
 
             <div className="mt-6 p-6 bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                 <h2 className="text-2xl font-semibold text-primary-400">Product Analysis</h2>
-                 <div className="flex flex-row gap-4 items-center">
-  <button
-    onClick={handleGenerateAnalysis}
-    disabled={isGeneratingAnalysis || product?.associatedDocuments.filter(doc => doc.extracted_text).length === 0}
-    className="px-6 py-3 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-  >
-    {isGeneratingAnalysis ? (
-      <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Generating...</>
-    ) : 'Generate Analysis'}
-  </button>
-  {parsedAnalysisData && !isGeneratingAnalysis && (
-    <button
-      onClick={handleDeleteAnalysis}
-      disabled={isDeletingAnalysis || isCardActionLoading}
-      className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-    >
-      {isDeletingAnalysis ? (
-        <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Deleting...</>
-      ) : 'Delete Analysis'}
-    </button>
-  )}
-</div>
+                <h2 className="text-2xl font-semibold text-primary-400">Product Analysis</h2>
+                <div className="flex flex-row gap-4 items-center">
+                  <button
+                    onClick={handleGenerateAnalysis}
+                    disabled={isGeneratingAnalysis || product?.associatedDocuments.filter(doc => doc.extracted_text).length === 0}
+                    className="px-6 py-3 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isGeneratingAnalysis ? (
+                      <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Generating...</>
+                    ) : 'Generate Analysis'}
+                  </button>
+                  { (parsedAnalysisData || analysisParsingError) && !isGeneratingAnalysis && (
+                    <button
+                      onClick={handleDeleteAnalysis}
+                      disabled={isDeletingAnalysis || isCardActionLoading}
+                      className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {isDeletingAnalysis ? (
+                        <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Deleting...</>
+                      ) : 'Delete Analysis'}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {parsedAnalysisData && (
+              {isGeneratingAnalysis && (
+                <div className="mt-4 text-center"><p className="text-lg"><svg className="animate-spin inline -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Loading analysis...</p></div>
+              )}
+
+              {!isGeneratingAnalysis && analysisParsingError && (
+                <div className="mt-4 p-4 bg-red-900/30 border border-red-700 rounded-lg">
+                  <h3 className="text-xl font-medium mb-2 text-red-300">Analysis Error</h3>
+                  <p className="text-red-200 mb-3">{analysisParsingError}</p>
+                  {analysisResults && (
+                    <div>
+                      <h4 className="text-md font-semibold text-yellow-300 mb-1">Raw Response (for debugging):</h4>
+                      <pre className="whitespace-pre-wrap break-all text-sm p-2 bg-gray-900/50 rounded max-h-60 overflow-auto">{JSON.stringify(analysisResults, null, 2)}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!isGeneratingAnalysis && !analysisParsingError && parsedAnalysisData && (
                 <ProductCard
                   product={parsedAnalysisData} // Pass the parsed analysis data
                   index={0} // Since it's a single product view
@@ -965,14 +989,11 @@ ${document.extracted_text.substring(0, 500)}`);
                   research_result_id={product?.id} // Pass the research_result_id (product.id)
                 />
               )}
-              {analysisResults && !parsedAnalysisData && (
-                <div className="mt-4 p-4 bg-gray-700 rounded">
-                  <h3 className="text-xl font-medium mb-2 text-yellow-300">Raw Analysis Results (Parsing Failed):</h3>
-                  <pre className="whitespace-pre-wrap break-all text-sm">{JSON.stringify(analysisResults, null, 2)}</pre>
+
+              {!isGeneratingAnalysis && !analysisParsingError && !parsedAnalysisData && (
+                <div className="mt-6 text-center text-gray-400">
+                  <p>No analysis data available. Click "Generate Analysis" to create one.</p>
                 </div>
-              )}
-              {isGeneratingAnalysis && !parsedAnalysisData && !analysisResults && (
-                <div className="mt-4 text-center"><p>Loading analysis...</p></div>
               )}
             </div>
 
@@ -1036,7 +1057,7 @@ ${document.extracted_text.substring(0, 500)}`);
                           className="px-3 py-2 bg-secondary-600 border border-l-0 border-secondary-500 rounded-r-md text-gray-300 hover:bg-secondary-500"
                           title={`Sort ${sortConfig.direction === 'asc' ? 'Descending' : 'Ascending'}`}
                         >
-                          {sortConfig.direction === 'asc' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                          {sortConfig.direction === 'asc' ? <ChevronUp size={18} className="text-gray-700 dark:text-gray-400" /> : <ChevronDown size={18} className="text-gray-700 dark:text-gray-400" />}
                         </button>
                       </div>
                     </div>

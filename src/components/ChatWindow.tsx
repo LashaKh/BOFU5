@@ -415,7 +415,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               {isLoadingProducts && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin ml-2" />} {/* Loading indicator */}
             </div>
           </div>

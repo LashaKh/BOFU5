@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Plus, Sparkles } from 'lucide-react';
 import { CapabilityEditor } from '../CapabilityEditor';
@@ -56,8 +55,8 @@ export function Capabilities({
           aria-label={isExpanded ? "Collapse capabilities" : "Expand capabilities"}
         >
           {isExpanded ? 
-            <ChevronUp className="text-gray-400" /> : 
-            <ChevronDown className="text-gray-400" />
+            <ChevronUp className="text-gray-700 dark:text-gray-400" /> : 
+            <ChevronDown className="text-gray-700 dark:text-gray-400" />
           }
         </button>
       </div>

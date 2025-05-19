@@ -94,8 +94,8 @@ const SectionItem: React.FC<SectionItemProps> = ({
         </div>
         <div>
           {isExpanded ? 
-            <ChevronUp className="w-5 h-5 text-gray-500" /> : 
-            <ChevronDown className="w-5 h-5 text-gray-500" />
+            <ChevronUp className="w-5 h-5 text-gray-700 dark:text-gray-400" /> : 
+            <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-400" />
           }
         </div>
       </div>
@@ -337,11 +337,11 @@ const ListSection: React.FC<{
             >
               {editingItem && editingItem.sectionKey === sectionKey && editingItem.index === index ? (
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
+                  <textarea
                     value={editingItem.value}
                     onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                    className="flex-1 p-2 rounded border focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="flex-1 p-2 rounded border focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-y text-sm"
+                    rows={3}
                     autoFocus
                   />
                   <button
@@ -587,6 +587,8 @@ const parseContent = (content: string, possibleTitles?: string[], additionalLink
       // Extract USPs (Section 6)
       if (parsedContent['6. Unique Selling Propositions / Benefits (List up to 4)']) {
         result.usps = parsedContent['6. Unique Selling Propositions / Benefits (List up to 4)'];
+      } else if (parsedContent.usps && Array.isArray(parsedContent.usps)) { // Fallback for simple 'usps' key
+        result.usps = parsedContent.usps;
       }
       
       // Extract capabilities (Section 7)
@@ -1388,6 +1390,25 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
             onUpdateItem={!readOnly ? handleUpdateItem : undefined}
             onRemoveItem={!readOnly ? handleRemoveItem : undefined}
             readOnly={readOnly}
+          />
+        </SectionItem>
+      )}
+
+      {/* Unique Selling Points section */}
+      {((sections.usps && sections.usps.length > 0) || !readOnly) && (
+        <SectionItem
+          title="Unique Selling Points"
+          icon={<Award className="w-5 h-5 text-purple-500" />}
+          colorClass="bg-purple-50 border-purple-100"
+        >
+          <ListSection
+            sectionKey="usps"
+            items={sections.usps || []}
+            onAddItem={!readOnly ? handleAddItem : undefined}
+            onUpdateItem={!readOnly ? handleUpdateItem : undefined}
+            onRemoveItem={!readOnly ? handleRemoveItem : undefined}
+            readOnly={readOnly}
+            emptyMessage="No Unique Selling Points defined. Add USPs that highlight product/service benefits."
           />
         </SectionItem>
       )}

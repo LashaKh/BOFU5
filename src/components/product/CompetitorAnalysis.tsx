@@ -410,7 +410,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
           onClick={() => toggleSection(type)}
         >
           <h4 className="font-medium text-gray-800">{title}</h4>
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          {isExpanded ? <ChevronUp size={16} className="text-gray-600 dark:text-gray-400" /> : <ChevronDown size={16} className="text-gray-600 dark:text-gray-400" />}
         </div>
         
         <AnimatePresence>
@@ -443,9 +443,9 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                           e.stopPropagation();
                           handleRemoveCompetitor(type, index);
                         }}
-                        className="text-gray-100 hover:text-red-500 p-1"
+                        className="text-gray-600 dark:text-gray-300 hover:text-red-500 p-1"
                       >
-                        <X className="text-gray-100" size={14} />
+                        <X size={14} />
                       </button>
                     </div>
                   ))}
@@ -504,9 +504,9 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                 <h4 className="text-sm font-medium text-primary-400">Add New Competitor</h4>
                 <button 
                   onClick={() => setShowForm(false)}
-                  className="p-1 text-gray-100 hover:text-black rounded-full hover:bg-secondary-700"
+                  className="p-1 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-full hover:bg-secondary-700"
                   >
-                    <X className="text-gray-100" size={14} />
+                    <X size={14} />
                   </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -515,7 +515,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                   <select 
                     value={newCompetitor.type}
                     onChange={(e) => setNewCompetitor({...newCompetitor, type: e.target.value as CompetitorType})}
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="direct">Direct</option>
                     <option value="niche">Niche</option>
@@ -529,7 +529,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                     value={newCompetitor.category}
                     onChange={(e) => setNewCompetitor({...newCompetitor, category: e.target.value})}
                     placeholder="e.g. Software as a Service"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
@@ -541,7 +541,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                     value={newCompetitor.company_name}
                     onChange={(e) => setNewCompetitor({...newCompetitor, company_name: e.target.value})}
                     placeholder="e.g. Acme Inc."
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
                 <div>
@@ -551,7 +551,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                     value={newCompetitor.product_name}
                     onChange={(e) => setNewCompetitor({...newCompetitor, product_name: e.target.value})}
                     placeholder="e.g. Acme Pro"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-black rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>

@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { EditableText } from '../ui/EditableText';
@@ -27,8 +26,8 @@ export function ProductDescription({
           aria-label={isExpanded ? "Collapse section" : "Expand section"}
         >
           {isExpanded ? 
-            <ChevronUp className="text-gray-400" /> : 
-            <ChevronDown className="text-gray-400" />
+            <ChevronUp className="text-gray-700 dark:text-gray-400" /> : 
+            <ChevronDown className="text-gray-700 dark:text-gray-400" />
           }
         </button>
       </div>

@@ -46,7 +46,7 @@ export function parseProductData(input: any): ProductAnalysis[] {
     // Handle null/undefined input
     if (!input) {
       console.warn("Received null/undefined input");
-      return [createDefaultProduct("Sample Product")];
+      return [];
     }
     
     // First try parsing as a webhook response
@@ -113,8 +113,8 @@ export function parseProductData(input: any): ProductAnalysis[] {
           safeCopy = {...input};
         }
       } catch (error) {
-        console.warn("Failed to create safe copy of input, using default product", error);
-        return [createDefaultProduct("Sample Product")];
+        console.warn("Failed to create safe copy of input", error);
+        return [];
       }
       
       // Try parsing the safe copy
@@ -190,11 +190,11 @@ export function parseProductData(input: any): ProductAnalysis[] {
     }
     
     // If all parsing attempts failed, return a default product
-    console.warn("All parsing attempts failed, returning default product");
-    return [createDefaultProduct("Sample Product")];
+    console.warn("All parsing attempts failed, returning an empty array.");
+    return [];
   } catch (error) {
     console.error("Error in parseProductData:", error);
-    return [createDefaultProduct("Sample Product")];
+    return [];
   }
 }
 

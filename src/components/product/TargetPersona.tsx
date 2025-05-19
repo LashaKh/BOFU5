@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { EditableText } from '../ui/EditableText';
@@ -49,8 +48,8 @@ export function TargetPersona({
           aria-label={isExpanded ? "Collapse target persona" : "Expand target persona"}
         >
           {isExpanded ? 
-            <ChevronUp className="text-gray-800 dark:text-gray-100" /> : 
-            <ChevronDown className="text-gray-800 dark:text-gray-100" />
+            <ChevronUp className="text-gray-700 dark:text-gray-400" /> : 
+            <ChevronDown className="text-gray-700 dark:text-gray-400" />
           }
         </button>
       </div>
@@ -69,11 +68,13 @@ export function TargetPersona({
                 value={safePersona.primaryAudience}
                 onUpdate={(value) => updateField('primaryAudience', value)}
                 label="Primary Audience"
+                multiline={true}
               />
               <EditableText
                 value={safePersona.demographics}
                 onUpdate={(value) => updateField('demographics', value)}
                 label="Demographics"
+                multiline={true}
               />
             </div>
             <div className="space-y-4">
@@ -81,11 +82,13 @@ export function TargetPersona({
                 value={safePersona.industrySegments}
                 onUpdate={(value) => updateField('industrySegments', value)}
                 label="Industry Segments"
+                multiline={true}
               />
               <EditableText
                 value={safePersona.psychographics}
                 onUpdate={(value) => updateField('psychographics', value)}
                 label="Psychographics"
+                multiline={true}
               />
             </div>
           </motion.div>

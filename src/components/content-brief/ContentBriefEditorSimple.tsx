@@ -567,7 +567,28 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
       
       <div className="border rounded-lg p-6 bg-white">
         <ContentBriefDisplay 
-          content={content || emptyContentTemplate} 
+          content={(() => {
+            const baseTemplate = JSON.parse(emptyContentTemplate);
+            let currentBriefObject: Record<string, any> = {};
+            try {
+              if (content && content.trim()) {
+                currentBriefObject = JSON.parse(content);
+              } else {
+                currentBriefObject = { ...baseTemplate }; // Use base if content is empty
+              }
+            } catch (e) {
+              console.warn('ContentBriefEditorSimple: Error parsing current content, falling back to base template.', e);
+              currentBriefObject = { ...baseTemplate }; // Fallback to base on error
+            }
+
+            // Ensure all keys from the base template are present
+            for (const key in baseTemplate) {
+              if (Object.prototype.hasOwnProperty.call(baseTemplate, key) && !Object.prototype.hasOwnProperty.call(currentBriefObject, key)) {
+                currentBriefObject[key] = baseTemplate[key]; // Add missing keys with default values (e.g., empty arrays)
+              }
+            }
+            return JSON.stringify(currentBriefObject, null, 2);
+          })()} 
           onContentChange={handleContentUpdate}
           additionalLinks={internalLinks || []}
           possibleTitles={suggestedTitles || []}

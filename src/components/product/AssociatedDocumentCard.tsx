@@ -34,7 +34,7 @@ const statusColorMap: { [key: string]: string } = {
   processing: 'text-blue-500',
   processed: 'text-green-500',
   failed: 'text-red-500',
-  default: 'text-gray-500',
+  default: 'text-gray-700',
 };
 
 const AssociatedDocumentCard: React.FC<AssociatedDocumentCardProps> = ({ document, onDelete, onView }) => {
@@ -54,7 +54,7 @@ const AssociatedDocumentCard: React.FC<AssociatedDocumentCardProps> = ({ documen
             {document.file_name}
           </h3>
         </div>
-        <div className="flex items-center text-xs text-gray-400 mb-1 pl-8">
+        <div className="flex items-center text-xs text-gray-300 mb-1 pl-8">
           <StatusIcon size={14} className={`mr-1.5 ${statusColor} ${statusString === 'processing' || statusString === 'pending' ? 'animate-spin' : ''}`} />
           Status: <span className={`ml-1 font-medium ${statusColor}`}>{document.status}</span>
         </div>

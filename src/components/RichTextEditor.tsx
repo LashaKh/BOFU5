@@ -105,7 +105,7 @@ export function RichTextEditor({ content, onChange, onImageUpload }: RichTextEdi
           <Redo size={16} />
         </button>
       </div>
-      <EditorContent editor={editor} className="prose max-w-none text-gray-300 p-4 min-h-[200px] focus:outline-none prose-headings:text-primary-400 prose-a:text-primary-400" />
+      <EditorContent editor={editor} className="prose max-w-none p-4 min-h-[200px] focus:outline-none prose-headings:text-primary-400 prose-a:text-primary-400" />
     </div>
   );
 }
