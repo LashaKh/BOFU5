@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { approveContentBrief } from '../../lib/airops';
+import { supabase } from '../../lib/supabase';
 
 interface ApproveContentBriefProps {
   contentBrief: string;
   internalLinks: string;
   articleTitle: string;
   contentFramework: string;
+  briefId: string;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
@@ -17,6 +19,7 @@ export function ApproveContentBrief({
   internalLinks,
   articleTitle,
   contentFramework,
+  briefId,
   onSuccess,
   onError
 }: ApproveContentBriefProps) {
@@ -40,13 +43,32 @@ export function ApproveContentBrief({
     );
     
     setIsApproving(true);
-    
+
     try {
+      // Fetch research_result_id from content_briefs table
+      let researchResultId: string | null = null;
+      if (briefId) {
+        const { data: briefData, error: briefError } = await supabase
+          .from('content_briefs')
+          .select('research_result_id')
+          .eq('id', briefId)
+          .single();
+
+        if (briefError) {
+          console.error('Error fetching research_result_id:', briefError);
+          // Decide if you want to proceed without it or show an error
+        }
+        if (briefData) {
+          researchResultId = briefData.research_result_id;
+        }
+      }
+
       await approveContentBrief({
         contentBrief,
         internalLinks,
         articleTitle,
-        contentFramework
+        contentFramework,
+        research_result_id: researchResultId
       });
       
       // Dismiss loading toast and show success

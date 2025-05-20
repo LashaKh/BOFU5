@@ -522,6 +522,7 @@ export default function EditContentBrief() {
                       : (brief.suggested_links?.map(link => link.url).join('\n') || ''))
                 }
                 contentFramework={brief.suggested_content_frameworks || brief.framework || ''}
+                briefId={id || ''} // Pass the briefId
                 onSuccess={() => {
                   toast.success('Content brief sent to AirOps successfully');
                   setBrief(prev => prev ? { ...prev, status: 'approved' } : null);
@@ -610,6 +611,7 @@ export default function EditContentBrief() {
                     : (brief.suggested_links?.map(link => link.url).join('\n') || ''))
               }
               contentFramework={brief.suggested_content_frameworks || brief.framework || ''}
+              briefId={id || ''} // Pass the briefId
               onSuccess={() => {
                 toast.success('Content brief sent to AirOps successfully');
                 setBrief(prev => prev ? { ...prev, status: 'approved' } : null);

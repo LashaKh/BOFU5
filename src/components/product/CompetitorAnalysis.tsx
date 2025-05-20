@@ -409,7 +409,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
           className="flex justify-between items-center p-2 bg-secondary-50 rounded-lg cursor-pointer"
           onClick={() => toggleSection(type)}
         >
-          <h4 className="font-medium text-gray-800">{title}</h4>
+          <h4 className="font-medium dark:text-white">{title}</h4>
           {isExpanded ? <ChevronUp size={16} className="text-gray-600 dark:text-gray-400" /> : <ChevronDown size={16} className="text-gray-600 dark:text-gray-400" />}
         </div>
         

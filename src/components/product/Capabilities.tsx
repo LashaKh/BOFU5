@@ -79,7 +79,7 @@ export function Capabilities({
               >
                 <Sparkles className="w-12 h-12 text-primary-500/30 mx-auto mb-3" />
                 <p className="text-gray-400">No capabilities added yet.</p>
-                <p className="text-sm text-gray-800 dark:text-gray-100">Click "Add" to get started.</p>
+                <p className="text-sm dark:text-white">Click "Add" to get started.</p>
               </motion.div>
             ) : (
               <div className="grid gap-4 relative">
@@ -110,7 +110,7 @@ export function Capabilities({
             exit={{ opacity: 0 }}
             className="mt-1"
           >
-            <p className="text-sm text-gray-800 dark:text-gray-100">
+            <p className="text-sm dark:text-white">
               {capabilities.length} {capabilities.length === 1 ? 'capability' : 'capabilities'} defined
             </p>
             <button

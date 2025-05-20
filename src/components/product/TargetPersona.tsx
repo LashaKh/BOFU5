@@ -98,7 +98,7 @@ export function TargetPersona({
             animate={{ opacity: 1 }}
             className="mt-1"
           >
-            <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-1">
+            <p className="text-sm dark:text-white line-clamp-1">
               Primary audience: {safePersona.primaryAudience}
             </p>
             <button

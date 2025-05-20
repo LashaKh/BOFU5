@@ -223,7 +223,7 @@ export function ProductSection({
       
       {!isExpanded && (
         <div className="mt-1 flex items-center">
-          <span className="text-sm text-gray-800 dark:text-gray-100">
+          <span className="text-sm dark:text-white dark:opacity-100">
             {items.length} {items.length === 1 ? 'item' : 'items'}
           </span>
           <button

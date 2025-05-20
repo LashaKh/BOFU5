@@ -12,6 +12,7 @@ interface ContentBriefInput {
   internalLinks: string;
   articleTitle: string;
   contentFramework: string;
+  research_result_id: string | null;
 }
 
 // Define the structure expected by AirOps API
@@ -32,7 +33,7 @@ function safeLog(prefix: string, obj: any) {
   try {
     // Use a replacer function to handle circular references
     const seen = new WeakSet();
-    const safeObj = JSON.stringify(obj, (key, value) => {
+    const safeObj = JSON.stringify(obj, (_key, value) => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) {
           return '[Circular Reference]';
@@ -95,7 +96,8 @@ export async function approveContentBrief(briefData: ContentBriefInput) {
           content_brief: briefData.contentBrief,
           internal_links: briefData.internalLinks,
           article_title: briefData.articleTitle,
-          content_framework: briefData.contentFramework
+          content_framework: briefData.contentFramework,
+          research_result_id: briefData.research_result_id
         }
       })
     });

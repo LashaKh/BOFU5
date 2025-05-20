@@ -418,19 +418,150 @@ const DedicatedProductPage: React.FC = () => {
     setIsCardActionLoading(false);
   };
 
-  const handleApproveProduct = async (prod: ProductAnalysis) => {
+  const handleApproveProduct = async (prod: ProductAnalysis, productIndex: number) => {
+    // productId is from useParams()
+    // 'product' is the state variable holding the fetched data from 'research_results' table.
+    const currentProductIdFromUrl = productId; 
+
+    if (!product || !product.id) {
+      toast.error('Cannot approve: Product data is not fully loaded or the main research record is missing.');
+      console.error('[DedicatedProductPage] handleApproveProduct: Aborting because product state or product.id is null/undefined.', { product });
+      setIsCardActionLoading(false); // Ensure loading state is reset
+      return;
+    }
+    console.log(
+      '[DedicatedProductPage] handleApproveProduct called with:',
+      {
+        'prod.research_result_id': prod.research_result_id,
+        'productIndex': productIndex,
+        'currentProductIdFromUrl (expected parent ID)': currentProductIdFromUrl,
+        'prod.productDetails.name': prod.productDetails?.name,
+        'prod.companyName': prod.companyName,
+        'isApproved (state before this action)': prod.isApproved
+      }
+    );
     setIsCardActionLoading(true);
-    const updatedProd = { ...prod, isApproved: !prod.isApproved };
-    setParsedAnalysisData(updatedProd); 
-    toast.success(`Product approval toggled (local stub).`);
-    await new Promise(resolve => setTimeout(resolve, 500)); 
-    setIsCardActionLoading(false);
+    const newApprovedState = !prod.isApproved;
+
+    try {
+      // Optimistically update UI
+      setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: newApprovedState } : null);
+      // Update product in the main state as well, if it exists
+      if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+        setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: newApprovedState } } : null);
+      }
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        toast.error('You must be logged in to approve products.');
+        // Revert optimistic update
+        setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+        if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+          setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: prod.isApproved } } : null);
+        }
+        return;
+      }
+
+      if (newApprovedState) { // Product is being approved or re-approved
+        const dataToUpsert = {
+          research_result_id: prod.research_result_id, // Use the ID from the prod object. This ID MUST exist in research_results table.
+          approved_by: session.user.id,
+          product_index: productIndex,
+          product_name: prod.productDetails.name,
+          product_description: prod.productDetails.description,
+          company_name: prod.companyName, // Product's own company name
+          product_data: { ...prod, isApproved: true, userUUID: session.user.id }, // Store enriched product with approval state
+          // approved_at, created_at, updated_at have db defaults or are set on update by Supabase/triggers
+        };
+
+        const { data: existingApproval, error: fetchError } = await supabase
+          .from('approved_products')
+          .select('id')
+          .eq('research_result_id', prod.research_result_id!)
+          .eq('approved_by', session.user.id!)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116: row not found, which is fine for insert
+          console.error('Error checking existing approval:', fetchError);
+          toast.error(`Error checking approval: ${fetchError.message}`);
+           setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+           if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+             setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: prod.isApproved } } : null);
+           }
+          return;
+        }
+
+        if (existingApproval) {
+          // Update existing approval
+          const { error: updateError } = await supabase
+            .from('approved_products')
+            .update({
+              product_index: productIndex,
+              product_name: prod.productDetails.name,
+              product_description: prod.productDetails.description,
+              company_name: prod.companyName,
+              product_data: { ...prod, isApproved: true, userUUID: session.user.id },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingApproval.id);
+
+          if (updateError) {
+            console.error('Error updating product approval:', updateError);
+            toast.error(updateError.message || 'Failed to update product approval.');
+            setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+            if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+              setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: prod.isApproved } } : null);
+            }
+            return;
+          }
+          toast.success('Product approval updated!');
+        } else {
+          // Insert new approval record
+          const { error: insertError } = await supabase
+            .from('approved_products')
+            .insert([dataToUpsert]);
+
+          if (insertError) {
+            console.error('Error approving product:', insertError);
+            toast.error(insertError.message || 'Failed to approve product.');
+            setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+            if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+              setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: prod.isApproved } } : null);
+            }
+            return;
+          }
+          toast.success('Product approved successfully!');
+        }
+      } else { // Product is being un-approved
+        const { error: deleteError } = await supabase
+          .from('approved_products')
+          .delete()
+          .eq('research_result_id', prod.research_result_id!)
+          .eq('approved_by', session.user.id!);
+
+        if (deleteError) {
+          console.error('Error unapproving product:', deleteError);
+          toast.error(deleteError.message || 'Failed to unapprove product.');
+          setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+          if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
+            setProduct((prevProd) => prevProd ? { ...prevProd, generated_analysis_data: { ...(prevProd.generated_analysis_data as ProductAnalysis), isApproved: prod.isApproved } } : null);
+          }
+          return;
+        }
+        toast.success('Product unapproved.');
+      }
+    } catch (error: any) {
+      console.error('Error in handleApproveProduct:', error);
+      toast.error('An unexpected error occurred: ' + error.message);
+    } finally {
+      setIsCardActionLoading(false);
+    }
   };
 
-  const handleUpdateEntireProduct = (updatedProd: ProductAnalysis) => {
-    setParsedAnalysisData(updatedProd);
-    toast('Entire product update triggered (local stub).');
-  };
+  // const handleUpdateEntireProduct = (updatedProd: ProductAnalysis) => {
+  //   setParsedAnalysisData(updatedProd);
+  //   toast('Entire product update triggered (local stub).');
+  // };
 
   const handleDeleteAnalysis = async () => {
     if (!productId || !parsedAnalysisData) {
@@ -974,7 +1105,7 @@ ${document.extracted_text.substring(0, 500)}`);
                   index={0} // Since it's a single product view
                   isActionLoading={isGeneratingAnalysis || isSavingSection || isCardActionLoading} // Combine loading states
                   onSave={(updatedProduct) => handleSaveProduct(updatedProduct as ProductAnalysis)} // Type assertion
-                  onApprove={(approvedProduct) => handleApproveProduct(approvedProduct as ProductAnalysis)} // Type assertion
+                  onApprove={(approvedProduct, idx) => handleApproveProduct(approvedProduct as ProductAnalysis, idx as number)} // Type assertion
                   onUpdateSection={handleProductSectionUpdate}
                   updateProduct={(updatedData) => {
                     // When ProductCard internally updates, reflect it in parsedAnalysisData and product state

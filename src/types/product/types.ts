@@ -55,15 +55,36 @@ export interface ProductAnalysis {
 }
 
 // Interface for product details fetched from Supabase
+// This interface should reflect the columns in your 'products' table
+
+export type ProductLifecycleStatus =
+  | 'draft'
+  | 'pending_research'
+  | 'research_processing'
+  | 'research_failed'
+  | 'pending_review'
+  | 'approved'
+  | 'rejected';
+
 export interface Product {
   id: string;
-  created_at: string;
+  created_at: string; // Or Date
+  updated_at: string; // Or Date - ensure this is present
   name: string;
-  description: string;
-  logo_url?: string;
-  user_id: string;
-  openai_vector_store_id?: string; // Added this line
-  // Add any other fields that your 'products' table has
+  description: string | null;
+  logo_url?: string | null;
+  user_id: string | null; // Reflects current DB state, consider if it should be string
+  openai_vector_store_id?: string | null;
+  generated_analysis_data?: ProductAnalysis | string | null; // Existing field for JSON
+
+  // New/updated fields from recent SQL changes
+  lifecycle_status?: ProductLifecycleStatus; // DB default 'draft'
+  is_approved?: boolean;      // DB default false
+  approved_by?: string | null; // UUID of user from auth.users
+  research_error_message?: string | null;
+  research_completed_at?: string | null; // Or Date | null
+  source_urls?: string[] | null; // Array of text
+  research_parameters_json?: any | null; // JSONB, use a more specific type if defined
 }
 
 // Interface for documents associated with a product

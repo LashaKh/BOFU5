@@ -26,6 +26,7 @@ import UserDashboard from './pages/UserDashboard';
 import UserContentBriefs from './pages/UserContentBriefs';
 import EditContentBrief from './pages/EditContentBrief';
 import ApprovedContent from './pages/ApprovedContent';
+import GeneratedArticlesPage from './pages/GeneratedArticlesPage'; // Import for new page
 import { ResetPassword } from './components/auth/ResetPassword';
 import { ToastProvider } from './contexts/ToastContext';
 import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
@@ -641,6 +642,7 @@ function App() {
           <Route path="/dashboard/content-briefs" element={<UserContentBriefs />} />
           <Route path="/dashboard/content-briefs/:id/edit" element={<EditContentBrief />} />
           <Route path="/dashboard/approved-content" element={<ApprovedContent />} />
+          <Route path="/dashboard/generated-article" element={<GeneratedArticlesPage />} /> {/* New route added */}
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/user-dashboard" element={<Navigate to="/dashboard" replace />} />
           <Route path="/user-dashboard/content-briefs" element={<Navigate to="/dashboard/content-briefs" replace />} />

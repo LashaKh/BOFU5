@@ -502,7 +502,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-secondary-900 text-white p-6">
+    <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-primary-400">Admin Dashboard</h1>
@@ -751,7 +751,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         {isDetailModalOpen && selectedProduct && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-auto">
             <div className="bg-secondary-800/90 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto mb-8">
-              <div className="sticky top-0 bg-secondary-800 p-6 border-b border-secondary-700 z-10 flex justify-between items-center">
+              <div className="bg-secondary-800 p-6 border-b border-secondary-700 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-primary-400">{selectedProduct!.product_name}</h2>
                 <button 
                   onClick={closeDetailModal}
