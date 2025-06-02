@@ -5,16 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "NODE_OPTIONS='--max-old-space-size=4096' vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "dev:server": "nodemon --exec \"node --loader ts-node/esm server/index.ts\""
   },
   "dependencies": {
-    "@blocknote/core": "^0.29.1",
-    "@blocknote/react": "^0.29.1",
-    "@ckeditor/ckeditor5-build-classic": "^44.3.0",
-    "@ckeditor/ckeditor5-react": "^9.5.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-avatar": "^1.1.9",
@@ -49,7 +45,6 @@
     "react-dropzone": "^14.2.3",
     "react-hot-toast": "^2.4.1",
     "react-markdown": "^10.1.0",
-    "react-quill": "^2.0.0",
     "react-router-dom": "^7.4.1",
     "react-textarea-autosize": "^8.5.9",
     "remark-gfm": "^4.0.1",

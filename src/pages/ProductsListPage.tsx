@@ -99,7 +99,7 @@ const ProductsListPage: React.FC = () => {
   return (
     <>
       <MainHeader user={user} />
-      <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-gray-100">
+      <div className="p-4 md:p-8 min-h-screen text-gray-100" style={{ backgroundColor: '#1f2937' }}>
         <div className="max-w-7xl mx-auto">
           <header className="mb-8 flex flex-col md:flex-row justify-between items-center">
             <h1 className="text-3xl md:text-4xl font-bold text-primary-300 mb-4 md:mb-0">

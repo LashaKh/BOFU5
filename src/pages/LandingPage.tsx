@@ -2,185 +2,389 @@ import React from 'react';
 import { MainHeader } from '../components/MainHeader';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, CheckCircle, BarChart2, FileText, Zap, Brain, Target, LucideIcon } from 'lucide-react';
+import { 
+  ArrowRight, 
+  CheckCircle, 
+  BarChart2, 
+  FileText, 
+  Zap, 
+  Brain, 
+  Target, 
+  LucideIcon,
+  Upload,
+  Settings,
+  Sparkles,
+  Shield,
+  Users,
+  TrendingUp,
+  Clock,
+  Database,
+  MessageSquare,
+  Star,
+  Globe,
+  Award
+} from 'lucide-react';
 
-// Variants for staggering animations - moved to module scope
+// Animation variants
 const containerVariant = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.2, // Time between each child animation
+      staggerChildren: 0.1,
     },
   },
 };
 
 const itemVariant = {
-  hidden: { y: 20, opacity: 0 },
+  hidden: { y: 30, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
     transition: {
-      duration: 0.5, // Duration of each child's animation
+      duration: 0.6,
+      ease: "easeOut",
+    },
+  },
+};
+
+const slideInLeft = {
+  hidden: { x: -50, opacity: 0 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.8,
+      ease: "easeOut",
+    },
+  },
+};
+
+const slideInRight = {
+  hidden: { x: 50, opacity: 0 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.8,
+      ease: "easeOut",
     },
   },
 };
 
 interface LandingPageProps {
-  user: any; // Replace 'any' with a more specific User type if available
+  user: any;
   onShowAuthModal: () => void;
-  onSignOut: () => Promise<void>; // Or appropriate return type
+  onSignOut: () => Promise<void>;
 }
 
 interface FeatureCardProps {
   icon: LucideIcon;
   title: string;
   description: string;
-  // delay prop is no longer needed due to staggerChildren
+  isLarge?: boolean;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, description /* delay prop no longer needed */ }) => (
+interface ProcessStepProps {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  step: number;
+  isReversed?: boolean;
+}
+
+interface StatProps {
+  value: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, description, isLarge = false }) => (
   <motion.div
-    className="bg-secondary-800 p-6 rounded-xl shadow-lg hover:shadow-primary-500/30 transition-shadow duration-300 border border-secondary-700"
+    className={`relative group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 hover:border-primary-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary-500/10 ${isLarge ? 'md:col-span-2' : ''}`}
     variants={itemVariant}
-    // initial, animate, transition props are now controlled by parent variants
+    whileHover={{ y: -5 }}
   >
-    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-primary-500 to-yellow-500 rounded-full mb-4">
-      <Icon className="text-secondary-900" size={24} />
+    <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-yellow-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    <div className="relative">
+      <div className="flex items-center justify-center w-14 h-14 bg-gradient-to-br from-primary-500 to-yellow-500 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300">
+        <Icon className="text-gray-900" size={28} />
+      </div>
+      <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
+      <p className="text-gray-300 leading-relaxed">{description}</p>
     </div>
-    <h3 className="text-xl font-semibold text-gray-100 mb-2">{title}</h3>
-    <p className="text-white text-sm leading-relaxed">{description}</p>
   </motion.div>
 );
 
-interface HowItWorksStepProps {
-  number: string | number;
-  title: string;
-  description: string;
-}
-
-const HowItWorksStep: React.FC<HowItWorksStepProps> = ({ number, title, description }) => (
+const ProcessStep: React.FC<ProcessStepProps> = ({ icon: Icon, title, description, step, isReversed = false }) => (
   <motion.div 
-    className="flex items-start space-x-4"
-    variants={itemVariant}
-    // initial, animate, transition props are now controlled by parent variants
+    className={`flex items-center gap-8 ${isReversed ? 'flex-row-reverse' : ''}`}
+    variants={isReversed ? slideInRight : slideInLeft}
   >
-    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary-500 to-yellow-500 text-secondary-900 font-bold rounded-full">
-      {number}
+    <div className="flex-1">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-primary-500 to-yellow-500 rounded-full text-gray-900 font-bold text-lg">
+          {step}
+        </div>
+        <div className="flex items-center justify-center w-12 h-12 bg-gray-800 rounded-xl">
+          <Icon className="text-primary-400" size={24} />
+        </div>
+      </div>
+      <h3 className="text-2xl font-bold text-white mb-3">{title}</h3>
+      <p className="text-gray-300 text-lg leading-relaxed">{description}</p>
     </div>
-    <div>
-      <h4 className="text-lg font-semibold text-primary-300 mb-1">{title}</h4>
-      <p className="text-gray-200 text-sm leading-relaxed">{description}</p>
+    <div className="hidden lg:block w-80 h-60 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl border border-gray-700/50 flex-shrink-0">
+      <div className="w-full h-full rounded-2xl bg-gradient-to-br from-primary-500/10 to-yellow-500/10 flex items-center justify-center">
+        <Icon className="text-primary-400" size={80} />
+      </div>
     </div>
+  </motion.div>
+);
+
+const StatCard: React.FC<StatProps> = ({ value, label, icon: Icon }) => (
+  <motion.div
+    className="text-center group"
+    variants={itemVariant}
+    whileHover={{ scale: 1.05 }}
+  >
+    <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-yellow-500 rounded-2xl mx-auto mb-4 group-hover:shadow-lg transition-all duration-300">
+      <Icon className="text-gray-900" size={32} />
+    </div>
+    <div className="text-4xl font-bold text-white mb-2">{value}</div>
+    <div className="text-gray-300 font-medium">{label}</div>
   </motion.div>
 );
 
 const LandingPage: React.FC<LandingPageProps> = ({ user, onShowAuthModal, onSignOut }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-neutral-800 text-white overflow-x-hidden">
+    <div className="min-h-screen text-white overflow-x-hidden" style={{ backgroundColor: '#1f2937' }}>
       <MainHeader 
         user={user} 
         onShowAuthModal={onShowAuthModal} 
         onSignOut={onSignOut} 
-        showHistory={false} // Assuming history button isn't active on landing
-        setShowHistory={() => { /* Can navigate to /history or be a no-op */ }}
+        showHistory={false}
+        setShowHistory={() => {}}
       />
-      {/* Hero Section */}
-      <motion.section
-        className="py-20 md:py-32 text-center relative overflow-hidden"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+
+      {/* Hero Section - Full Width */}
+      <section className="relative py-20 lg:py-32 overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/20 to-primary-900/10" />
+        <div className="absolute inset-0">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,230,0,0.1)" strokeWidth="1"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
+        </div>
+        
+        <div className="relative z-10 w-full">
+          <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
+            {/* Left Content */}
+            <motion.div
+              className="space-y-6 lg:space-y-8"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.8 }}
       >
-        <div className="absolute inset-0 opacity-10">
-          {/* Subtle background pattern or effect */}
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,220,0,0.2)" strokeWidth="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(#smallGrid)" /></svg>
-        </div>
-        <div className="container mx-auto px-6 relative z-10">
-          <motion.h1
-            className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 bg-clip-text text-transparent"
-            initial={{ y: -30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-          >
-            Unlock Your Product's Full Potential with AI-Powered Analysis
-          </motion.h1>
-          <motion.p
-            className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto mb-10"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-          >
-            BOFU ai is your dedicated platform for transforming product documentation into a dynamic knowledge base. Generate powerful product analyses, craft high-converting bottom-of-funnel content, and keep your product information always up-to-date.
-          </motion.p>
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          >
-            <Link
-              to="/app" // This will be the new route for your main application
-              className="bg-gradient-to-r from-primary-500 to-yellow-500 hover:from-primary-600 hover:to-yellow-600 text-secondary-900 font-semibold px-10 py-4 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 inline-flex items-center"
+              <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-primary-500/20 to-yellow-500/20 border border-primary-500/30 rounded-full">
+                <Sparkles className="text-primary-400 mr-2" size={16} />
+                <span className="text-primary-300 font-medium">AI-Powered Research Assistant</span>
+              </div>
+              
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+                <span className="block text-white">
+                  Transform Your
+                </span>
+                <span className="block text-yellow-400 font-extrabold">
+                  Research Documents
+                </span>
+                <span className="block text-white">
+                  Into Powerful Insights
+                </span>
+              </h1>
+              
+              <p className="text-lg lg:text-xl text-gray-300 leading-relaxed max-w-2xl">
+                Upload documents, add blog URLs, and define your products to generate comprehensive 
+                analysis that drives conversions with AI-powered bottom-of-funnel insights.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Link
+                  to="/app"
+                  className="group bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8 py-4 rounded-xl text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center"
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
+                </Link>
+                
+                <button
+                  onClick={onShowAuthModal}
+                  className="border-2 border-gray-600 hover:border-yellow-500 text-white hover:text-yellow-300 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:bg-yellow-500/10"
+                >
+                  Sign In
+                </button>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 pt-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="text-green-400" size={20} />
+                  <span className="text-gray-300">No credit card required</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="text-blue-400" size={20} />
+                  <span className="text-gray-300">Enterprise secure</span>
+                </div>
+              </div>
+            </motion.div>
+            
+            {/* Right Visual */}
+            <motion.div
+              className="relative"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Launch App & Analyze <ArrowRight className="ml-2" size={20} />
-            </Link>
-          </motion.div>
+              <div className="relative bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-3xl p-8">
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-primary-500/20 p-4 rounded-xl flex items-center gap-3">
+                    <Upload className="text-primary-400" size={24} />
+                    <span className="text-white font-medium">Upload Sources</span>
+                  </div>
+                  <div className="bg-blue-500/20 p-4 rounded-xl flex items-center gap-3">
+                    <Target className="text-blue-400" size={24} />
+                    <span className="text-white font-medium">Define Products</span>
+                  </div>
+                  <div className="bg-purple-500/20 p-4 rounded-xl flex items-center gap-3">
+                    <Brain className="text-purple-400" size={24} />
+                    <span className="text-white font-medium">AI Analysis</span>
+                  </div>
+                  <div className="bg-green-500/20 p-4 rounded-xl flex items-center gap-3">
+                    <Zap className="text-green-400" size={24} />
+                    <span className="text-white font-medium">Take Action</span>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-primary-500/10 to-yellow-500/10 p-6 rounded-2xl">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Sparkles className="text-primary-400" size={24} />
+                    <span className="text-white font-semibold">AI-Powered Insights</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-2 bg-primary-500/30 rounded-full">
+                      <div className="h-2 bg-gradient-to-r from-primary-500 to-yellow-500 rounded-full w-4/5"></div>
+                    </div>
+                    <div className="h-2 bg-primary-500/30 rounded-full">
+                      <div className="h-2 bg-gradient-to-r from-primary-500 to-yellow-500 rounded-full w-3/5"></div>
+                    </div>
+                    <div className="h-2 bg-primary-500/30 rounded-full">
+                      <div className="h-2 bg-gradient-to-r from-primary-500 to-yellow-500 rounded-full w-4/5"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
-      </motion.section>
+      </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 md:py-24 bg-secondary-900/30">
-        <div className="container mx-auto px-6">
-          <motion.h2 
-            className="text-3xl md:text-4xl font-bold text-center mb-16 text-primary-400"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            Simple Steps to In-Depth Product Mastery
-          </motion.h2>
-          <motion.div 
-            className="max-w-3xl mx-auto grid md:grid-cols-1 gap-10"
+      {/* Stats Section */}
+      <section className="py-20 bg-gray-900/30">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            className="grid grid-cols-2 lg:grid-cols-4 gap-8"
             variants={containerVariant}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.3 }}
           >
-            <HowItWorksStep 
-              number="1" 
-              title="1. Build Your Product's Knowledge Base" 
-              description="Consolidate all product documentation—manuals, research papers, marketing materials, and updates. BOFU ai creates a centralized, intelligent repository for each product."
+            <StatCard value="50%" label="Faster Content Creation" icon={Clock} />
+            <StatCard value="95%" label="Accuracy Rate" icon={Target} />
+            <StatCard value="24/7" label="AI Availability" icon={Zap} />
+            <StatCard value="100+" label="Document Types" icon={FileText} />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* How It Works - Full Width Process */}
+      <section className="py-32">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            className="text-center mb-20"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-5xl font-bold text-white mb-6">
+              How It Works
+            </h2>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              Transform your research workflow in four simple steps
+            </p>
+          </motion.div>
+          
+          <motion.div 
+            className="space-y-32"
+            variants={containerVariant}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.1 }}
+          >
+            <ProcessStep 
+              step={1}
+              icon={Upload}
+              title="Upload & Organize"
+              description="Upload documents, add blog URLs, and organize your research sources. Our AI extracts and processes content from PDFs, Word docs, PowerPoint, and web pages automatically."
             />
-            <HowItWorksStep 
-              number="2" 
-              title="2. AI-Driven Analysis & Insight Generation"
-              description="Our advanced AI dives deep into your knowledge base, extracting critical insights, USPs, pain points, and technical specifications to generate a comprehensive Product Analysis."
+            
+            <ProcessStep 
+              step={2}
+              icon={Target}
+              title="Define Products"
+              description="Specify your product lines and target markets. Our system creates dedicated knowledge bases for each product, ensuring relevant and focused analysis."
+              isReversed
             />
-            <HowItWorksStep 
-              number="3" 
-              title="3. Generate High-Impact Content Briefs"
-              description="Transform raw Product Analysis into structured, actionable Content Briefs, perfectly primed for creating persuasive bottom-of-funnel marketing content."
+            
+            <ProcessStep 
+              step={3}
+              icon={Brain}
+              title="AI Analysis"
+              description="Advanced AI analyzes your content to generate comprehensive product insights, competitive advantages, pain points, and market positioning strategies."
             />
-            <HowItWorksStep 
-              number="4" 
-              title="4. Create, Discuss & Dynamically Update"
-              description="Generate compelling content, engage with our AI for product-specific discussions and suggestions, and seamlessly update your knowledge base as your product evolves. Keep everything in sync."
+            
+            <ProcessStep 
+              step={4}
+              icon={Zap}
+              title="Generate Content"
+              description="Create powerful bottom-of-funnel content, marketing materials, and strategic documents based on AI-generated insights and analysis."
+              isReversed
             />
           </motion.div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 md:py-24">
-        <div className="container mx-auto px-6">
-          <motion.h2 
-            className="text-3xl md:text-4xl font-bold text-center mb-16 text-primary-400"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+      {/* Features Grid - Better Layout */}
+      <section className="py-32 bg-gray-900/30">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            className="text-center mb-20"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
           >
-            Core Advantages of BOFU ai
-          </motion.h2>
+            <h2 className="text-5xl font-bold text-white mb-6">
+              Powerful Features
+            </h2>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              Everything you need to transform research into results
+            </p>
+          </motion.div>
+          
           <motion.div 
             className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
             variants={containerVariant}
@@ -188,53 +392,100 @@ const LandingPage: React.FC<LandingPageProps> = ({ user, onShowAuthModal, onSign
             whileInView="visible"
             viewport={{ once: true, amount: 0.2 }}
           >
-            <FeatureCard icon={FileText} title="Centralized Knowledge Hub" description="Easily upload and manage all product-related documents in one place. PDFs, DOCX, URLs, and text inputs are all supported."/>
-            <FeatureCard icon={Zap} title="Dynamic Product Analysis" description="AI meticulously analyzes your documents to create in-depth Product Analyses, highlighting key features, benefits, and target audience insights."/>
-            <FeatureCard icon={Brain} title="Automated Content Briefs" description="Generate structured content briefs from product analyses, streamlining your bottom-of-funnel content creation process."/>
-            <FeatureCard icon={BarChart2} title="Interactive AI Product Chat" description="Discuss your product, ask questions, and get suggestions directly from our AI, trained on your specific product knowledge."/>
-            <FeatureCard icon={CheckCircle} title="Live Document Sync" description="Update documents dynamically. Your product's knowledge base and analyses adapt instantly to new information."/>
-            <FeatureCard icon={Target} title="Efficient Content Workflow" description="From documentation to analysis to content brief to final content – manage the entire lifecycle efficiently."/>
+            <FeatureCard 
+              icon={Database} 
+              title="Smart Document Processing" 
+              description="Automatically extract and analyze content from multiple file formats with advanced AI processing capabilities."
+            />
+            <FeatureCard 
+              icon={Brain} 
+              title="AI-Powered Analysis" 
+              description="Generate deep insights, competitive analysis, and strategic recommendations from your research data."
+            />
+            <FeatureCard 
+              icon={MessageSquare} 
+              title="Interactive AI Chat" 
+              description="Discuss your products, ask questions, and get instant AI-powered recommendations and insights."
+            />
+            <FeatureCard 
+              icon={TrendingUp} 
+              title="Performance Tracking" 
+              description="Monitor content performance and optimize your bottom-of-funnel strategies with data-driven insights."
+            />
+            <FeatureCard 
+              icon={Shield} 
+              title="Enterprise Security" 
+              description="Bank-grade security ensures your sensitive research and product data remains protected and private."
+            />
+            <FeatureCard 
+              icon={Globe} 
+              title="Multi-Format Support" 
+              description="Support for PDFs, Word docs, PowerPoint, web pages, and direct text input for maximum flexibility."
+              isLarge
+            />
           </motion.div>
         </div>
       </section>
 
-      {/* Call to Action Section */}
-      <section className="py-20 md:py-32 bg-gradient-to-r from-primary-600 to-yellow-600">
-        <div className="container mx-auto px-6 text-center">
-          <motion.h2 
-            className="text-3xl md:text-5xl font-bold text-secondary-900 mb-6"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            Transform Your Product Content Strategy Today
-          </motion.h2>
-          <motion.p 
-            className="text-lg md:text-xl text-white font-semibold max-w-xl mx-auto mb-10"
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-          >
-            Empower your team with AI-driven insights and a streamlined content creation process. Turn your product knowledge into your most powerful asset.
-          </motion.p>
+      {/* Call to Action - Full Width */}
+      <section className="py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary-600/20 to-yellow-600/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/80 to-gray-800/80" />
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
           >
+            <h2 className="text-5xl lg:text-6xl font-bold text-white mb-8">
+              Ready to Transform Your 
+              <span className="bg-gradient-to-r from-primary-400 to-yellow-400 bg-clip-text text-transparent">
+                {" "}Research Workflow?
+              </span>
+            </h2>
+            
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-12">
+              Join thousands of professionals who are already using BOFU AI to create 
+              more effective content and drive better results.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <Link
               to="/app"
-              className="bg-white hover:bg-gray-100 text-yellow-500 font-semibold px-12 py-4 rounded-lg text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 inline-flex items-center"
+                className="group bg-gradient-to-r from-primary-500 to-yellow-500 hover:from-primary-600 hover:to-yellow-600 text-gray-900 font-bold px-12 py-5 rounded-xl text-xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 inline-flex items-center"
             >
-              Launch the App <ArrowRight className="ml-2" size={20} />
+                Start Free Today
+                <ArrowRight className="ml-3 group-hover:translate-x-1 transition-transform" size={24} />
             </Link>
+              
+              <div className="flex items-center gap-4 text-gray-300">
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="text-yellow-400 fill-current" size={20} />
+                  ))}
+                </div>
+                <span className="font-medium">Trusted by 10,000+ users</span>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-10 bg-gray-900 text-center">
-        <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} BOFU ai. All rights reserved.</p>
+      <footer className="py-12 bg-gray-900 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center gap-2 mb-4 md:mb-0">
+              <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-yellow-500 rounded-lg"></div>
+              <span className="text-white font-bold text-xl">BOFU ai</span>
+            </div>
+            <p className="text-gray-400 text-sm">
+              &copy; {new Date().getFullYear()} BOFU ai. All rights reserved.
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   );

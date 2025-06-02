@@ -553,7 +553,7 @@ function App() {
     // Only render the main app layout if isAppRoute is true
     if (isAppRoute) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
+        <div className="min-h-screen text-white" style={{ backgroundColor: '#1f2937' }}>
           <MainHeader 
             user={user} 
             onShowAuthModal={() => setShowAuthModal(true)}

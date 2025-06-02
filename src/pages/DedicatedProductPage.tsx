@@ -863,11 +863,13 @@ ${document.extracted_text.substring(0, 500)}`);
   // << End Filter and sort logic
 
   const handleProductSectionUpdate = async (
-    _productIndex: number, // Unused on DedicatedProductPage, but part of the shared signature
+    productIndex: number,
     sectionType: keyof ProductAnalysis,
     newItems: string[] | Record<string, any> // This should be the edited items from ProductSection
   ) => {
-    console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Initiating update. SectionType: '${sectionType}'. Received newItems:`, JSON.parse(JSON.stringify(newItems)));
+    // Safe logging that handles undefined values properly
+    const safeLogValue = newItems !== undefined ? JSON.parse(JSON.stringify(newItems)) : 'undefined';
+    console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Initiating update. ProductIndex: ${productIndex}, SectionType: '${sectionType}'. Received newItems:`, safeLogValue);
     if (!product?.id) {
       toast.error('Product ID is missing. Cannot update section.');
       console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error: Product or product.id is not available.');
@@ -1010,7 +1012,7 @@ ${document.extracted_text.substring(0, 500)}`);
   return (
     <>
       <MainHeader />
-      <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-gray-100">
+      <div className="p-4 md:p-8 min-h-screen text-gray-100" style={{ backgroundColor: '#1f2937' }}>
         <div className="max-w-7xl mx-auto">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center mb-8">
@@ -1104,12 +1106,12 @@ ${document.extracted_text.substring(0, 500)}`);
                   product={parsedAnalysisData} // Pass the parsed analysis data
                   index={0} // Since it's a single product view
                   isActionLoading={isGeneratingAnalysis || isSavingSection || isCardActionLoading} // Combine loading states
-                  onSave={(updatedProduct) => handleSaveProduct(updatedProduct as ProductAnalysis)} // Type assertion
-                  onApprove={(approvedProduct, idx) => handleApproveProduct(approvedProduct as ProductAnalysis, idx as number)} // Type assertion
+                  onSave={(updatedProduct: ProductAnalysis) => handleSaveProduct(updatedProduct)} // Type assertion
+                  onApprove={(approvedProduct: ProductAnalysis, idx: number) => handleApproveProduct(approvedProduct, idx)} // Type assertion
                   onUpdateSection={handleProductSectionUpdate}
-                  updateProduct={(updatedData) => {
+                  updateProduct={(updatedData: ProductAnalysis) => {
                     // When ProductCard internally updates, reflect it in parsedAnalysisData and product state
-                    setParsedAnalysisData(updatedData as ProductAnalysis); 
+                    setParsedAnalysisData(updatedData); 
                     if (product) {
                       setProduct({...product, generated_analysis_data: updatedData });
                     }

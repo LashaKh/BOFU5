@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Plus, X, ChevronDown, ChevronUp, BarChart, Loader2 } from 'lucide-react';
+import { Target, Plus, X, ChevronDown, ChevronUp, BarChart, Loader2, Search } from 'lucide-react';
 import { ProductAnalysis, CompetitorItem, CompetitorsData } from '../../types/product/types';
-import { CompetitorAnalysisButton } from '../CompetitorAnalysisButton';
 import toast from 'react-hot-toast';
 import { makeWebhookRequest } from '../../utils/webhookUtils';
 import { parseProductData } from '../../types/product';
@@ -33,6 +32,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
     niche_competitors: true,
     broader_competitors: true
   });
+  const [isIdentifying, setIsIdentifying] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
@@ -154,18 +154,10 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
     // Call the parent's onUpdateCompetitors function with the updated competitors
     if (onUpdateCompetitors) {
       console.log("Calling parent's onUpdateCompetitors with:", updatedCompetitors);
-      
-      // Make sure to preserve the competitorAnalysisUrl if it exists
-      const preservedUrl = product.competitorAnalysisUrl;
-      console.log("Preserving competitorAnalysisUrl:", preservedUrl);
-      
       onUpdateCompetitors(updatedCompetitors);
       
-      // If we have a URL but it's about to be lost, reapply it
-      if (preservedUrl && !product.competitorAnalysisUrl) {
-        console.log("Reapplying preserved URL:", preservedUrl);
-        onUpdate(preservedUrl);
-      }
+      // Force component to re-render by updating local state
+      setNewCompetitor(prev => ({ ...prev }));
     } else {
       console.warn("onUpdateCompetitors is not defined");
     }
@@ -247,7 +239,34 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
         }
       );
 
-      // Parse the response using our new parser
+      console.log('Received competitor analysis response:', response);
+
+      // First check if the response contains a URL directly
+      let foundUrl = false;
+      let urlToProcess = null;
+
+      // Check for URL in different formats
+      if (typeof response === 'string' && response.includes('docs.google.com')) {
+        urlToProcess = response.trim();
+        foundUrl = true;
+      } else if (typeof response === 'object' && response) {
+        const url = response.analysisUrl || response.documentUrl || response.url || response.google_doc || response.competitorAnalysisUrl;
+        if (url && typeof url === 'string' && url.includes('docs.google.com')) {
+          urlToProcess = url.trim();
+          foundUrl = true;
+        }
+      }
+
+      // If we found a URL, process it and preserve existing competitors
+      if (foundUrl && urlToProcess) {
+        console.log('Found analysis URL, processing and preserving existing competitors:', urlToProcess);
+        processUrl(urlToProcess);
+        // Don't parse through parseProductData to avoid overwriting competitors
+        toast.success('Competitor analysis completed - document ready!', { id: loadingToast });
+        return;
+      }
+
+      // If no direct URL found, try parsing the response
       const parsedProducts = parseProductData(response);
       
       // If we got any products back, use the first one's data
@@ -256,18 +275,28 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
         
         // If the product has a competitor analysis URL, process it
         if (firstProduct.competitorAnalysisUrl) {
+          console.log('Found analysis URL in parsed product:', firstProduct.competitorAnalysisUrl);
           processUrl(firstProduct.competitorAnalysisUrl);
         }
         
-        // If the product has competitors data, update it
+        // Only update competitors if the response actually contains competitor data
+        // Otherwise, preserve the existing competitors from the UI
         if (firstProduct.competitors && onUpdateCompetitors) {
-          onUpdateCompetitors(firstProduct.competitors);
+          const hasCompetitorData = (firstProduct.competitors.direct_competitors?.length || 0) > 0 ||
+                                   (firstProduct.competitors.niche_competitors?.length || 0) > 0 ||
+                                   (firstProduct.competitors.broader_competitors?.length || 0) > 0;
+          
+          if (hasCompetitorData) {
+            console.log('Updating competitors from analysis response:', firstProduct.competitors);
+            onUpdateCompetitors(firstProduct.competitors);
+          } else {
+            console.log('No competitor data in response, preserving existing competitors');
+          }
         } else {
-          // Check raw response for competitors data if not found in parsed product
-          checkAndProcessRawResponse(response);
+          console.log('No competitors in parsed product, preserving existing data');
         }
       } else {
-        // If no products were parsed, check the raw response
+        // If no products were parsed, check the raw response for competitors or URL
         checkAndProcessRawResponse(response);
       }
 
@@ -397,6 +426,71 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
     }
   };
 
+  const handleIdentifyCompetitors = async () => {
+    setIsIdentifying(true);
+    const loadingToast = toast.loading('Identifying competitors...');
+
+    try {
+      // Prepare the data to send to the webhook
+      const data = {
+        product: {
+          companyName: product.companyName,
+          productName: product.productDetails?.name,
+          description: product.productDetails?.description,
+          usps: product.usps,
+          businessOverview: product.businessOverview,
+          painPoints: product.painPoints,
+          features: product.features,
+          targetPersona: product.targetPersona,
+          pricing: product.pricing,
+          currentSolutions: product.currentSolutions,
+          capabilities: product.capabilities
+        },
+        requestType: 'identify_competitors',
+        uniqueId: crypto.randomUUID()
+      };
+
+      console.log('Sending competitor identification request:', data);
+
+      const response = await makeWebhookRequest(
+        'https://hook.us2.make.com/n4kuyrqovr1ndwj9nsodio7th70wbm6i',
+        data,
+        {
+          timeout: 300000, // 5 minutes
+          maxRetries: 3,
+          retryDelay: 2000
+        }
+      );
+
+      // Parse the response using our new parser
+      const parsedProducts = parseProductData(response);
+      
+      // If we got any products back, use the first one's data
+      if (parsedProducts.length > 0) {
+        const firstProduct = parsedProducts[0];
+        
+        // If the product has competitors data, update it
+        if (firstProduct.competitors && onUpdateCompetitors) {
+          console.log('Updating competitors from identification:', firstProduct.competitors);
+          onUpdateCompetitors(firstProduct.competitors);
+        } else {
+          // Check raw response for competitors data if not found in parsed product
+          checkAndProcessRawResponse(response);
+        }
+      } else {
+        // If no products were parsed, check the raw response
+        checkAndProcessRawResponse(response);
+      }
+
+      toast.success('Competitors identified successfully', { id: loadingToast });
+    } catch (error) {
+      console.error('Error in competitor identification:', error);
+      toast.error(`Failed to identify competitors: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: loadingToast });
+    } finally {
+      setIsIdentifying(false);
+    }
+  };
+
   const renderCompetitorSection = (title: string, type: CompetitorType, competitors: CompetitorItem[]) => {
     const isExpanded = expandedSections[type];
     const competitorList = Array.isArray(competitors) ? competitors : [];
@@ -406,11 +500,11 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
     return (
       <div className="mb-3">
         <div
-          className="flex justify-between items-center p-2 bg-secondary-50 rounded-lg cursor-pointer"
+          className="flex justify-between items-center p-3 bg-gray-50 rounded-lg cursor-pointer border border-gray-200 hover:bg-gray-100 transition-colors"
           onClick={() => toggleSection(type)}
         >
-          <h4 className="font-medium dark:text-white">{title}</h4>
-          {isExpanded ? <ChevronUp size={16} className="text-gray-600 dark:text-gray-400" /> : <ChevronDown size={16} className="text-gray-600 dark:text-gray-400" />}
+          <h5 className="font-medium text-gray-900">{title}</h5>
+          {isExpanded ? <ChevronUp size={16} className="text-gray-600" /> : <ChevronDown size={16} className="text-gray-600" />}
         </div>
         
         <AnimatePresence>
@@ -427,23 +521,23 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                   {competitorList.map((competitor, index) => (
                     <div 
                       key={`${type}-${index}`}
-                      className="p-3 bg-white rounded-lg border border-secondary-100 flex justify-between items-start"
+                      className="p-3 bg-white rounded-lg border border-gray-200 flex justify-between items-start shadow-sm"
                     >
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-gray-900">{competitor.company_name}</span>
-                          <span className="text-xs px-2 py-0.5 bg-secondary-100 text-secondary-700 rounded-full">
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
                             {competitor.product_name}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">{competitor.category}</p>
+                        <p className="text-xs text-gray-600 mt-1">{competitor.category}</p>
                       </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveCompetitor(type, index);
                         }}
-                        className="text-gray-600 dark:text-gray-300 hover:text-red-500 p-1"
+                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors"
                       >
                         <X size={14} />
                       </button>
@@ -451,7 +545,7 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-white italic mt-2 px-2">
+                <p className="text-sm text-gray-500 italic mt-2 px-3">
                   No {title.toLowerCase()} identified yet.
                 </p>
               )}
@@ -463,158 +557,149 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
   };
 
   return (
-    <motion.div 
-      className="bg-secondary-900/80 backdrop-blur-sm rounded-xl border border-primary-500/20 p-4 hover:shadow-glow transition-all"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-primary-400 flex items-center gap-2">
-          <Target className="text-primary-400" size={20} />
-          Competitor Analysis
-        </h3>
-        <CompetitorAnalysisButton 
-          product={product} 
-          onAnalysisComplete={onUpdate} 
-          onCompetitorsReceived={handleUpdateCompetitors} 
-        />
+    <div className="space-y-4">
+      <h4 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Competitor Analysis</h4>
+      
+      {/* Two separate action buttons */}
+      <div className="space-y-3">
+        {/* Identify Competitors Button */}
+        <button
+          onClick={handleIdentifyCompetitors}
+          disabled={isIdentifying}
+          className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-150 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isIdentifying ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Identifying Competitors...
+            </>
+          ) : (
+            <>
+              <Search className="w-5 h-5" />
+              Identify Competitors
+            </>
+          )}
+        </button>
+        
+        {/* Analyze Competitors Button */}
+        <button
+          onClick={handleAnalyzeCompetitors}
+          disabled={isAnalyzing || 
+            (!product.competitors?.direct_competitors?.length && 
+             !product.competitors?.niche_competitors?.length && 
+             !product.competitors?.broader_competitors?.length)}
+          className="w-full px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors duration-150 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isAnalyzing ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Analyzing Competitors...
+            </>
+          ) : (
+            <>
+              <BarChart className="w-5 h-5" />
+              Analyze Competitors
+            </>
+          )}
+        </button>
       </div>
       
-      {/* Competitors Section */}
-      {(product.competitors || true) &&
-        <div>
-          {/* Manual competitor entry */}
-          {!showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-1 mb-3 px-3 py-1.5 text-xs rounded-lg bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 transition-colors"
+      {/* Manual competitor entry */}
+      {!showForm ? (
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+        >
+          <Plus size={16} />
+          Add Competitor Manually
+        </button>
+      ) : (
+        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h5 className="text-sm font-medium text-gray-900">Add New Competitor</h5>
+            <button 
+              onClick={() => setShowForm(false)}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200"
             >
-              <Plus size={14} />
-              Add Competitor Manually
+              <X size={16} />
             </button>
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-4 bg-secondary-800 rounded-lg border border-primary-500/20 p-3"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-primary-400">Add New Competitor</h4>
-                <button 
-                  onClick={() => setShowForm(false)}
-                  className="p-1 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-full hover:bg-secondary-700"
-                  >
-                    <X size={14} />
-                  </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs text-gray-100 mb-1">Competitor Type</label>
-                  <select 
-                    value={newCompetitor.type}
-                    onChange={(e) => setNewCompetitor({...newCompetitor, type: e.target.value as CompetitorType})}
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="direct">Direct</option>
-                    <option value="niche">Niche</option>
-                    <option value="broader">Broader</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-100 mb-1">Category/Segment</label>
-                  <input
-                    type="text"
-                    value={newCompetitor.category}
-                    onChange={(e) => setNewCompetitor({...newCompetitor, category: e.target.value})}
-                    placeholder="e.g. Software as a Service"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs text-gray-100 mb-1">Company Name</label>
-                  <input
-                    type="text"
-                    value={newCompetitor.company_name}
-                    onChange={(e) => setNewCompetitor({...newCompetitor, company_name: e.target.value})}
-                    placeholder="e.g. Acme Inc."
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-100 mb-1">Product Name</label>
-                  <input
-                    type="text"
-                    value={newCompetitor.product_name}
-                    onChange={(e) => setNewCompetitor({...newCompetitor, product_name: e.target.value})}
-                    placeholder="e.g. Acme Pro"
-                    className="w-full px-3 py-1.5 text-sm bg-secondary-900 border border-primary-500/30 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={handleAddCompetitor}
-                  disabled={!newCompetitor.company_name || !newCompetitor.product_name}
-                  className="px-3 py-1.5 text-xs bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                >
-                  <Plus size={14} />
-                  Add
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          <div className="bg-secondary-800 rounded-lg border border-primary-500/20 p-3">
-            {renderCompetitorSection('Direct Competitors', 'direct_competitors', 
-              Array.isArray(product.competitors?.direct_competitors) ? product.competitors.direct_competitors : [])}
-            {renderCompetitorSection('Niche Competitors', 'niche_competitors', 
-              Array.isArray(product.competitors?.niche_competitors) ? product.competitors.niche_competitors : [])}
-            {renderCompetitorSection('Broader Competitors', 'broader_competitors', 
-              Array.isArray(product.competitors?.broader_competitors) ? product.competitors.broader_competitors : [])}
-            
-            {/* Analyze Competitors Button */}
-            <div className="mt-4">
-              <div className="text-xs text-white text-center mb-2">
-                Click below to perform deep analysis on all identified competitors.
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={handleAnalyzeCompetitors}
-                  disabled={isAnalyzing || 
-                    (!product.competitors?.direct_competitors?.length && 
-                     !product.competitors?.niche_competitors?.length && 
-                     !product.competitors?.broader_competitors?.length)}
-                  className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-colors duration-150 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-700 disabled:hover:shadow-none"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <BarChart className="w-4 h-4" />
-                      Analyze Competitors
-                    </>
-                  )}
-                </button>
-              </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Competitor Type</label>
+              <select 
+                value={newCompetitor.type}
+                onChange={(e) => setNewCompetitor({...newCompetitor, type: e.target.value as CompetitorType})}
+                className="w-full px-3 py-2 text-sm bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="direct_competitors">Direct</option>
+                <option value="niche_competitors">Niche</option>
+                <option value="broader_competitors">Broader</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Category/Segment</label>
+              <input
+                type="text"
+                value={newCompetitor.category}
+                onChange={(e) => setNewCompetitor({...newCompetitor, category: e.target.value})}
+                placeholder="e.g. Software as a Service"
+                className="w-full px-3 py-2 text-sm bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+              />
             </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Company Name</label>
+              <input
+                type="text"
+                value={newCompetitor.company_name}
+                onChange={(e) => setNewCompetitor({...newCompetitor, company_name: e.target.value})}
+                placeholder="e.g. Acme Inc."
+                className="w-full px-3 py-2 text-sm bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Product Name</label>
+              <input
+                type="text"
+                value={newCompetitor.product_name}
+                onChange={(e) => setNewCompetitor({...newCompetitor, product_name: e.target.value})}
+                placeholder="e.g. Acme Pro"
+                className="w-full px-3 py-2 text-sm bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+              />
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <button
+              onClick={handleAddCompetitor}
+              disabled={!newCompetitor.company_name || !newCompetitor.product_name}
+              className="px-4 py-2 text-sm bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add
+            </button>
+          </div>
         </div>
-      }
+      )}
+
+      {/* Competitors Display */}
+      <div className="space-y-3">
+        {renderCompetitorSection('Direct Competitors', 'direct_competitors', 
+          Array.isArray(product.competitors?.direct_competitors) ? product.competitors.direct_competitors : [])}
+        {renderCompetitorSection('Niche Competitors', 'niche_competitors', 
+          Array.isArray(product.competitors?.niche_competitors) ? product.competitors.niche_competitors : [])}
+        {renderCompetitorSection('Broader Competitors', 'broader_competitors', 
+          Array.isArray(product.competitors?.broader_competitors) ? product.competitors.broader_competitors : [])}
+      </div>
       
-      {/* Remove the competitorAnalysisUrl section and only keep the 'no competitors' message */}
+      {/* Empty state message */}
       {!product.competitors && (
-        <p className="text-sm text-white italic">
+        <p className="text-sm text-gray-500 italic">
           No competitor analysis available yet. Click the button above to generate one.
         </p>
       )}
-    </motion.div>
+    </div>
   );
 } 

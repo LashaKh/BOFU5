@@ -384,3 +384,63 @@ export async function fetchCapabilities(researchResultId?: string): Promise<Capa
     return [];
   }
 }
+
+/**
+ * Fetches USPs (Unique Selling Propositions) from the approved_products table
+ * This function can be used without a specific research_result_id to get all available USPs
+ */
+export async function fetchUSPs(researchResultId?: string) {
+  try {
+    let query = supabase
+      .from('approved_products')
+      .select('product_data, research_result_id');
+    
+    // If a research_result_id is provided, filter by it
+    if (researchResultId) {
+      query = query.eq('research_result_id', researchResultId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching USPs:', error);
+      return [];
+    }
+    
+    // Process all product data to extract USPs
+    let allUSPs: string[] = [];
+    
+    if (data && data.length > 0) {
+      data.forEach(item => {
+        if (item.product_data) {
+          // Parse product_data JSON and extract USPs
+          try {
+            const productData = typeof item.product_data === 'string'
+              ? JSON.parse(item.product_data)
+              : item.product_data;
+            
+            // Extract USPs array (could be stored in different fields)
+            const usps = productData.usps || 
+                        productData.unique_selling_propositions ||
+                        productData.uniqueSellingPropositions ||
+                        productData.selling_points ||
+                        productData.value_propositions ||
+                        [];
+            
+            if (usps.length > 0) {
+              allUSPs = [...allUSPs, ...usps];
+            }
+          } catch (parseError) {
+            console.error('Error parsing product data for USPs:', parseError);
+          }
+        }
+      });
+    }
+    
+    // Return unique USPs
+    return Array.from(new Set(allUSPs));
+  } catch (err) {
+    console.error('Unexpected error fetching USPs:', err);
+    return [];
+  }
+}

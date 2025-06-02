@@ -6,20 +6,34 @@ import { UserDashboardLayout } from '../components/user-dashboard/UserDashboardL
 import { getBriefById, updateBrief } from '../lib/contentBriefs';
 import { ContentBrief } from '../types/contentBrief';
 import { toast } from 'react-hot-toast';
-import debounce from 'lodash/debounce';
 import { BriefContent } from '../components/content-brief/BriefContent';
 import { ContentBriefEditorSimple } from '../components/content-brief/ContentBriefEditorSimple';
-import { ApproveContentBrief } from '../components/content/ApproveContentBrief';
-
+import { DesktopApprovalButton, MobileApprovalButton } from '../components/common/ResponsiveApprovalButton';
+import { useBriefAutoSave } from '../hooks/useBriefAutoSave';
+import { 
+  ensureLinksAsText, 
+  ensureLinksAsArray,
+  ensureTitlesAsArray 
+} from '../utils/contentFormatUtils';
+import { 
+  cleanBriefContent, 
+  shouldUseJsonEditor, 
+  prepareContentForEditor 
+} from '../utils/contentProcessor';
+import { motion } from 'framer-motion';
+import { Edit3, ArrowLeft, Package, FileText, AlertCircle } from 'lucide-react';
+import { ResponsiveApprovalButton } from '../components/common/ResponsiveApprovalButton';
 
 export default function EditContentBrief() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [brief, setBrief] = useState<ContentBrief | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [useJsonEditor, setUseJsonEditor] = useState(false);
   const [jsonContent, setJsonContent] = useState('');
+
+  // Use the extracted auto-save hook
+  const { saving, saveToSupabase, handleAutoSave } = useBriefAutoSave(id, brief);
 
   const editor = useEditor({
     extensions: [
@@ -51,137 +65,22 @@ export default function EditContentBrief() {
     },
   });
 
-  // Helper function to ensure links are in string format (text)
-  const ensureLinksAsText = (links: string[] | string | undefined): string => {
-    if (!links) return '';
-    if (typeof links === 'string') return links;
-    return links.join('\n');
-  };
-  
-  // Helper function to ensure array format when needed
-  const ensureLinksAsArray = (links: string[] | string | undefined): string[] => {
-    if (!links) return [];
-    if (typeof links === 'string') {
-      // Try to parse as JSON first
-      try {
-        const parsed = JSON.parse(links);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
-        // Not JSON, split by newlines
-        return links.split('\n').filter(l => l.trim().length > 0);
-      }
-    }
-    if (Array.isArray(links)) return links;
-    return [];
-  };
-
-  // Direct save function without debounce - more reliable for array values
-  const saveToSupabase = useCallback(async (updates: {
-    brief_content?: string;
-    brief_content_text?: string;
-    product_name?: string;
-    status?: ContentBrief['status'];
-    internal_links?: string[] | string; // Accept either string[] or string (for text format)
-    possible_article_titles?: string[] | string; // Accept either string[] or string (for text format)
-    suggested_content_frameworks?: string;
-  }) => {
-    if (!id || !brief) return;
-    
-    // Log the updates we're saving to help with debugging
-    console.log('SAVING TO SUPABASE - RECEIVED UPDATES:', updates);
-    
-    try {
-      setSaving(true);
-      console.log('Saving to Supabase:', updates);
-      
-      // Always get latest data from state to ensure we have complete values
-      const completeUpdates = {
-        ...updates,
-        // Include complete brief data
-        brief_content: updates.brief_content || brief.brief_content,
-        brief_content_text: updates.brief_content_text || brief.brief_content_text || updates.brief_content || brief.brief_content,
-        product_name: updates.product_name || brief.product_name || '',
-        status: updates.status || brief.status || 'pending',
-        // Always ensure these are saved as text with newlines (string format for Supabase)
-        internal_links: updates.internal_links !== undefined ? ensureLinksAsText(updates.internal_links) : ensureLinksAsText(brief.internal_links || []),
-        possible_article_titles: updates.possible_article_titles !== undefined ? ensureLinksAsText(updates.possible_article_titles) : ensureLinksAsText(brief.possible_article_titles || []),
-        suggested_content_frameworks: updates.suggested_content_frameworks || brief.suggested_content_frameworks || ''
-      };
-      
-      console.log('Complete update to Supabase:', completeUpdates);
-      
-      // IMPORTANT: Allow empty values to be saved to Supabase
-      // These lines are intentionally removed to allow clearing these fields
-      // Log what we're doing to help debug
-      console.log('Preserving current internal_links:', completeUpdates.internal_links);
-      console.log('Preserving current possible_article_titles:', completeUpdates.possible_article_titles);
-      
-      const result = await updateBrief(id, completeUpdates);
-      console.log('Update result:', result);
-      
-      // Update the local brief state to match what's in the database
-      setBrief(prev => prev ? {
-        ...prev,
-        ...completeUpdates
-      } : null);
-      
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast.error('Failed to save changes');
-    } finally {
-      setSaving(false);
-    }
-  }, [id, brief]);
-  
-  // Auto-save debounced function for text fields
-  const handleAutoSave = useCallback(
-    debounce(async (updates: {
-      brief_content?: string;
-      brief_content_text?: string;
-      product_name?: string;
-      status?: ContentBrief['status'];
-      internal_links?: string[];
-      possible_article_titles?: string[];
-      suggested_content_frameworks?: string;
-    }) => {
-      saveToSupabase(updates);
-    }, 1000),
-    [saveToSupabase]
-  );
-
-  // Helper function to clean content with code block markers
-  const cleanBriefContent = (content: string): string => {
-    if (!content) return '';
-    
-    // Check if content has markdown code block markers
-    const codeBlockRegex = /^\s*```(?:json|javascript|js)?([\s\S]*?)```\s*$/;
-    const match = content.match(codeBlockRegex);
-    
-    if (match && match[1]) {
-      console.log('EditContentBrief: Detected content in code blocks, cleaning');
-      return match[1].trim();
-    }
-    
-    return content;
-  };
-
   // Handle JSON content update
   const handleJsonUpdate = useCallback(
     (content: string, newLinks: string[], newTitles: string[]) => {
       const cleanedContent = cleanBriefContent(content);
-      setJsonContent(cleanedContent); // Update content for the JSON editor display
+      setJsonContent(cleanedContent);
 
       // Update the main brief state
       setBrief(prev => {
         if (!prev) return null;
-        // Ensure state stores arrays; saveToSupabase will handle text conversion
         const internal_links_array = ensureLinksAsArray(newLinks);
         const possible_article_titles_array = ensureLinksAsArray(newTitles);
 
         return {
           ...prev,
           brief_content: cleanedContent,
-          brief_content_text: cleanedContent, // Assuming text is same as content for this editor path
+          brief_content_text: cleanedContent,
           internal_links: internal_links_array,
           possible_article_titles: possible_article_titles_array,
         };
@@ -190,8 +89,8 @@ export default function EditContentBrief() {
       // Trigger debounced save with all data pieces
       console.log('EditContentBrief.handleJsonUpdate triggering auto-save with:', {
         brief_content: cleanedContent,
-        internal_links: newLinks, // Pass as received, ensureLinksAsText is in saveToSupabase
-        possible_article_titles: newTitles, // Pass as received
+        internal_links: newLinks,
+        possible_article_titles: newTitles,
       });
       handleAutoSave({
         brief_content: cleanedContent,
@@ -199,10 +98,8 @@ export default function EditContentBrief() {
         possible_article_titles: newTitles,
       });
     },
-    [cleanBriefContent, handleAutoSave, ensureLinksAsArray] // Updated dependencies
+    [handleAutoSave]
   );
-
-  // Function to handle link insertion was removed as it's now handled in BriefContent
 
   // Function to fetch suggestions - now handled in loadBrief
   const fetchSuggestions = useCallback(async () => {
@@ -213,6 +110,45 @@ export default function EditContentBrief() {
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
+
+  // Parse links and titles from various formats
+  const parseLinksAndTitles = (data: any) => {
+    const parseField = (field: any): string[] => {
+      if (Array.isArray(field)) {
+        return field;
+      } else if (typeof field === 'string') {
+        try {
+          const parsed = JSON.parse(field);
+          if (Array.isArray(parsed)) {
+            return parsed.map((item: any) => {
+              if (typeof item === 'string') {
+                try {
+                  const parsedItem = JSON.parse(item);
+                  if (Array.isArray(parsedItem)) {
+                    return parsedItem;
+                  }
+                  return item;
+                } catch {
+                  return item;
+                }
+              }
+              return item;
+            }).flat();
+          } else {
+            return [field];
+          }
+        } catch {
+          return field.split('\n').filter((item: string) => item.trim().length > 0);
+        }
+      }
+      return [];
+    };
+
+    return {
+      parsedInternalLinks: parseField(data.internal_links),
+      parsedArticleTitles: parseField(data.possible_article_titles)
+    };
+  };
 
   // Load brief data
   useEffect(() => {
@@ -233,180 +169,49 @@ export default function EditContentBrief() {
           return;
         }
 
-        // First parse text-formatted links and titles into proper arrays
-        let parsedInternalLinks: string[] = [];
-        
-        if (Array.isArray(data.internal_links)) {
-          parsedInternalLinks = data.internal_links;
-        } else if (typeof data.internal_links === 'string') {
-          const internalLinksStr = data.internal_links as string;
-          
-          // Check if it's a JSON array (stringified)
-          try {
-            // First try parsing as a JSON array
-            const parsed = JSON.parse(internalLinksStr);
-            console.log('Parsed internal_links JSON:', parsed);
-            
-            if (Array.isArray(parsed)) {
-              // It's already a proper array
-              parsedInternalLinks = parsed.map((item: any) => {
-                // Handle nested JSON strings that might be inside the array
-                if (typeof item === 'string') {
-                  try {
-                    const parsedItem = JSON.parse(item);
-                    if (Array.isArray(parsedItem)) {
-                      return parsedItem; // This will return the inner array
-                    }
-                    return item;
-                  } catch {
-                    return item; // Return as-is if not JSON
-                  }
-                }
-                return item;
-              }).flat(); // Flatten in case we had nested arrays
-            } else {
-              // If it's JSON but not an array, add it as a single item
-              parsedInternalLinks = [internalLinksStr];
-            }
-          } catch (e) {
-            // Not valid JSON, fall back to newline splitting
-            console.log('Not valid JSON, using newline splitting for internal_links');
-            parsedInternalLinks = internalLinksStr.split('\n').filter((link: string) => link.trim().length > 0);
-          }
-        }
-        
-        // Do the same for possible_article_titles
-        let parsedArticleTitles: string[] = [];
-        
-        if (Array.isArray(data.possible_article_titles)) {
-          parsedArticleTitles = data.possible_article_titles;
-        } else if (typeof data.possible_article_titles === 'string') {
-          const titleStr = data.possible_article_titles as string;
-          
-          // Check if it's a JSON array (stringified)
-          try {
-            // First try parsing as a JSON array
-            const parsed = JSON.parse(titleStr);
-            console.log('Parsed possible_article_titles JSON:', parsed);
-            
-            if (Array.isArray(parsed)) {
-              // It's already a proper array
-              parsedArticleTitles = parsed.map((item: any) => {
-                // Handle nested JSON strings that might be inside the array
-                if (typeof item === 'string') {
-                  try {
-                    const parsedItem = JSON.parse(item);
-                    if (Array.isArray(parsedItem)) {
-                      return parsedItem; // This will return the inner array
-                    }
-                    return item;
-                  } catch {
-                    return item; // Return as-is if not JSON
-                  }
-                }
-                return item;
-              }).flat(); // Flatten in case we had nested arrays
-            } else {
-              // If it's JSON but not an array, add it as a single item
-              parsedArticleTitles = [titleStr];
-            }
-          } catch (e) {
-            // Not valid JSON, fall back to newline splitting
-            console.log('Not valid JSON, using newline splitting for possible_article_titles');
-            parsedArticleTitles = titleStr.split('\n').filter((title: string) => title.trim().length > 0);
-          }
-        }
+        // Parse links and titles using extracted function
+        const { parsedInternalLinks, parsedArticleTitles } = parseLinksAndTitles(data);
           
         // Transform the data to match UI expectations
         const transformedBrief = {
           ...data,
           product_name: data.product_name || 'Untitled Product',
-          title: data.title || data.product_name || 'Untitled Brief',
           status: data.status || 'pending',
-          // Use the parsed arrays
           internal_links: parsedInternalLinks,
           possible_article_titles: parsedArticleTitles,
-          // Create object structures for UI components based on the parsed arrays
           suggested_titles: parsedArticleTitles.map((title: string) => ({ title, score: 0 })),
           suggested_links: parsedInternalLinks.map((url: string) => {
-            let displayTitle = url; // Default to the full URL string
+            let displayTitle = url;
             const lastSegment = url.substring(url.lastIndexOf('/') + 1).trim();
 
             if (lastSegment) {
               displayTitle = lastSegment;
-            } else {
-              // If lastSegment is empty (e.g., URL ends with '/'), try to use hostname
-              if (url.includes('://')) {
-                try {
-                  displayTitle = new URL(url).hostname;
-                } catch (e) {
-                  // Parsing failed, displayTitle remains the original url, which is safe
-                  console.warn(`Failed to parse URL for hostname: ${url}. Falling back to full URL or derived segment for title.`);
-                }
+            } else if (url.includes('://')) {
+              try {
+                displayTitle = new URL(url).hostname;
+              } catch (e) {
+                console.warn(`Failed to parse URL for hostname: ${url}`);
               }
             }
             return { title: displayTitle, url, relevance: 1 };
           })
         };
         
-        console.log('Loaded internal_links:', data.internal_links);
-        console.log('Loaded possible_article_titles:', data.possible_article_titles);
-
         console.log('Brief loaded:', transformedBrief);
 
-        // Check if content is JSON format
-        try {
-          let contentToUse = '';
-        
-          if (data?.brief_content_text && typeof data.brief_content_text === 'string') {
-            // Use the brief_content_text field if available and it's a string
-            contentToUse = data.brief_content_text;
-            console.log('Using brief_content_text:', typeof contentToUse === 'string' ? contentToUse.substring(0, 50) : 'Not a string');
-          } else if (data?.brief_content) {
-            // Fall back to brief_content
-            if (typeof data.brief_content === 'string') {
-              contentToUse = data.brief_content;
-              console.log('Using brief_content:', contentToUse.substring(0, 50));
-            } else if (typeof data.brief_content === 'object') {
-              // If brief_content is an object, convert it to a string representation
-              contentToUse = JSON.stringify(data.brief_content, null, 2);
-              console.log('Using stringified brief_content object');
-            } else {
-              console.log('brief_content is neither string nor object:', typeof data.brief_content);
-            }
-          } else {
-            console.log('No content found in brief');
-          }
-        
-          // Clean the content to remove code block markers or other issues
-          if (typeof contentToUse === 'string' && contentToUse.includes('```')) {
-            console.log('Content contains markdown code blocks, cleaning them');
-            contentToUse = cleanBriefContent(contentToUse);
-          }
-        
-          setJsonContent(contentToUse);
-        
-          // If we have an editor, set its content
-          if (editor && contentToUse) {
-            editor.commands.setContent(contentToUse);
-          }
-        } catch (e) {
-          console.error('Error loading brief content:', e);
+        // Prepare content for editor using extracted utilities
+        const contentToUse = prepareContentForEditor(
+          data?.brief_content_text || data?.brief_content
+        );
+        setJsonContent(contentToUse);
+
+        // Set editor content if available
+        if (editor && contentToUse) {
+          editor.commands.setContent(contentToUse);
         }
 
-        // Check if content is JSON format
-        try {
-          if (data.brief_content && typeof data.brief_content === 'string') {
-            JSON.parse(data.brief_content);
-            setUseJsonEditor(true);
-          } else if (data.brief_content && typeof data.brief_content === 'object') {
-            // Already an object, so we'll use the JSON editor
-            setUseJsonEditor(true);
-          }
-        } catch (e) {
-          // Not valid JSON, will use standard editor
-          setUseJsonEditor(false);
-        }
+        // Determine editor mode using extracted utility
+        setUseJsonEditor(shouldUseJsonEditor(data.brief_content));
         
         setBrief(transformedBrief);
       } catch (error) {
@@ -419,7 +224,7 @@ export default function EditContentBrief() {
     }
 
     loadBrief();
-  }, [id, navigate]);
+  }, [id, navigate, editor]);
 
   // Set initial content when editor is ready and brief is loaded
   useEffect(() => {
@@ -430,9 +235,18 @@ export default function EditContentBrief() {
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
-    setBrief(prev => prev ? { ...prev, title: newTitle } : null);
+    setBrief(prev => prev ? { ...prev, product_name: newTitle } : null);
     handleAutoSave({ brief_content: editor?.getHTML(), product_name: newTitle });
   }, [handleAutoSave, editor]);
+
+  // Handle approval success
+  const handleApprovalSuccess = useCallback(() => {
+    toast.success('Content brief sent to AirOps successfully');
+    setBrief(prev => prev ? { ...prev, status: 'approved' } : null);
+    if (id) {
+      updateBrief(id, { status: 'approved' });
+    }
+  }, [id]);
 
   if (loading) {
     return (
@@ -461,168 +275,178 @@ export default function EditContentBrief() {
   }
 
   return (
-    <UserDashboardLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-            <div className="flex-1">
-              <div className="mb-2">
-                <label className="block text-sm font-medium text-gray-500 mb-1">Product Name</label>
-                <input
-                  type="text"
-                  value={brief.product_name || ''}
-                  onChange={(e) => {
-                    setBrief(prev => prev ? { ...prev, product_name: e.target.value } : null);
-                    handleAutoSave({ product_name: e.target.value });
-                  }}
-                  className="text-2xl font-bold text-gray-900 w-full bg-transparent border-0 focus:ring-2 focus:ring-primary-500 rounded px-2 py-1"
-                  placeholder="Enter product name"
-                />
-              </div>
-              <div className="flex items-center text-sm text-gray-500 gap-3">
-                <span>Last updated: {new Date(brief.updated_at).toLocaleDateString()} {new Date(brief.updated_at).toLocaleTimeString()}</span>
-                {brief.status && (
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center ${
-                      brief.status === 'approved'
-                        ? 'bg-green-100 text-green-800'
-                        : brief.status === 'rejected'
-                        ? 'bg-red-100 text-red-800'
-                        : brief.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                      brief.status === 'approved' ? 'bg-green-600' : 
-                      brief.status === 'rejected' ? 'bg-red-600' : 
-                      brief.status === 'pending' ? 'bg-yellow-600' : 'bg-gray-600'
-                    }`}></span>
-                    {brief.status.charAt(0).toUpperCase() + brief.status.slice(1)}
-                  </span>
-                )}
-                {saving && <span className="text-primary-500 animate-pulse">Saving...</span>}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50">
+      {/* Professional Navigation Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200/50 shadow-sm"
+      >
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/dashboard/content-briefs')}
+                className="group flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-lg hover:bg-gray-100/80"
+              >
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                <span className="font-medium">Back to Content Briefs</span>
+              </button>
+              
+              <div className="h-6 w-px bg-gray-300"></div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-lg">
+                  <Edit3 className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">Edit Content Brief</h1>
+                  <p className="text-sm text-gray-500">Customize your content strategy</p>
+                </div>
               </div>
             </div>
             
-            <div className="hidden sm:block">
-              <ApproveContentBrief
-                contentBrief={brief.brief_content || editor?.getHTML() || ''}
-                articleTitle={
-                  Array.isArray(brief.possible_article_titles) && brief.possible_article_titles.length > 0 
-                    ? brief.possible_article_titles[0] 
-                    : (typeof brief.possible_article_titles === 'string' ? brief.possible_article_titles.split('\n')[0] : brief.title || '')
-                }
-                internalLinks={
-                  // Handle both string and array formats for internal_links
-                  typeof brief.internal_links === 'string' 
-                    ? brief.internal_links 
-                    : (Array.isArray(brief.internal_links) 
-                      ? brief.internal_links.join('\n') 
-                      : (brief.suggested_links?.map(link => link.url).join('\n') || ''))
-                }
-                contentFramework={brief.suggested_content_frameworks || brief.framework || ''}
-                briefId={id || ''} // Pass the briefId
-                onSuccess={() => {
-                  toast.success('Content brief sent to AirOps successfully');
-                  setBrief(prev => prev ? { ...prev, status: 'approved' } : null);
-                  if (id) {
-                    updateBrief(id, { status: 'approved' });
-                  }
-                }}
-              />
+            <div className="flex items-center space-x-3">
+              {/* Status Indicator */}
+              <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Auto-saving</span>
+              </div>
             </div>
           </div>
         </div>
+      </motion.div>
 
-        <div className="w-full flex flex-col">
-          <div className="bg-white rounded-lg shadow-sm mb-6">
-            {useJsonEditor ? (
-              <div className="p-6">
-                <ContentBriefEditorSimple
-                  initialContent={jsonContent} 
-                  onUpdate={handleJsonUpdate}
-                  briefId={id || ''}
-                />
+      {/* Enhanced Main Content Container */}
+      <div className="relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute inset-0 bg-grid-pattern opacity-20"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/30 via-transparent to-purple-50/30"></div>
+        </div>
+        
+        {/* Content Container */}
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-8">
+          {loading ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center py-20"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <div className="text-gray-600 font-medium">Loading content brief...</div>
+                <div className="text-sm text-gray-500">Please wait while we fetch your data</div>
               </div>
-            ) : (
-              <BriefContent 
-                editor={editor} 
-                briefId={id || ''} 
-                articleTitle={brief.title}
-                onArticleTitleChange={(title) => {
-                  // Update title in brief and save to server
-                  handleTitleChange({ target: { value: title } } as React.ChangeEvent<HTMLInputElement>);
-                }}
-                onSuggestedTitlesChange={(titles) => {
-                  console.log('EditContentBrief received titles update:', titles);
-                  const titlesArray = ensureLinksAsArray(titles); // Use existing helper
-                  setBrief(prev => {
-                    if (!prev) return null;
-                    return {
-                      ...prev,
-                      possible_article_titles: titlesArray, // Store as array
-                    };
-                  });
-                  // Direct saveToSupabase and toast removed.
-                  // The Tiptap editor's onUpdate will trigger handleAutoSave,
-                  // which calls saveToSupabase, picking up the latest titles from state.
-                  if (!titles || titlesArray.length === 0) {
-                     console.warn('BriefContent: Suggested titles cleared or empty.');
-                  }
-                }}
-                onInternalLinksChange={(links) => {
-                  console.log('EditContentBrief received internal links update:', links);
-                  const linksArray = ensureLinksAsArray(links); // Use existing helper
-                  setBrief(prev => {
-                    if (!prev) return null;
-                    return {
-                      ...prev,
-                      internal_links: linksArray, // Store as array
-                    };
-                  });
-                  // Direct saveToSupabase and toast removed.
-                  // The Tiptap editor's onUpdate will trigger handleAutoSave,
-                  // which calls saveToSupabase, picking up the latest links from state.
-                  if (!links || linksArray.length === 0) {
-                    console.warn('BriefContent: Internal links cleared or empty.');
-                  }
-                }}
-                suggestedTitles={Array.isArray(brief.possible_article_titles) ? brief.possible_article_titles.map(title => ({ title, score: 0 })) : (brief.suggested_titles || [])}
-                suggestedLinks={Array.isArray(brief.internal_links) ? brief.internal_links.map(url => ({ title: typeof url === 'string' ? url.split('/').pop() || url : url, url, relevance: 0 })) : (brief.suggested_links || [])}
-              />
-            )}
-          </div>
-          
-          <div className="sm:hidden flex justify-center mt-4 mb-8">
-            <ApproveContentBrief
-              contentBrief={brief.brief_content || editor?.getHTML() || ''}
-              articleTitle={
-                Array.isArray(brief.possible_article_titles) && brief.possible_article_titles.length > 0 
-                  ? brief.possible_article_titles[0] 
-                  : (typeof brief.possible_article_titles === 'string' ? brief.possible_article_titles.split('\n')[0] : brief.title || '')
-              }
-              internalLinks={
-                // Handle both string and array formats for internal_links
-                typeof brief.internal_links === 'string' 
-                  ? brief.internal_links 
-                  : (Array.isArray(brief.internal_links) 
-                    ? brief.internal_links.join('\n') 
-                    : (brief.suggested_links?.map(link => link.url).join('\n') || ''))
-              }
-              contentFramework={brief.suggested_content_frameworks || brief.framework || ''}
-              briefId={id || ''} // Pass the briefId
-              onSuccess={() => {
-                toast.success('Content brief sent to AirOps successfully');
-                setBrief(prev => prev ? { ...prev, status: 'approved' } : null);
-                if (id) {
-                  updateBrief(id, { status: 'approved' });
-                }
-              }}
-            />
-          </div>
+            </motion.div>
+          ) : brief ? (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              className="space-y-8"
+            >
+              {/* Professional Product Header Card */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-50 via-blue-50 to-purple-50 rounded-2xl opacity-80"></div>
+                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+                  <div className="bg-gradient-to-r from-indigo-500 via-blue-600 to-purple-600 px-8 py-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl">
+                          <Package className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold text-white">{brief.product_name}</h2>
+                          <p className="text-blue-100 font-medium">Content Brief Editor</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <ResponsiveApprovalButton 
+                          brief={brief}
+                          briefId={id || ''}
+                          onSuccess={handleApprovalSuccess}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Product Info Section */}
+                  {brief.product_name && (
+                    <div className="px-8 py-6 border-b border-gray-200/50">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg mt-1">
+                          <FileText className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 mb-2">Product Overview</h3>
+                          <p className="text-gray-700 leading-relaxed">Editing content brief for <span className="font-medium">{brief.product_name}</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Editor Section */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-2xl opacity-60"></div>
+                <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+                  <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-white">
+                    <div className="px-8 py-6">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                          <Edit3 className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">Content Editor</h3>
+                          <p className="text-gray-600">Edit and organize your content brief sections</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-8">
+                    <ContentBriefEditorSimple
+                      initialContent={brief?.brief_content_text || brief?.brief_content || ''}
+                      onUpdate={(content: string, links: string[], titles: string[]) => {
+                        setBrief(prev => prev ? { ...prev, brief_content: content, internal_links: links, possible_article_titles: titles } : null);
+                        handleAutoSave({ brief_content: content, internal_links: links, possible_article_titles: titles });
+                      }}
+                      briefId={id || ''}
+                      researchResultId={brief?.research_result_id}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-20"
+            >
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Content Brief Not Found</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  The content brief you're looking for doesn't exist or you don't have permission to access it.
+                </p>
+                <button
+                  onClick={() => navigate('/dashboard/content-briefs')}
+                  className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Return to Content Briefs
+                </button>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
-    </UserDashboardLayout>
+    </div>
   );
 }

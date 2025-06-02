@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { File, X, CheckCircle, AlertTriangle, Image, Upload, Trash2 } from 'lucide-react';
+import { File, X, CheckCircle, AlertTriangle, Image, Upload, Trash2, Brain } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as PDFJS from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
@@ -334,233 +334,362 @@ To process this document, please export it from Google Docs as PDF or DOCX forma
   };
 
   return (
-    <div className="w-full space-y-6">
+    <div className="space-y-8">
+      {/* Enhanced Section Header */}
       <motion.div
-        className={`relative overflow-hidden border-2 border-dashed rounded-xl p-8 transition-all duration-300 flex flex-col items-center justify-center text-center cursor-pointer shadow-lg ${
-          isDragActive 
-            ? 'border-primary-400 bg-primary-500/10 shadow-primary-500/20' 
-            : 'border-primary-500/20 hover:border-primary-400/50 bg-secondary-800/50 hover:bg-secondary-800/80 hover:shadow-primary-500/10'
-        }`}
-        initial={{ y: 0 }}
-        animate={{ y: 0 }}
-        whileHover={{ y: -4 }}
-        transition={{ duration: 0.3 }}
+        className="text-center space-y-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
       >
-        <div {...getRootProps()} className="absolute inset-0 z-20">
-          <input {...getInputProps()} />
-        </div>
-        
-        {/* Animated background gradient */}
-        <div 
-          className={`absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
-            isDragActive ? 'opacity-100' : ''
-          }`}
-        />
-        
         <motion.div
-          className="absolute -top-24 -right-24 w-64 h-64 bg-primary-500/5 rounded-full blur-3xl"
-          animate={{ 
-            scale: [1, 1.1, 1],
-            opacity: [0.3, 0.2, 0.3]
-          }}
-          transition={{ 
-            duration: 8,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-        
-        <motion.div 
-          className="relative z-10 flex flex-col items-center"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-primary-500/20 to-blue-500/20 border border-primary-500/30 rounded-full backdrop-blur-sm"
+          whileHover={{ scale: 1.05 }}
         >
-          <motion.div
-            className={`mb-5 p-4 rounded-full ${isDragActive ? 'bg-primary-500/20' : 'bg-primary-500/10'} hover:bg-primary-500/20 transition-colors duration-300`}
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Upload 
-              className={`transition-colors duration-300 ${isDragActive ? 'text-primary-400' : 'text-primary-400/80'} hover:text-primary-300`} 
-              size={36} 
-            />
-          </motion.div>
-          
-          <motion.h3 
-            className={`text-xl font-medium mb-2 transition-colors duration-300 ${
-              isDragActive ? 'text-primary-300' : 'text-white'
-            }`}
-          >
-            {isDragActive ? 'Drop files here' : 'Drag & drop your files'}
-          </motion.h3>
-          
-          <motion.p 
-            className="text-sm text-white mt-2 max-w-xs"
-          >
-            Supports PDF, Word, PowerPoint, or text files. We'll automatically extract and process the content.
-          </motion.p>
-          
-          <motion.button 
-            type="button"
-            className="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-yellow-500 text-white font-medium rounded-lg hover:shadow-glow transition-all"
-            whileHover={{ scale: 1.03, y: -2 }}
-            whileTap={{ scale: 0.97, y: 0 }}
-          >
-            Browse Files
-          </motion.button>
+          <Upload className="w-4 h-4 text-primary-400" />
+          <span className="text-sm font-medium text-primary-300">Step 1</span>
         </motion.div>
+        <h2 className="text-2xl font-bold text-white">Upload Your Research Sources</h2>
+        <p className="text-white/70 max-w-lg mx-auto">
+          Drag and drop your documents or browse to upload. We support PDF, Word, PowerPoint, and text files.
+        </p>
       </motion.div>
 
+      {/* Enhanced Upload Zone */}
+      <motion.div
+        {...getRootProps()}
+        className={`
+          relative group cursor-pointer transition-all duration-500 ease-out
+          ${isDragActive 
+            ? 'scale-[1.02] shadow-2xl shadow-primary-500/20' 
+            : 'hover:scale-[1.01] hover:shadow-xl hover:shadow-primary-500/10'
+          }
+        `}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+      >
+        <input {...getInputProps()} />
+        
+        {/* Glassmorphism Background */}
+        <div className={`
+          relative overflow-hidden rounded-3xl border backdrop-blur-xl transition-all duration-500
+          ${isDragActive 
+            ? 'bg-gradient-to-br from-primary-500/20 via-blue-500/15 to-purple-500/20 border-primary-400/60 shadow-2xl shadow-primary-500/25' 
+            : 'bg-gradient-to-br from-white/5 via-white/10 to-white/5 border-white/20 hover:border-primary-400/40 hover:bg-gradient-to-br hover:from-primary-500/10 hover:via-blue-500/5 hover:to-purple-500/10'
+          }
+        `}>
+          
+          {/* Animated Background Pattern */}
+          <div className="absolute inset-0 opacity-30">
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+              animate={{
+                x: ['-100%', '100%'],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            />
+          </div>
+
+          {/* Floating Particles */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-primary-400/40 rounded-full"
+                style={{
+                  left: `${20 + i * 15}%`,
+                  top: `${30 + (i % 2) * 40}%`,
+                }}
+                animate={{
+                  y: [-10, 10, -10],
+                  opacity: [0.2, 0.6, 0.2],
+                }}
+                transition={{
+                  duration: 2 + i * 0.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: i * 0.3,
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Main Content */}
+          <div className="relative z-10 flex flex-col items-center justify-center p-16 text-center">
+            <motion.div
+              className={`mb-8 p-6 rounded-full backdrop-blur-sm transition-all duration-300 ${
+                isDragActive 
+                  ? 'bg-primary-500/30 shadow-2xl shadow-primary-500/30' 
+                  : 'bg-primary-500/20 group-hover:bg-primary-500/30 group-hover:shadow-xl group-hover:shadow-primary-500/20'
+              }`}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <motion.div
+                animate={isDragActive ? { rotate: 360 } : { rotate: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Upload 
+                  className={`transition-all duration-300 ${
+                    isDragActive ? 'text-primary-300 w-12 h-12' : 'text-primary-400 w-10 h-10 group-hover:text-primary-300'
+                  }`}
+                />
+              </motion.div>
+            </motion.div>
+            
+            <motion.div className="space-y-4">
+              <motion.h3 
+                className={`text-2xl font-bold transition-colors duration-300 ${
+                  isDragActive ? 'text-primary-300' : 'text-white group-hover:text-primary-200'
+                }`}
+                animate={isDragActive ? { scale: 1.05 } : { scale: 1 }}
+              >
+                {isDragActive ? '✨ Drop your files here!' : 'Drag & drop your research files'}
+              </motion.h3>
+              
+              <motion.p 
+                className="text-white/70 text-lg max-w-md mx-auto leading-relaxed"
+                initial={{ opacity: 0.7 }}
+                animate={{ opacity: isDragActive ? 1 : 0.7 }}
+              >
+                {isDragActive 
+                  ? 'Release to upload your documents' 
+                  : 'We support PDF, Word, PowerPoint, and text files up to 10MB each'
+                }
+              </motion.p>
+              
+              <motion.div className="flex flex-col sm:flex-row gap-4 items-center justify-center mt-8">
+                <motion.button 
+                  type="button"
+                  className="group/btn relative px-8 py-4 bg-gradient-to-r from-primary-500 to-blue-500 text-white font-semibold rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary-500/30 focus:ring-4 focus:ring-primary-300/50"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300" />
+                  <span className="relative z-10 flex items-center gap-2">
+                    <Upload className="w-5 h-5" />
+                    Browse Files
+                  </span>
+                </motion.button>
+                
+                <div className="text-white/50 text-sm">or</div>
+                
+                <motion.div 
+                  className="text-white/60 text-sm"
+                  whileHover={{ scale: 1.05 }}
+                >
+                  🔗 <span className="underline cursor-pointer hover:text-white/80">Paste URL</span>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Enhanced File List */}
       {documents.length > 0 && (
         <motion.div 
-          className="mt-8 space-y-3"
+          className="space-y-4"
           variants={container}
           initial="hidden"
           animate="show"
         >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-white">Uploaded Documents</h3>
+          <motion.div 
+            className="flex justify-between items-center p-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl backdrop-blur-sm border border-white/10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <h3 className="text-lg font-semibold text-white">
+                Uploaded Documents ({documents.length})
+              </h3>
+            </div>
+            
             {documents.length > 1 && (
               <motion.button 
                 onClick={() => {
                   setDocuments([]);
-                  // DO NOT call onDocumentsProcessed here, this clears the local UI list
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:text-red-300 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 bg-red-500/10 rounded-xl hover:bg-red-500/20 transition-all duration-200 backdrop-blur-sm border border-red-500/20"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <Trash2 size={14} />
-                Remove all
+                Clear All
               </motion.button>
             )}
-          </div>
+          </motion.div>
           
-          <AnimatePresence>
-            {documents.map((doc, index) => (
-              <motion.div 
-                key={index}
-                variants={item}
-                exit={{ opacity: 0, x: -100 }}
-                layout
-                className="flex items-center justify-between p-4 bg-secondary-800/80 border border-primary-500/10 rounded-xl hover:shadow-glow-sm hover:border-primary-500/20 transition-all"
-                whileHover={{ x: 4 }}
-              >
-                <div className="flex items-center flex-1 min-w-0">
-                  <div className={`w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center mr-3 ${
-                    doc.status === 'processed' 
-                      ? doc.isGoogleDoc 
-                        ? 'bg-yellow-500/20 text-yellow-300' 
-                        : doc.usedAI 
-                          ? 'bg-indigo-500/20 text-indigo-300' 
-                          : 'bg-green-500/20 text-green-300' 
-                      : doc.status === 'error' 
-                        ? 'bg-red-500/20 text-red-300' 
-                        : 'bg-blue-500/20 text-blue-300'
-                  }`}>
-                    <File size={18} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-white truncate">
-                      {doc.name}
-                    </p>
-                    <div className="flex items-center">
-                      {doc.status === 'processing' && (
-                        <div className="w-3 h-3 rounded-full border-2 border-primary-500 border-t-transparent animate-spin mr-2"></div>
-                      )}
-                      {doc.status === 'processed' && doc.isGoogleDoc && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Google Docs Link
-                        </span>
-                      )}
-                      {doc.status === 'processed' && doc.usedAI && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                          <Image size={10} className="mr-1" />
-                          AI-processed
-                        </span>
-                      )}
-                      {doc.status === 'processed' && !doc.isGoogleDoc && !doc.usedAI && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle size={10} className="mr-1" />
-                          Processed
-                        </span>
-                      )}
-                      {doc.status === 'error' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <AlertTriangle size={10} className="mr-1" />
-                          Error
-                        </span>
-                      )}
-                      
-                      <span className="text-sm text-white truncate" title={doc.name}>
+          <div className="grid gap-3">
+            <AnimatePresence>
+              {documents.map((doc, index) => (
+                <motion.div 
+                  key={index}
+                  variants={item}
+                  exit={{ opacity: 0, x: -100, scale: 0.95 }}
+                  layout
+                  className="group relative flex items-center justify-between p-5 bg-gradient-to-r from-white/5 via-white/10 to-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:border-primary-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/10"
+                  whileHover={{ x: 4, scale: 1.01 }}
+                >
+                  {/* Status Indicator */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-primary-500 to-transparent opacity-0 group-hover:opacity-100 rounded-l-2xl transition-opacity duration-300" />
+                  
+                  <div className="flex items-center flex-1 min-w-0">
+                    <motion.div 
+                      className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${
+                        doc.status === 'processed' 
+                          ? doc.isGoogleDoc 
+                            ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 text-yellow-300 border border-yellow-500/30' 
+                            : doc.usedAI 
+                              ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30' 
+                              : 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 text-green-300 border border-green-500/30' 
+                          : doc.status === 'error' 
+                            ? 'bg-gradient-to-br from-red-500/20 to-pink-500/20 text-red-300 border border-red-500/30' 
+                            : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30'
+                      }`}
+                      whileHover={{ rotate: 5, scale: 1.1 }}
+                    >
+                      <File size={20} />
+                    </motion.div>
+                    
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <p className="font-semibold text-white truncate text-lg">
                         {doc.name}
-                      </span>
-                      {doc.originalFile && (
-                        <span className="text-xs text-white ml-2 shrink-0">
-                          ({(doc.originalFile.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      )}
+                      </p>
+                      
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {doc.status === 'processing' && (
+                          <div className="flex items-center gap-2">
+                            <motion.div 
+                              className="w-3 h-3 rounded-full border-2 border-primary-500 border-t-transparent"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <span className="text-sm text-primary-300 font-medium">Processing...</span>
+                          </div>
+                        )}
+                        
+                        {doc.status === 'processed' && doc.isGoogleDoc && (
+                          <motion.span 
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-400/20 to-orange-400/20 text-yellow-300 border border-yellow-400/30"
+                            whileHover={{ scale: 1.05 }}
+                          >
+                            📄 Google Docs Link
+                          </motion.span>
+                        )}
+                        
+                        {doc.status === 'processed' && doc.usedAI && (
+                          <motion.span 
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-400/20 to-purple-400/20 text-indigo-300 border border-indigo-400/30"
+                            whileHover={{ scale: 1.05 }}
+                          >
+                            <Brain size={12} />
+                            AI-Enhanced
+                          </motion.span>
+                        )}
+                        
+                        {doc.status === 'processed' && !doc.isGoogleDoc && !doc.usedAI && (
+                          <motion.span 
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400/20 to-emerald-400/20 text-green-300 border border-green-400/30"
+                            whileHover={{ scale: 1.05 }}
+                          >
+                            <CheckCircle size={12} />
+                            Processed
+                          </motion.span>
+                        )}
+                        
+                        {doc.status === 'error' && (
+                          <motion.span 
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-red-400/20 to-pink-400/20 text-red-300 border border-red-400/30"
+                            whileHover={{ scale: 1.05 }}
+                          >
+                            <AlertTriangle size={12} />
+                            Error
+                          </motion.span>
+                        )}
+                        
+                        {doc.originalFile && (
+                          <span className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded-lg">
+                            {(doc.originalFile.size / 1024 / 1024).toFixed(2)} MB
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <button 
-                  onClick={() => removeDocument(index)}
-                  className="ml-2 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
-                >
-                  <X size={16} className="text-neutral-500" />
-                </button>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                  
+                  <motion.button 
+                    onClick={() => removeDocument(index)}
+                    className="ml-4 p-2 rounded-xl hover:bg-red-500/20 transition-colors duration-200 text-white/60 hover:text-red-300 border border-transparent hover:border-red-500/30"
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <X size={18} />
+                  </motion.button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </motion.div>
       )}
       
+      {/* Enhanced Processing State */}
       {isOverallProcessing && (
-        <div className="mt-4 flex items-center justify-center text-sm text-white">
-          <div className="w-4 h-4 rounded-full border-2 border-primary-500 border-t-transparent animate-spin mr-2"></div>
-          Processing documents...
-        </div>
+        <motion.div 
+          className="flex items-center justify-center p-8 bg-gradient-to-r from-primary-500/10 via-blue-500/10 to-purple-500/10 rounded-2xl backdrop-blur-sm border border-primary-500/20"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+        >
+          <div className="flex items-center gap-4">
+            <motion.div 
+              className="w-6 h-6 rounded-full border-3 border-primary-500 border-t-transparent"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            />
+            <span className="text-lg font-medium text-white">Processing your documents...</span>
+          </div>
+        </motion.div>
       )}
 
-      {documents.length > 0 && !isOverallProcessing && (
-        <div className="mt-6 text-center">
-          <motion.button
-            onClick={() => { 
-              if (!isOverallProcessing) {
-                setDocuments([]);
-                toast.success('Cleared all pending documents.');
-              }
-            }}
-            className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 shadow-md flex items-center justify-center mx-auto ${documents.length > 0 && !isOverallProcessing ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 focus:ring-4 focus:ring-primary-300/50' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
-            disabled={documents.length === 0 || isOverallProcessing}
-            whileHover={{ scale: documents.length > 0 && !isOverallProcessing ? 1.03 : 1.0 }}
-            whileTap={{ scale: documents.length > 0 && !isOverallProcessing ? 0.97 : 1.0 }}
+      {/* Enhanced Options */}
+      <motion.div 
+        className="flex items-center justify-between p-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl backdrop-blur-sm border border-white/10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="flex items-center gap-3">
+          <motion.input
+            type="checkbox"
+            id="forceUpdateCheckbox"
+            checked={forceUpdate}
+            onChange={(e) => setForceUpdate(e.target.checked)}
+            className="w-5 h-5 text-primary-600 bg-white/10 border-white/30 rounded focus:ring-primary-500 focus:ring-2 backdrop-blur-sm"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          />
+          <label htmlFor="forceUpdateCheckbox" className="text-sm text-white/80 font-medium cursor-pointer">
+            Replace existing documents if duplicates are found
+          </label>
+        </div>
+        
+        {documents.length === 0 && !isOverallProcessing && (
+          <motion.div 
+            className="text-sm text-white/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
           >
-            <Upload size={16} className="mr-2" />
-            Clear List 
-          </motion.button>
-        </div>
-      )}
-
-      {documents.length === 0 && !isOverallProcessing && (
-        <p className="mt-4 text-center text-sm text-white">
-          No documents uploaded yet.
-        </p>
-      )}
-      
-      <div className="mt-4 flex items-center">
-        <input
-          type="checkbox"
-          id="forceUpdateCheckbox"
-          checked={forceUpdate}
-          onChange={(e) => setForceUpdate(e.target.checked)}
-          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mr-2"
-        />
-        <label htmlFor="forceUpdateCheckbox" className="text-sm text-white">
-          Replace existing document if a duplicate (by URL or content) is found.
-        </label>
-      </div>
+            🚀 Ready to upload your first document
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 }
