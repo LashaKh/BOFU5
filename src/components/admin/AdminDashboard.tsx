@@ -51,20 +51,18 @@ interface UserProfile {
 const AdminArticleManagementPage = lazy(() => import('../../pages/AdminArticleManagementPage'));
 
 // Beautiful Stats Card Component
-const StatsCard = ({ title, value, change, icon: Icon, trend, color = "blue" }: {
+const StatsCard = ({ title, value, change, icon: Icon, trend, color = "gray" }: {
   title: string;
   value: string | number;
   change?: string;
   icon: any;
   trend?: 'up' | 'down' | 'neutral';
-  color?: 'blue' | 'green' | 'yellow' | 'purple' | 'pink';
+  color?: 'gray' | 'dark' | 'minimal';
 }) => {
   const colorClasses = {
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600', 
-    yellow: 'from-yellow-400 to-yellow-500',
-    purple: 'from-purple-500 to-purple-600',
-    pink: 'from-pink-500 to-pink-600'
+    gray: 'from-gray-600 to-gray-700',
+    dark: 'from-gray-700 to-gray-800', 
+    minimal: 'from-gray-500 to-gray-600'
   };
 
   const trendColors = {
@@ -77,27 +75,26 @@ const StatsCard = ({ title, value, change, icon: Icon, trend, color = "blue" }: 
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2 }}
       className="relative group"
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-yellow-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100" />
-      <div className="relative bg-gray-800/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-gray-700/50 hover:shadow-2xl hover:border-yellow-500/30 transition-all duration-300">
+      <div className="relative bg-gray-800/60 backdrop-blur-sm p-6 rounded-lg shadow-lg border border-gray-700/30 hover:shadow-xl hover:border-gray-600/50 transition-all duration-300">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-400 mb-1">{title}</p>
-            <p className="text-3xl font-bold text-white mb-2">{value}</p>
+            <p className="text-2xl font-bold text-white mb-2">{value}</p>
             {change && (
               <div className="flex items-center gap-1">
-                {trend === 'up' && <TrendingUp size={16} className={trendColors.up} />}
-                {trend === 'down' && <ArrowLeft size={16} className={`${trendColors.down} rotate-45`} />}
-                <span className={`text-sm font-medium ${trend ? trendColors[trend] : 'text-gray-400'}`}>
+                {trend === 'up' && <TrendingUp size={14} className={trendColors.up} />}
+                {trend === 'down' && <ArrowLeft size={14} className={`${trendColors.down} rotate-45`} />}
+                <span className={`text-xs font-medium ${trend ? trendColors[trend] : 'text-gray-400'}`}>
                   {change}
                 </span>
               </div>
             )}
           </div>
-          <div className={`p-3 rounded-xl bg-gradient-to-r ${colorClasses[color]} shadow-lg`}>
-            <Icon className="h-6 w-6 text-white" />
+          <div className={`p-2 rounded-lg bg-gradient-to-r ${colorClasses[color]} shadow-sm border border-gray-600/20`}>
+            <Icon className="h-5 w-5 text-gray-300" />
           </div>
         </div>
       </div>
@@ -110,21 +107,21 @@ const ActivityFeed = ({ activities }: { activities: any[] }) => (
   <motion.div 
     initial={{ opacity: 0, x: 20 }}
     animate={{ opacity: 1, x: 0 }}
-    className="bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50 p-6"
+    className="bg-gray-800/60 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/30 p-6"
   >
     <div className="flex items-center justify-between mb-6">
       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-        <Activity className="h-5 w-5 text-yellow-400" />
+        <Activity className="h-5 w-5 text-gray-400" />
         Recent Activity
       </h3>
-      <button className="text-sm text-yellow-400 hover:text-yellow-300 font-medium transition-colors">
+      <button className="text-sm text-gray-400 hover:text-gray-300 font-medium transition-colors">
         View All
       </button>
     </div>
-    <div className="space-y-4">
+    <div className="space-y-3">
       {activities.length > 0 ? activities.slice(0, 5).map((activity, index) => (
-        <div key={index} className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-700/50 transition-colors border border-gray-700/30 hover:border-yellow-500/30">
-          <div className="flex-shrink-0 w-2 h-2 bg-yellow-400 rounded-full mt-2" />
+        <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-700/40 transition-colors border border-gray-700/20 hover:border-gray-600/30">
+          <div className="flex-shrink-0 w-2 h-2 bg-gray-500 rounded-full mt-2" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-white font-medium">{activity.title}</p>
             <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
@@ -132,7 +129,7 @@ const ActivityFeed = ({ activities }: { activities: any[] }) => (
         </div>
       )) : (
         <div className="text-center py-8">
-          <Clock className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+          <Clock className="h-10 w-10 text-gray-500 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No recent activity</p>
         </div>
       )}
@@ -145,28 +142,27 @@ const QuickActions = () => (
   <motion.div 
     initial={{ opacity: 0, x: -20 }}
     animate={{ opacity: 1, x: 0 }}
-    className="bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50 p-6"
+    className="bg-gray-800/60 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/30 p-6"
   >
     <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-      <Zap className="h-5 w-5 text-yellow-400" />
+      <Zap className="h-5 w-5 text-gray-400" />
       Quick Actions
     </h3>
     <div className="grid grid-cols-2 gap-3">
       {[
-        { label: 'New Article', icon: Plus, color: 'from-blue-500 to-blue-600' },
-        { label: 'Review Queue', icon: Eye, color: 'from-purple-500 to-purple-600' },
-        { label: 'User Reports', icon: BarChart3, color: 'from-green-500 to-green-600' },
-        { label: 'System Health', icon: Activity, color: 'from-red-500 to-red-600' }
+        { label: 'New Article', icon: Plus },
+        { label: 'Review Queue', icon: Eye },
+        { label: 'User Reports', icon: BarChart3 },
+        { label: 'System Health', icon: Activity }
       ].map((action, index) => (
         <motion.button
           key={action.label}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className={`relative p-4 rounded-xl bg-gradient-to-r ${action.color} text-white shadow-lg hover:shadow-xl transition-all duration-200 group overflow-hidden border border-gray-600/30 hover:border-white/20`}
+          className="relative p-4 rounded-lg bg-gray-700/60 hover:bg-gray-600/60 text-gray-300 hover:text-white shadow-sm hover:shadow-md transition-all duration-200 border border-gray-600/30 hover:border-gray-500/50"
         >
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="relative flex flex-col items-center gap-2">
-            <action.icon className="h-6 w-6" />
+          <div className="flex flex-col items-center gap-2">
+            <action.icon className="h-5 w-5" />
             <span className="text-sm font-medium">{action.label}</span>
           </div>
         </motion.button>
@@ -1083,7 +1079,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
       <motion.aside 
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="fixed left-0 top-0 h-full w-80 bg-gray-800/90 backdrop-blur-2xl border-r border-gray-700/50 shadow-2xl z-40"
+        className="fixed left-0 top-0 h-full w-80 bg-gray-900/95 backdrop-blur-sm border-r border-gray-700/50 shadow-lg z-40"
       >
         <div className="flex flex-col h-full p-6">
           {/* Brand Header */}
@@ -1093,55 +1089,46 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
             className="mb-8"
           >
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg">
-                <Crown className="h-6 w-6 text-white" />
+              <div className="w-10 h-10 bg-gray-700 rounded-lg flex items-center justify-center">
+                <Crown className="h-5 w-5 text-gray-300" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent">
-                  BOFU Admin
+                <h1 className="text-xl font-semibold text-white">
+                  Control Center
                 </h1>
-                <p className="text-sm text-gray-400">Control Center</p>
+                <p className="text-sm text-gray-400">Admin Dashboard</p>
               </div>
             </div>
-            <div className="h-px bg-gradient-to-r from-yellow-400/20 via-yellow-400 to-yellow-400/20" />
+            <div className="h-px bg-gray-700" />
           </motion.div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-1">
             {[
-              { view: 'dashboard', label: 'Dashboard', icon: Home, color: 'from-blue-500 to-blue-600' },
-              { view: 'productReview', label: 'Product Review', icon: Eye, color: 'from-purple-500 to-purple-600' },
-              { view: 'userManagement', label: 'User Management', icon: Users, color: 'from-green-500 to-green-600' },
-              { view: 'articleManagement', label: 'Content Hub', icon: BookOpen, color: 'from-orange-500 to-orange-600' },
-              { view: 'commentManagement', label: 'Engagement', icon: MessageSquare, color: 'from-pink-500 to-pink-600' },
-              { view: 'auditLogs', label: 'Security Logs', icon: Shield, color: 'from-red-500 to-red-600' },
-              { view: 'settings', label: 'Settings', icon: Settings, color: 'from-gray-500 to-gray-600' },
+              { view: 'dashboard', label: 'Dashboard', icon: Home },
+              { view: 'productReview', label: 'Product Review', icon: Eye },
+              { view: 'userManagement', label: 'User Management', icon: Users },
+              { view: 'articleManagement', label: 'Content Hub', icon: BookOpen },
+              { view: 'commentManagement', label: 'Engagement', icon: MessageSquare },
+              { view: 'auditLogs', label: 'Security Logs', icon: Shield },
+              { view: 'settings', label: 'Settings', icon: Settings },
             ].map((item, index) => (
               <motion.button
                 key={item.view}
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.05 }}
                 onClick={() => { setCurrentView(item.view as any); setSelectedUser(null); }}
-                className={`group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
                   currentView === item.view
-                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-lg shadow-yellow-500/25'
-                    : 'text-gray-300 hover:text-white hover:bg-gray-700/60'
+                    ? 'bg-gray-700/80 text-white border border-gray-600/50'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                 }`}
               >
-                <div className={`p-2 rounded-lg transition-all duration-200 ${
-                  currentView === item.view 
-                    ? 'bg-white/20' 
-                    : `bg-gradient-to-r ${item.color} text-white group-hover:scale-110`
-                }`}>
-                  <item.icon size={18} />
-                </div>
+                <item.icon size={18} />
                 <span className="font-medium">{item.label}</span>
                 {currentView === item.view && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute right-3 w-2 h-2 bg-white rounded-full"
-                  />
+                  <div className="ml-auto w-1.5 h-1.5 bg-gray-400 rounded-full" />
                 )}
               </motion.button>
             ))}
@@ -1153,22 +1140,22 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
             animate={{ y: 0, opacity: 1 }}
             className="mt-6 pt-6 border-t border-gray-700/50"
           >
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-gray-700/50 to-gray-600/50 mb-4 border border-gray-600/30">
-              <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center">
-                <UserCircle className="h-5 w-5 text-white" />
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/60 mb-4 border border-gray-700/30">
+              <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+                <UserCircle className="h-4 w-4 text-gray-300" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">Admin User</p>
-                <p className="text-xs text-gray-300">lashay@bofu.ai</p>
+                <p className="text-xs text-gray-400">lashay@bofu.ai</p>
               </div>
             </div>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 transition-all duration-200 group border border-red-500/30 hover:border-red-500"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:text-white hover:bg-red-500/20 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
             >
-              <LogOut size={18} className="group-hover:rotate-12 transition-transform duration-200" />
+              <LogOut size={16} />
               <span className="font-medium">Sign Out</span>
             </motion.button>
           </motion.div>
@@ -1239,7 +1226,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                   change="+12% vs last month"
                   trend="up"
                   icon={Users}
-                  color="blue"
+                  color="gray"
                 />
                 <StatsCard
                   title="Research Projects"
@@ -1247,7 +1234,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                   change="+8% vs last month"
                   trend="up"
                   icon={BarChart3}
-                  color="green"
+                  color="gray"
                 />
                 <StatsCard
                   title="Approved Products"
@@ -1255,7 +1242,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                   change="+15% vs last month"
                   trend="up"
                   icon={CheckCircle}
-                  color="yellow"
+                  color="gray"
                 />
                 <StatsCard
                   title="Pending Reviews"
@@ -1263,7 +1250,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                   change={stats.pendingReview > 0 ? "Needs attention" : "All caught up!"}
                   trend={stats.pendingReview > 0 ? "neutral" : "up"}
                   icon={Clock}
-                  color="purple"
+                  color="gray"
                 />
               </div>
 
