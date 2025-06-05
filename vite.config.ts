@@ -21,7 +21,14 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
-    include: ['react', 'react-dom', '@tiptap/react', '@tiptap/starter-kit']
+    include: [
+      'react', 
+      'react-dom', 
+      '@tiptap/react', 
+      '@tiptap/starter-kit',
+      'use-isomorphic-layout-effect',
+      'framer-motion'
+    ]
   },
   resolve: {
     alias: {
@@ -37,8 +44,8 @@ export default defineConfig({
       external: [],
       output: {
         manualChunks: (id) => {
-          // React core
-          if (id.includes('react') || id.includes('react-dom')) {
+          // React core and related hooks libraries
+          if (id.includes('react') || id.includes('react-dom') || id.includes('use-isomorphic-layout-effect')) {
             return 'react-vendor';
           }
           
