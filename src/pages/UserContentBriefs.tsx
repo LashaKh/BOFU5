@@ -373,7 +373,7 @@ export default function UserContentBriefs() {
                     </button>
                     <button 
                       title="Edit"
-                      onClick={() => navigate(`/dashboard/content-briefs/${brief.id}/edit`)}
+                      onClick={() => navigate(`/dashboard/content-briefs/edit/${brief.id}`)}
                       className="action-btn bg-primary-50 text-primary-600 hover:bg-primary-100"
                     >
                       <Edit size={18} />

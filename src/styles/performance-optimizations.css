@@ -1,0 +1,258 @@
+/* Performance Optimizations for TipTap Editor */
+
+/* Content Visibility Optimizations */
+.performance-optimized {
+  /* Enable content-visibility for large content blocks */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+.performance-optimized-container {
+  /* Main editor container optimizations */
+  content-visibility: auto;
+  contain-intrinsic-size: 1000px;
+  contain: layout style paint;
+}
+
+/* ProseMirror Editor Optimizations */
+.ProseMirror {
+  /* Hardware acceleration for smooth scrolling */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  
+  /* Optimize scroll performance */
+  will-change: scroll-position;
+  overflow-anchor: none;
+  
+  /* Content containment for performance */
+  contain: layout style paint;
+  
+  /* Optimize for large documents */
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Large Document Optimizations */
+.editor-large-document .ProseMirror {
+  /* Disable smooth scrolling for better performance */
+  scroll-behavior: auto;
+  
+  /* Aggressive content containment */
+  contain: layout style paint size;
+  
+  /* Optimize text rendering for performance */
+  text-rendering: optimizeSpeed;
+  
+  /* Optimize image rendering for performance */
+  image-rendering: optimizeSpeed;
+}
+
+/* Large Content Block Optimizations */
+.performance-optimized-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 50px;
+  contain: layout style;
+}
+
+/* Table Performance Optimizations */
+table.performance-optimized-table {
+  /* Enable content-visibility for large tables */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+  
+  /* Optimize table layout for performance */
+  table-layout: fixed;
+  
+  /* Hardware acceleration */
+  transform: translateZ(0);
+}
+
+/* Image Performance Optimizations */
+img.performance-optimized-image {
+  /* Lazy loading and content-visibility */
+  content-visibility: auto;
+  contain-intrinsic-size: 300px 200px;
+  
+  /* Optimize image rendering */
+  image-rendering: auto;
+  
+  /* Hardware acceleration */
+  transform: translateZ(0);
+}
+
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+  .performance-optimized-mobile .ProseMirror {
+    /* More aggressive optimization for mobile */
+    will-change: scroll-position, transform;
+    
+    /* Reduce render quality for better performance */
+    image-rendering: optimizeSpeed;
+    text-rendering: optimizeSpeed;
+    
+    /* Disable expensive effects */
+    text-shadow: none;
+    box-shadow: none;
+  }
+  
+  .performance-optimized-mobile .performance-optimized-block {
+    /* Smaller intrinsic sizes for mobile */
+    contain-intrinsic-size: auto 30px;
+  }
+}
+
+/* Tablet Performance Optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .performance-optimized-tablet .ProseMirror {
+    /* Balanced optimization for tablet */
+    image-rendering: auto;
+    text-rendering: optimizeSpeed;
+  }
+}
+
+/* Desktop Performance Optimizations */
+@media (min-width: 1025px) {
+  .performance-optimized-desktop .ProseMirror {
+    /* High quality for desktop */
+    image-rendering: auto;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Viewport-based Optimizations */
+.out-of-viewport {
+  /* Optimize elements outside viewport */
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.in-viewport {
+  /* Ensure elements in viewport are interactive */
+  pointer-events: auto;
+  visibility: visible;
+}
+
+/* Scroll Performance Optimizations */
+.performance-scroll-container {
+  /* Optimize container for smooth scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  
+  /* Hardware acceleration */
+  transform: translateZ(0);
+  will-change: scroll-position;
+  
+  /* Prevent scroll anchoring issues */
+  overflow-anchor: none;
+}
+
+.performance-scroll-container.large-document {
+  /* Disable smooth scrolling for large documents */
+  scroll-behavior: auto;
+}
+
+/* Memory Optimizations */
+.memory-optimized {
+  /* Reduce memory usage */
+  contain: layout style paint;
+  content-visibility: auto;
+}
+
+/* Animation Performance Optimizations */
+.performance-optimized-animation {
+  /* Use transform instead of changing position properties */
+  transform: translateZ(0);
+  will-change: transform;
+  
+  /* Hardware acceleration */
+  backface-visibility: hidden;
+}
+
+/* Text Selection Performance */
+.performance-optimized-selection {
+  /* Optimize text selection for large documents */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.performance-optimized-selection.large-document {
+  /* More aggressive optimization for large documents */
+  user-select: auto;
+}
+
+/* Focus Performance Optimizations */
+.performance-optimized-focus:focus {
+  /* Optimize focus styles for performance */
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  
+  /* Avoid expensive box-shadow on focus for large elements */
+  box-shadow: none;
+}
+
+/* Print Performance Optimizations */
+@media print {
+  .performance-optimized {
+    /* Disable content-visibility for printing */
+    content-visibility: visible;
+  }
+  
+  .ProseMirror {
+    /* Optimize for print */
+    transform: none;
+    will-change: auto;
+    contain: none;
+  }
+}
+
+/* Reduced Motion Optimizations */
+@media (prefers-reduced-motion: reduce) {
+  .performance-optimized-animation {
+    /* Disable animations for users who prefer reduced motion */
+    transform: none;
+    will-change: auto;
+    transition: none;
+  }
+  
+  .performance-scroll-container {
+    /* Disable smooth scrolling for reduced motion */
+    scroll-behavior: auto;
+  }
+}
+
+/* Dark Theme Performance Optimizations */
+@media (prefers-color-scheme: dark) {
+  .performance-optimized-dark {
+    /* Optimize for dark theme rendering */
+    color-scheme: dark;
+  }
+}
+
+/* High Contrast Performance Optimizations */
+@media (prefers-contrast: high) {
+  .performance-optimized-contrast {
+    /* Optimize for high contrast mode */
+    forced-color-adjust: auto;
+  }
+}
+
+/* Performance Debug Utilities */
+.performance-debug {
+  /* Visual indicators for performance debugging */
+  border: 1px dashed red;
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.performance-debug::before {
+  content: "PERF";
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 10px;
+  background: red;
+  color: white;
+  padding: 2px;
+  z-index: 1000;
+} 

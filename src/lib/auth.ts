@@ -49,20 +49,53 @@ export async function registerAdmin(email: string, password: string, name: strin
 }
 
 // Check if user is an admin
-export async function isUserAdmin() {
+export const checkAdminStatus = async (userId?: string): Promise<boolean> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
     
-    if (!user) return false;
+    if (error || !user) {
+      console.log('User not authenticated, not admin');
+      return false;
+    }
+
+    const targetUserId = userId || user.id;
     
-    // Check user metadata for admin flag
-    const userData = user.user_metadata;
-    return userData && (userData.is_admin === true || userData.role === 'admin');
+    // First try to check admin_profiles table
+    try {
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_profiles')
+        .select('id')
+        .eq('id', targetUserId)
+        .single();
+
+      if (adminData && !adminError) {
+        console.log('User found in admin_profiles table, is admin');
+        return true;
+      }
+    } catch (adminProfileError) {
+      console.log('admin_profiles table check failed, trying metadata fallback:', adminProfileError);
+    }
+
+    // Fallback to metadata check if admin_profiles doesn't work
+    try {
+      const metaData = user.user_metadata || {};
+      const isAdminFromMeta = metaData.is_admin === true || metaData.role === 'admin';
+      
+      if (isAdminFromMeta) {
+        console.log('User is admin based on metadata');
+        return true;
+      }
+    } catch (metaError) {
+      console.log('Metadata check failed:', metaError);
+    }
+
+    console.log('User is not an admin');
+    return false;
   } catch (error) {
     console.error('Error checking admin status:', error);
     return false;
   }
-}
+};
 
 // Get current user
 export async function getCurrentUser() {
@@ -208,3 +241,6 @@ export function useAuth() {
     verifyPasswordResetToken,
   };
 }
+
+// Legacy function alias for backward compatibility
+export const isUserAdmin = checkAdminStatus;

@@ -121,21 +121,124 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
       }
     }
     
-    // Parse target persona with safety checks
+    // Parse target persona with safety checks and multiple field name variations
     if (data.target_persona && typeof data.target_persona === 'object') {
       const persona = data.target_persona;
-      product.targetPersona = {
-        primaryAudience: Array.isArray(persona.primary_audience)
-          ? persona.primary_audience.slice(0, 10).join(', ') // Limit array size
-          : getStringOrJoinArray(persona.primary_audience),
-        demographics: typeof persona.demographics === 'string' ? persona.demographics : '',
-        industrySegments: Array.isArray(persona.industry_segments)
-          ? persona.industry_segments.slice(0, 10).join(', ') // Limit array size
-          : getStringOrJoinArray(persona.industry_segments),
-        psychographics: Array.isArray(persona.psychographics)
-          ? persona.psychographics.slice(0, 10).join(', ') // Limit array size
-          : getStringOrJoinArray(persona.psychographics)
+      
+      // Helper function to get value from multiple possible field names and convert to array format
+      const getFieldValue = (obj: any, fieldNames: string[]): string[] => {
+        for (const fieldName of fieldNames) {
+          const value = obj[fieldName];
+          if (value !== null && value !== undefined) {
+            if (typeof value === 'string' && value.trim()) {
+              // Convert comma-separated strings to arrays
+              const trimmedValue = value.trim();
+              if (trimmedValue.includes(',')) {
+                return trimmedValue.split(',').map(item => item.trim()).filter(item => item.length > 0);
+              } else {
+                return [trimmedValue];
+              }
+            } else if (Array.isArray(value) && value.length > 0) {
+              return value.slice(0, 10).map(item => String(item).trim()).filter(item => item.length > 0);
+            } else if (typeof value === 'object' && value !== null) {
+              // Try to extract from object properties
+              const objValues = Object.values(value)
+                .filter(v => typeof v === 'string' && v.trim())
+                .slice(0, 10)
+                .map(v => String(v).trim());
+              if (objValues.length > 0) {
+                return objValues;
+              }
+            }
+          }
+        }
+        return [];
       };
+      
+      product.targetPersona = {
+        primaryAudience: getFieldValue(persona, [
+          'primary_audience', 
+          'primaryAudience', 
+          'target_audience', 
+          'audience'
+        ]).join(', '), // Keep primaryAudience as string since UI expects it
+        demographics: getFieldValue(persona, [
+          'demographics', 
+          'demographic', 
+          'demographic_profile',
+          'target_demographics'
+        ]),
+        industrySegments: getFieldValue(persona, [
+          'industry_segments', 
+          'industrySegments', 
+          'industry_segment',
+          'target_industries',
+          'industries'
+        ]),
+        psychographics: getFieldValue(persona, [
+          'psychographics', 
+          'psychographic', 
+          'psychographic_profile',
+          'behavioral_traits',
+          'personality_traits'
+        ])
+      };
+      
+      // Debug logging to help identify what data is coming from webhook
+      console.log('Target persona parsing debug:', {
+        originalPersonaData: persona,
+        parsedPersona: product.targetPersona
+      });
+    } else {
+      // Fallback: try to extract from top-level data object
+      const getTopLevelValue = (fieldNames: string[]): string[] => {
+        for (const fieldName of fieldNames) {
+          const value = data[fieldName];
+          if (value !== null && value !== undefined) {
+            if (typeof value === 'string' && value.trim()) {
+              // Convert comma-separated strings to arrays
+              const trimmedValue = value.trim();
+              if (trimmedValue.includes(',')) {
+                return trimmedValue.split(',').map(item => item.trim()).filter(item => item.length > 0);
+              } else {
+                return [trimmedValue];
+              }
+            } else if (Array.isArray(value) && value.length > 0) {
+              return value.slice(0, 10).map(item => String(item).trim()).filter(item => item.length > 0);
+            }
+          }
+        }
+        return [];
+      };
+      
+      product.targetPersona = {
+        primaryAudience: getTopLevelValue([
+          'primary_audience', 
+          'target_audience', 
+          'audience'
+        ]).join(', '), // Keep primaryAudience as string since UI expects it
+        demographics: getTopLevelValue([
+          'demographics', 
+          'demographic', 
+          'target_demographics'
+        ]),
+        industrySegments: getTopLevelValue([
+          'industry_segments', 
+          'industrySegments', 
+          'target_industries',
+          'industries'
+        ]),
+        psychographics: getTopLevelValue([
+          'psychographics', 
+          'psychographic', 
+          'behavioral_traits'
+        ])
+      };
+      
+      console.log('Top-level target persona parsing debug:', {
+        availableFields: Object.keys(data),
+        parsedPersona: product.targetPersona
+      });
     }
     
     // Parse pricing

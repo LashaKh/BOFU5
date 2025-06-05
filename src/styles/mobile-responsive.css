@@ -1,0 +1,813 @@
+/* Mobile Responsive Styles for BOFU AI Editor */
+
+/* CSS Custom Properties for Safe Areas */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile Navigation Styles */
+@media (max-width: 768px) {
+  /* Mobile Navigation Bar */
+  .mobile-nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    /* Safe area handling */
+    padding-top: var(--safe-area-inset-top);
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+  
+  /* Mobile Drawer Styles */
+  .mobile-drawer {
+    /* Ensure drawer works with safe areas */
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+  
+  /* Mobile Navigation Items */
+  .mobile-nav-item {
+    /* Touch-friendly navigation items */
+    min-height: 48px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    transition: all 0.2s ease;
+  }
+  
+  .mobile-nav-item:active {
+    background-color: #f9fafb;
+    transform: scale(0.98);
+  }
+  
+  /* Mobile Article List */
+  .mobile-article-item {
+    /* Touch-friendly article items */
+    min-height: 72px;
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s ease;
+  }
+  
+  .mobile-article-item:active {
+    background-color: #f9fafb;
+  }
+  
+  /* Mobile Grid View */
+  .mobile-article-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  .mobile-article-grid-item {
+    min-height: 120px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+  }
+  
+  .mobile-article-grid-item:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Mobile Comment System Styles */
+  .mobile-comment-system {
+    /* Comment system container */
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .mobile-comment-thread {
+    /* Individual comment thread styling */
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.2s ease;
+  }
+  
+  .mobile-comment-thread:active {
+    background-color: #f9fafb;
+  }
+  
+  .mobile-comment-header {
+    /* Comment header with avatar and info */
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  .mobile-comment-content {
+    /* Comment content area */
+    padding: 12px 16px;
+    line-height: 1.5;
+    word-wrap: break-word;
+  }
+  
+  .mobile-comment-actions {
+    /* Comment action buttons */
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .mobile-comment-reply-form {
+    /* Reply form styling */
+    padding: 12px 16px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .mobile-comment-reply-form textarea {
+    /* Touch-friendly textarea */
+    min-height: 80px;
+    resize: none;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .mobile-comment-avatar {
+    /* Comment author avatar */
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+  
+  .mobile-comment-meta {
+    /* Comment metadata (author, time, etc.) */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .mobile-comment-author {
+    /* Author name styling */
+    font-weight: 500;
+    color: #111827;
+    font-size: 14px;
+  }
+  
+  .mobile-comment-time {
+    /* Timestamp styling */
+    font-size: 12px;
+    color: #6b7280;
+  }
+  
+  .mobile-comment-status {
+    /* Comment status indicators */
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  
+  .mobile-comment-status.resolved {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .mobile-comment-status.active {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .mobile-comment-reactions {
+    /* Comment reaction buttons */
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .mobile-comment-reaction-btn {
+    /* Individual reaction button */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    min-height: 28px;
+  }
+  
+  .mobile-comment-reaction-btn:active {
+    transform: scale(0.95);
+  }
+  
+  .mobile-comment-thread-indent {
+    /* Indentation for nested comments */
+    margin-left: 16px;
+    border-left: 2px solid #e5e7eb;
+    padding-left: 12px;
+  }
+  
+  .mobile-comment-search {
+    /* Comment search input */
+    position: relative;
+    margin-bottom: 16px;
+  }
+  
+  .mobile-comment-search input {
+    /* Search input styling */
+    width: 100%;
+    padding: 12px 16px 12px 40px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .mobile-comment-filters {
+    /* Comment filter controls */
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  
+  .mobile-comment-filter {
+    /* Individual filter button */
+    padding: 6px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 16px;
+    font-size: 14px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+  
+  .mobile-comment-filter.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+  
+  .mobile-comment-empty-state {
+    /* Empty state for no comments */
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+  }
+  
+  .mobile-comment-loading {
+    /* Loading state */
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* Mobile Toolbar Styles */
+  .mobile-toolbar {
+    /* Ensure toolbar doesn't interfere with safe areas */
+    padding-top: var(--safe-area-inset-top);
+    margin-left: var(--safe-area-inset-left);
+    margin-right: var(--safe-area-inset-right);
+  }
+
+  /* Mobile Editor Content */
+  .ProseMirror {
+    /* Improve text editing on mobile */
+    -webkit-user-select: text;
+    user-select: text;
+    
+    /* Better touch handling */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    
+    /* Improve cursor visibility */
+    caret-color: #3b82f6;
+    
+    /* Better line height for mobile reading */
+    line-height: 1.6;
+    
+    /* Ensure proper text size */
+    font-size: 16px; /* Prevents zoom on iOS */
+    
+    /* Better spacing for touch interactions */
+    padding: 16px;
+    min-height: 200px;
+  }
+  
+  /* Mobile touch-friendly paragraphs */
+  .ProseMirror p {
+    margin-bottom: 12px;
+    min-height: 24px; /* Easier touch target for empty paragraphs */
+  }
+  
+  /* Touch-friendly headings */
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3,
+  .ProseMirror h4,
+  .ProseMirror h5,
+  .ProseMirror h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    min-height: 32px; /* Easier touch targeting */
+  }
+  
+  /* Touch-friendly lists */
+  .ProseMirror ul,
+  .ProseMirror ol {
+    padding-left: 24px; /* More space for touch targets */
+  }
+  
+  .ProseMirror li {
+    margin-bottom: 8px;
+    min-height: 24px;
+  }
+  
+  /* Touch-friendly blockquotes */
+  .ProseMirror blockquote {
+    margin: 16px 0;
+    padding: 12px 16px;
+    border-left: 4px solid #e5e7eb;
+    background: #f9fafb;
+  }
+  
+  /* Touch-friendly code blocks */
+  .ProseMirror pre {
+    padding: 16px;
+    margin: 16px 0;
+    border-radius: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Touch-friendly tables */
+  .ProseMirror table {
+    margin: 16px 0;
+    border-collapse: collapse;
+    width: 100%;
+    overflow-x: auto;
+    display: block;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .ProseMirror td,
+  .ProseMirror th {
+    padding: 12px 8px;
+    min-width: 44px; /* Touch-friendly minimum */
+    border: 1px solid #e5e7eb;
+  }
+  
+  /* Touch-friendly images */
+  .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    margin: 16px 0;
+    border-radius: 8px;
+    /* Touch feedback for selection */
+    transition: box-shadow 0.2s ease;
+  }
+  
+  .ProseMirror img.ProseMirror-selectednode {
+    box-shadow: 0 0 0 3px #3b82f6;
+  }
+  
+  /* Mobile selection styles */
+  .ProseMirror ::selection {
+    background: rgba(59, 130, 246, 0.3);
+  }
+  
+  .ProseMirror ::-moz-selection {
+    background: rgba(59, 130, 246, 0.3);
+  }
+}
+
+/* Tablet-specific adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .ProseMirror {
+    font-size: 16px;
+    line-height: 1.65;
+    padding: 20px;
+  }
+  
+  /* Slightly larger touch targets for tablets */
+  .ProseMirror p {
+    min-height: 26px;
+  }
+  
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3,
+  .ProseMirror h4,
+  .ProseMirror h5,
+  .ProseMirror h6 {
+    min-height: 34px;
+  }
+  
+  /* Tablet navigation adjustments */
+  .mobile-nav-item {
+    min-height: 52px;
+    padding: 14px 20px;
+  }
+  
+  .mobile-article-item {
+    min-height: 80px;
+    padding: 20px;
+  }
+  
+  /* Tablet comment adjustments */
+  .mobile-comment-thread {
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .mobile-comment-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .mobile-comment-thread-indent {
+    margin-left: 20px;
+    padding-left: 16px;
+  }
+}
+
+/* Touch device specific improvements */
+@media (pointer: coarse) {
+  /* Larger touch targets for all interactive elements */
+  button,
+  .toolbar-button,
+  [role="button"] {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+  }
+  
+  /* Better touch feedback */
+  button:active,
+  .toolbar-button:active,
+  [role="button"]:active {
+    background-color: rgba(0, 0, 0, 0.1);
+    transform: scale(0.98);
+    transition: all 0.1s ease;
+  }
+  
+  /* Dropdown and modal touch improvements */
+  .dropdown-content,
+  .modal-content {
+    padding: 16px;
+  }
+  
+  .dropdown-item,
+  .modal-item {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Navigation specific touch improvements */
+  .mobile-nav-item,
+  .mobile-article-item {
+    /* Better touch feedback for navigation */
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Comment-specific touch improvements */
+  .mobile-comment-thread,
+  .mobile-comment-reaction-btn,
+  .mobile-comment-filter {
+    /* Better touch feedback for comments */
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Touch-friendly swipe indicators */
+  .swipe-indicator {
+    width: 32px;
+    height: 4px;
+    background: #d1d5db;
+    border-radius: 2px;
+    margin: 8px auto;
+  }
+}
+
+/* High DPI displays (retina) adjustments */
+@media (-webkit-min-device-pixel-ratio: 2),
+       (min-resolution: 192dpi) {
+  .ProseMirror {
+    /* Sharper text rendering on high DPI displays */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Ensure icons remain crisp */
+  .icon,
+  .toolbar-icon,
+  .nav-icon,
+  .comment-icon {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* Compact toolbar for landscape mode */
+  .mobile-toolbar {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  
+  /* Optimize editor height for landscape */
+  .ProseMirror {
+    min-height: 150px;
+    padding: 12px;
+  }
+  
+  /* Compact typography in landscape */
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3 {
+    margin-top: 16px;
+    margin-bottom: 12px;
+  }
+  
+  /* Navigation adjustments for landscape */
+  .mobile-nav-bar {
+    padding-top: calc(var(--safe-area-inset-top) + 4px);
+    padding-bottom: 8px;
+  }
+  
+  .mobile-nav-item {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+  
+  /* Drawer width adjustment for landscape */
+  .mobile-drawer {
+    max-width: 70vw;
+  }
+  
+  /* Comment adjustments for landscape */
+  .mobile-comment-header {
+    padding: 10px 16px;
+  }
+  
+  .mobile-comment-content {
+    padding: 10px 16px;
+  }
+  
+  .mobile-comment-reply-form {
+    padding: 10px 16px;
+  }
+  
+  .mobile-comment-reply-form textarea {
+    min-height: 60px;
+  }
+}
+
+/* Portrait mobile optimizations */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* Full height editor in portrait mode */
+  .article-editor-modal .ProseMirror {
+    min-height: calc(100vh - 200px);
+  }
+  
+  /* Better spacing for portrait reading */
+  .ProseMirror {
+    padding: 20px 16px;
+  }
+  
+  /* Navigation specific portrait adjustments */
+  .mobile-article-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  
+  .mobile-nav-bar {
+    padding: 12px 16px;
+  }
+  
+  /* Comment system portrait adjustments */
+  .mobile-comment-system {
+    border-radius: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .mobile-comment-thread-indent {
+    margin-left: 12px;
+    padding-left: 8px;
+  }
+}
+
+/* iOS specific fixes */
+@supports (-webkit-appearance: none) {
+  .ProseMirror {
+    /* Fix iOS keyboard behavior */
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  /* Fix iOS zoom issues */
+  .ProseMirror input,
+  .ProseMirror textarea,
+  .ProseMirror [contenteditable] {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  /* iOS safe area handling */
+  .mobile-modal,
+  .mobile-drawer {
+    padding-bottom: calc(var(--safe-area-inset-bottom) + 16px);
+  }
+  
+  /* iOS navigation bar safe area */
+  .mobile-nav-bar {
+    padding-top: calc(var(--safe-area-inset-top) + 8px);
+  }
+  
+  /* iOS drawer safe area handling */
+  .mobile-drawer .drawer-content {
+    padding-bottom: calc(var(--safe-area-inset-bottom) + 20px);
+  }
+  
+  /* iOS comment system safe area */
+  .mobile-comment-system {
+    padding-bottom: calc(var(--safe-area-inset-bottom) + 12px);
+  }
+  
+  /* iOS keyboard handling for comment forms */
+  .mobile-comment-reply-form textarea,
+  .mobile-comment-search input {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Android specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) and (min-resolution: .001dpcm) {
+  .ProseMirror {
+    /* Better Android text rendering */
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Android keyboard adjustments */
+  .ProseMirror:focus {
+    /* Prevent layout shifts on keyboard open */
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Android navigation improvements */
+  .mobile-nav-item:active,
+  .mobile-article-item:active {
+    /* Better Android touch feedback */
+    background-color: rgba(59, 130, 246, 0.05);
+  }
+  
+  /* Android comment improvements */
+  .mobile-comment-thread:active,
+  .mobile-comment-reaction-btn:active {
+    background-color: rgba(59, 130, 246, 0.05);
+  }
+}
+
+/* Accessibility improvements for mobile */
+@media (prefers-reduced-motion: reduce) {
+  /* Reduce animations for users who prefer reduced motion */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  /* Keep essential feedback animations */
+  .button:active,
+  .toolbar-button:active,
+  .mobile-nav-item:active,
+  .mobile-article-item:active,
+  .mobile-comment-thread:active,
+  .mobile-comment-reaction-btn:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Focus management for mobile keyboards */
+@media (max-width: 768px) {
+  .ProseMirror:focus {
+    /* Ensure editor remains visible when keyboard appears */
+    scroll-margin-bottom: 100px;
+  }
+  
+  /* Better focus indicators for touch navigation */
+  .ProseMirror:focus-visible,
+  .mobile-nav-item:focus-visible,
+  button:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  
+  /* Navigation focus improvements */
+  .mobile-nav-item:focus {
+    background-color: #f3f4f6;
+    outline: none;
+  }
+  
+  .mobile-nav-item:focus-visible {
+    background-color: #f3f4f6;
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+  }
+  
+  /* Comment system focus improvements */
+  .mobile-comment-reply-form textarea:focus,
+  .mobile-comment-search input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-color: #3b82f6;
+  }
+  
+  .mobile-comment-thread:focus-visible,
+  .mobile-comment-reaction-btn:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+}
+
+/* Loading states for mobile */
+@media (max-width: 768px) {
+  .mobile-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  
+  .mobile-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+}
+
+/* Swipe gesture indicators */
+@media (max-width: 768px) {
+  .swipe-action-hint {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 12px;
+    opacity: 0.7;
+  }
+  
+  .swipe-to-close-hint {
+    display: flex;
+    justify-content: center;
+    padding: 8px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}
+
+/* Print styles for mobile */
+@media print {
+  .mobile-toolbar,
+  .mobile-nav-bar,
+  .mobile-drawer,
+  .mobile-comment-system,
+  .toolbar,
+  .floating-toolbar {
+    display: none !important;
+  }
+  
+  .ProseMirror {
+    font-size: 12pt;
+    line-height: 1.5;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .mobile-article-item,
+  .mobile-article-grid-item {
+    border: none;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+} 

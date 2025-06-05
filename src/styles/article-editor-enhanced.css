@@ -1,0 +1,527 @@
+/* Enhanced Article Editor Styles */
+
+/* Floating toolbar animations */
+.floating-toolbar {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-toolbar.dark {
+  background: rgba(17, 24, 39, 0.95);
+}
+
+/* Toolbar button enhancements */
+.toolbar-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toolbar-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.toolbar-btn:hover::before {
+  left: 100%;
+}
+
+.toolbar-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Status indicator styles */
+.status-indicator {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.status-indicator.saving {
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+}
+
+.status-indicator.saved {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.status-indicator.error {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+/* Editor content enhancements */
+.enhanced-editor-content {
+  position: relative;
+}
+
+.enhanced-editor-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+}
+
+/* Zen mode styles */
+.zen-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.zen-mode.dark {
+  background: #0f172a;
+}
+
+.zen-mode .editor-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+  min-height: 100vh;
+  font-size: 1.125rem;
+  line-height: 1.8;
+}
+
+/* Focus mode styles */
+.focus-mode {
+  max-width: 4xl;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.focus-mode.dark {
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Word count and stats */
+.editor-stats {
+  font-size: 0.75rem;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.editor-stats:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+/* Collaborative cursors */
+.collaborative-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  transition: all 0.1s ease;
+}
+
+.collaborative-cursor::after {
+  content: attr(data-user);
+  position: absolute;
+  top: -1.5rem;
+  left: 0;
+  background: currentColor;
+  color: white;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.collaborative-cursor:hover::after {
+  opacity: 1;
+}
+
+/* Enhanced table styles */
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
+  position: relative;
+  background: white;
+  transition: background-color 0.2s ease;
+}
+
+.ProseMirror table th {
+  background: #f9fafb;
+  font-weight: 600;
+  text-align: left;
+}
+
+.ProseMirror table td:hover,
+.ProseMirror table th:hover {
+  background: #f3f4f6;
+}
+
+/* Enhanced code block styles */
+.ProseMirror pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.ProseMirror pre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0.25rem;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* Enhanced link styles */
+.ProseMirror a {
+  color: #3b82f6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.ProseMirror a:hover {
+  color: #1d4ed8;
+  border-bottom-color: #3b82f6;
+}
+
+.ProseMirror a::before {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.ProseMirror a:hover::before {
+  width: 100%;
+}
+
+/* Enhanced task list styles */
+.ProseMirror .task-list {
+  list-style: none;
+  padding: 0;
+}
+
+.ProseMirror .task-item {
+  display: flex;
+  align-items: flex-start;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror .task-item input[type="checkbox"] {
+  margin-right: 0.75rem;
+  margin-top: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  border-radius: 0.25rem;
+}
+
+.ProseMirror .task-item[data-checked="true"] {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+/* Enhanced blockquote styles */
+.ProseMirror blockquote {
+  border-left: 4px solid #3b82f6;
+  margin: 1.5rem 0;
+  padding: 1rem 1.5rem;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 0 0.5rem 0.5rem 0;
+  position: relative;
+}
+
+.ProseMirror blockquote::before {
+  content: '"';
+  position: absolute;
+  top: -0.5rem;
+  left: 1rem;
+  font-size: 3rem;
+  color: #3b82f6;
+  opacity: 0.3;
+  font-family: serif;
+}
+
+/* Enhanced highlight styles */
+.ProseMirror mark {
+  background: linear-gradient(120deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1f2937;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 2px rgba(251, 191, 36, 0.3);
+}
+
+/* Enhanced heading styles */
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  position: relative;
+  color: #1f2937;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 2rem 0 1rem 0;
+}
+
+.ProseMirror h1::after,
+.ProseMirror h2::after,
+.ProseMirror h3::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, transparent);
+  border-radius: 1px;
+}
+
+.ProseMirror h1::after {
+  width: 4rem;
+}
+
+.ProseMirror h2::after {
+  width: 3rem;
+}
+
+.ProseMirror h3::after {
+  width: 2rem;
+}
+
+/* Dark theme overrides */
+.dark .ProseMirror {
+  color: #e5e7eb;
+}
+
+.dark .ProseMirror h1,
+.dark .ProseMirror h2,
+.dark .ProseMirror h3 {
+  color: #f9fafb;
+}
+
+.dark .ProseMirror table td,
+.dark .ProseMirror table th {
+  border-color: #374151;
+  background: #1f2937;
+}
+
+.dark .ProseMirror table th {
+  background: #111827;
+}
+
+.dark .ProseMirror table td:hover,
+.dark .ProseMirror table th:hover {
+  background: #374151;
+}
+
+.dark .ProseMirror blockquote {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #60a5fa;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .floating-toolbar {
+    padding: 0.75rem;
+  }
+  
+  .toolbar-btn {
+    padding: 0.5rem;
+  }
+  
+  .zen-mode .editor-content {
+    padding: 2rem 1rem;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  
+  .focus-mode {
+    margin: 1rem;
+    padding: 1rem;
+  }
+  
+  .ProseMirror {
+    font-size: 0.9rem;
+  }
+  
+  .ProseMirror pre {
+    padding: 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Animation keyframes */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Apply animations */
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.3s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.2s ease-out;
+}
+
+/* Loading skeleton styles */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+/* Enhanced scrollbar */
+.enhanced-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.enhanced-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.enhanced-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.enhanced-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark .enhanced-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark .enhanced-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark .enhanced-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Print styles */
+@media print {
+  .floating-toolbar,
+  .toolbar-btn,
+  .status-indicator,
+  .collaborative-cursor {
+    display: none !important;
+  }
+  
+  .ProseMirror {
+    font-size: 12pt;
+    line-height: 1.4;
+    color: black;
+  }
+  
+  .ProseMirror a {
+    color: black;
+    text-decoration: underline;
+  }
+  
+  .ProseMirror pre {
+    background: #f5f5f5;
+    color: black;
+    border: 1px solid #ddd;
+  }
+} 

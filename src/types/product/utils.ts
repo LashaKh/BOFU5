@@ -38,15 +38,36 @@ export function extractNumberedProperties(obj: any, prefix: string): string[] {
   return result;
 }
 
-// Handle both string and array values
+// Handle both string and array values, plus objects and nested structures
 export function getStringOrJoinArray(value: any): string {
   if (!value) return '';
   
   if (typeof value === 'string') {
-    return value;
+    return value.trim();
   } else if (Array.isArray(value) && value.length > 0) {
-    return value.join(', ');
+    // Filter out empty/null values and join
+    const validValues = value
+      .filter(v => v !== null && v !== undefined && v !== '')
+      .slice(0, 10); // Limit to prevent excessive processing
+    
+    if (validValues.length > 0) {
+      return validValues.map(v => typeof v === 'string' ? v.trim() : String(v)).join(', ');
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    // Try to extract meaningful text from object
+    const objectValues = Object.values(value)
+      .filter(v => v !== null && v !== undefined && v !== '')
+      .slice(0, 10);
+    
+    if (objectValues.length > 0) {
+      return objectValues
+        .map(v => typeof v === 'string' ? v.trim() : String(v))
+        .join(', ');
+    }
+  } else if (typeof value === 'number') {
+    return String(value);
   }
+  
   return '';
 }
 

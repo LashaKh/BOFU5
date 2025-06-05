@@ -51,4 +51,406 @@
 - Maintain responsive design across device sizes
 - Follow existing component patterns for UI consistency
 - Keep console logging for debugging purposes
-- Maintain clear state management across complex workflows 
+- Maintain clear state management across complex workflows
+
+# Cursor's Memory Bank
+
+I am Cursor, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
+
+## Memory Bank Structure
+
+The Memory Bank consists of required core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
+
+```mermaid
+flowchart TD
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
+    
+    PC --> AC[activeContext.md]
+    SP --> AC
+    TC --> AC
+    
+    AC --> P[progress.md]
+```
+
+### Core Files (Required)
+1. `projectbrief.md`
+   - Foundation document that shapes all other files
+   - Created at project start if it doesn't exist
+   - Defines core requirements and goals
+   - Source of truth for project scope
+
+2. `productContext.md`
+   - Why this project exists
+   - Problems it solves
+   - How it should work
+   - User experience goals
+
+3. `activeContext.md`
+   - Current work focus
+   - Recent changes
+   - Next steps
+   - Active decisions and considerations
+
+4. `systemPatterns.md`
+   - System architecture
+   - Key technical decisions
+   - Design patterns in use
+   - Component relationships
+
+5. `techContext.md`
+   - Technologies used
+   - Development setup
+   - Technical constraints
+   - Dependencies
+
+6. `progress.md`
+   - What works
+   - What's left to build
+   - Current status
+   - Known issues
+
+### Additional Context
+Create additional files/folders within memory-bank/ when they help organize:
+- Complex feature documentation
+- Integration specifications
+- API documentation
+- Testing strategies
+- Deployment procedures
+
+## Core Workflows
+
+### Plan Mode
+```mermaid
+flowchart TD
+    Start[Start] --> ReadFiles[Read Memory Bank]
+    ReadFiles --> CheckFiles{Files Complete?}
+    
+    CheckFiles -->|No| Plan[Create Plan]
+    Plan --> Document[Document in Chat]
+    
+    CheckFiles -->|Yes| Verify[Verify Context]
+    Verify --> Strategy[Develop Strategy]
+    Strategy --> Present[Present Approach]
+```
+
+### Act Mode
+```mermaid
+flowchart TD
+    Start[Start] --> Context[Check Memory Bank]
+    Context --> Update[Update Documentation]
+    Update --> Rules[Update .cursorrules if needed]
+    Rules --> Execute[Execute Task]
+    Execute --> Document[Document Changes]
+```
+
+## Documentation Updates
+
+Memory Bank updates occur when:
+1. Discovering new project patterns
+2. After implementing significant changes
+3. When user requests with **update memory bank** (MUST review ALL files)
+4. When context needs clarification
+
+```mermaid
+flowchart TD
+    Start[Update Process]
+    
+    subgraph Process
+        P1[Review ALL Files]
+        P2[Document Current State]
+        P3[Clarify Next Steps]
+        P4[Update .cursorrules]
+        
+        P1 --> P2 --> P3 --> P4
+    end
+    
+    Start --> Process
+```
+
+Note: When triggered by **update memory bank**, I MUST review every memory bank file, even if some don't require updates. Focus particularly on activeContext.md and progress.md as they track current state.
+
+## Project Intelligence (.cursorrules)
+
+The .cursorrules file is my learning journal for each project. It captures important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
+
+```mermaid
+flowchart TD
+    Start{Discover New Pattern}
+    
+    subgraph Learn [Learning Process]
+        D1[Identify Pattern]
+        D2[Validate with User]
+        D3[Document in .cursorrules]
+    end
+    
+    subgraph Apply [Usage]
+        A1[Read .cursorrules]
+        A2[Apply Learned Patterns]
+        A3[Improve Future Work]
+    end
+    
+    Start --> Learn
+    Learn --> Apply
+```
+
+### What to Capture
+- Critical implementation paths
+- User preferences and workflow
+- Project-specific patterns
+- Known challenges
+- Evolution of project decisions
+- Tool usage patterns
+
+The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of .cursorrules as a living document that grows smarter as we work together.
+
+REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.
+
+---
+
+## Coding Best Practices
+- **Do not modify code or UI elements that already work**, unless explicitly instructed.
+- Avoid duplicating existing functionality; reuse working components whenever possible.
+- Write comprehensive tests for all new or modified functionality.
+- **Never unintentionally delete data or code**; confirm explicitly before destructive actions.
+- Commit frequently to maintain a reliable project history.
+- Always ask clarifying questions if tasks or requirements are unclear.
+- Focus on the areas of code relevant to the task - Do not touch code that is unrelated to the task
+- Write thorough tests for all major functionality
+- Avoid making major changes to the patterns and architecture of how a feature works, after it has shown to work well, unless explicitly instructed
+- Always think about what other methods and areas of code might be affected by code changes
+
+## User Interface (UI)
+- **Never change or affect the UI unintentionally.** Only alter UI components if explicitly instructed or clearly part of the assigned task.
+- Always ensure UI changes are fully tested and validated.
+
+## Coding pattern preferences
+- Always prefer simple solutions
+- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
+- Write code that takes into account the different environments: dev, test, and prod
+- You are careful to only make changes that are requested or you are confident are well understood and related to the change being requested 
+- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we don't have duplicate logic.
+- Keep the codebase very clean and organized
+- Avoid writing scripts in files if possible, especially if the script is likely only to be run once
+- Avoid having files over 200-300 lines of code. Refactor at that point. 
+- Mocking data is only needed for tests, never mock data for dev or prod
+- Never add stubbing or fake data patterns to code that affects the dev or prod environments
+- Never overwrite my .env file without first asking and confirming
+
+## Available MCP servers and when to use them 
+
+### Sequential Thinking
+- Use **Sequential Thinking MCP** for debugging, troubleshooting, complex problem-solving, and detailed project planning.
+- Avoid excessive recursive calls; trigger intelligently only when new progress or significant information is possible.
+
+### Information Gathering (Brave Search, Puppeteer, FireCrawl)
+- Use **Brave Search, Puppeteer, and FireCrawl MCP servers** when troubleshooting, searching documentation, or exploring similar user issues.
+- Combine effectively with **Sequential Thinking MCP** to refine solutions and acquire up-to-date information.
+- Prioritize reliable and concise sources.
+
+### Browser Tools
+- **Browser Tools MCP** requires user confirmation. Always recommend the user explicitly start the server and ensure a Chromium browser is running before using Browser Tools MCP.
+- Let the user explicitly instruct Cursor when Browser Tools should be used.
+- Remind user to disable puppeteer before attempting to use
+
+### GitHub MCP
+- Commit and push code changes to GitHub using the **GitHub MCP server** after every successful test.
+- Ensure commits are clear, descriptive, and incremental.
+- Never overwrite or unintentionally alter files like README.md or other critical documentation without explicit user approval.
+
+## Article Editor Development Patterns (Learned from Task 8)
+
+### Custom Package Implementation Strategy
+- **Research First**: Always investigate package availability thoroughly before starting implementation
+- **Custom Solutions**: Consider building targeted solutions when external packages are missing or inadequate
+- **Control Benefits**: Custom implementations often provide better control over complex features
+- **Example**: Task 8 markdown support succeeded by building custom conversion system instead of forcing TipTap extensions
+
+### TypeScript Integration Best Practices
+- **Early Planning**: Address TypeScript configuration during initial development, not as an afterthought
+- **External Libraries**: Plan for type handling of external libraries (use @ts-ignore sparingly with documentation)
+- **Systematic Approach**: Address TypeScript errors systematically during implementation
+- **Zero Errors Goal**: Strive for zero TypeScript compilation errors with full type coverage
+
+### Component Architecture for Editor Features
+- **Modular Design**: Separate complex features into focused, reusable components
+- **Clear Boundaries**: Design clean component interfaces for seamless integration
+- **State Management**: Plan component communication and state sharing patterns carefully
+- **Future Scalability**: Build architecture ready for additional features and format support
+
+### User Experience Design Principles
+- **Progressive Disclosure**: Provide multiple levels of help (quick reference + comprehensive guides)
+- **Dual Workflows**: Enable multiple editing approaches (rich text + markdown) in single interface
+- **Learning Support**: Include comprehensive help systems with interactive examples
+- **Visual Feedback**: Clear indicators for mode changes, conversion status, and system state
+
+### File Operations and Import/Export
+- **Smart Naming**: Implement intelligent filename generation based on content and timestamps
+- **Multiple Formats**: Support various file formats (.md, .markdown, .txt) with content cleaning
+- **Error Recovery**: Robust error handling with graceful fallbacks for conversion failures
+- **Content Preservation**: Maintain formatting integrity during import/export operations
+
+### Performance Optimization for Rich Editors
+- **Efficient Conversion**: Optimize bidirectional format conversion without UI lag
+- **Debounced Operations**: Use debouncing for expensive operations (auto-save, live conversion)
+- **Cross-browser Testing**: Validate functionality across modern browsers consistently
+- **Bundle Management**: Monitor bundle size impact when adding new features
+
+### Integration with Existing Systems
+- **Non-disruptive Enhancement**: Add new features without breaking existing functionality
+- **Backward Compatibility**: Maintain all existing editor capabilities when adding new ones
+- **Clean Integration**: Seamlessly integrate new components with existing architecture
+- **Testing Strategy**: Verify both new features and existing functionality after integration
+
+### Live Editing Features Implementation
+- **Real-time Shortcuts**: Implement pattern recognition for markdown syntax (# for headers, * for lists)
+- **Inline Formatting**: Live detection and conversion of formatting patterns (**bold**, *italic*, etc.)
+- **Pattern Detection**: Smart recognition of user input patterns for auto-formatting
+- **Seamless Transitions**: Smooth conversion between editing modes without data loss
+
+These patterns emerged from the successful implementation of comprehensive markdown support and should guide future editor enhancements.
+
+## Product Page Background Styling Patterns (Learned from Background Fix)
+
+### CSS Conflict Resolution Strategy
+- **Inline Style Override Approach**: When Tailwind CSS classes aren't applying properly in production, use React inline styles for guaranteed application
+- **Background Consistency Pattern**: Apply `style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}` for consistent gray gradient backgrounds
+- **Cross-Component Consistency**: Ensure identical styling implementation across related components (DedicatedProductPage, history page, etc.)
+- **Conflict Prevention**: Use inline styles to override external CSS compilation order issues without complex debugging
+
+### Visual Consistency Implementation
+- **Dark Theme Preservation**: Maintain professional dark theme consistency throughout navigation experience
+- **User Experience Focus**: Eliminate jarring background color changes that disrupt visual flow
+- **Brand Standards**: Preserve professional brand appearance with consistent color schemes
+- **Production Quality**: Ensure styling works reliably across development and production environments
+
+### Maintainable Styling Patterns
+- **Minimal Code Impact**: Prefer efficient solutions requiring only wrapper div updates over major refactoring
+- **Immediate Feedback**: Use styling approaches that provide instant visual response without build dependencies
+- **Pattern Establishment**: Create consistent patterns for background styling that can be applied across similar pages
+- **Documentation**: Document styling solutions for future reference and team consistency
+
+### Background Color Standards
+- **Primary Gradient**: `linear-gradient(to bottom right, #111827, #1f2937)` for main content areas
+- **Color Values**: Use `#111827` (gray-900) to `#1f2937` (gray-800) for consistent professional appearance
+- **Application Method**: React inline styles for guaranteed override of conflicting CSS
+- **Cross-Browser Compatibility**: Ensure gradient implementations work across modern browsers
+
+These patterns emerged from resolving white background issues on product pages and should guide future styling consistency challenges requiring reliable CSS override solutions.
+
+## Enhanced Undo/Redo Implementation Patterns (Learned from Task 12)
+
+### History Engine Configuration Strategy
+- **Depth Planning**: Increase history depth beyond defaults (50 → 100) for professional editing experience
+- **Transaction Grouping**: Use intelligent grouping delays (500ms) to create logical undo steps
+- **Performance Balance**: Balance history depth with memory usage and performance requirements
+- **Configuration Testing**: Validate history configuration across different editing scenarios
+
+### Cross-Platform Keyboard Shortcut Implementation
+- **OS Detection**: Implement platform-aware modifier key detection (Ctrl vs Cmd)
+- **Multiple Redo Patterns**: Support both Windows (Ctrl+Y) and Mac (Cmd+Shift+Z) redo shortcuts
+- **Event Handling**: Use proper event prevention and focus management for keyboard shortcuts
+- **Accessibility**: Ensure keyboard shortcuts work with screen readers and accessibility tools
+
+### Real-Time State Tracking Architecture
+- **Plugin State Access**: Access ProseMirror plugin state for real-time history information
+- **Event Listeners**: Use editor update and transaction events for live state synchronization
+- **Performance Optimization**: Minimize re-renders by batching state updates efficiently
+- **Memory Management**: Properly cleanup event listeners and state references
+
+### Visual Feedback Systems for Editor Actions
+- **Dynamic Button States**: Implement visual indicators showing action availability and counts
+- **Tooltip Enhancement**: Provide detailed tooltips with action counts and current state
+- **Animation Integration**: Use smooth transitions for state changes without performance impact
+- **Progressive Disclosure**: Show advanced features contextually without overwhelming users
+
+### Transaction Batching Utility Design
+- **Modular Architecture**: Create reusable utility classes for different operation types
+- **Operation-Specific Helpers**: Implement specialized batching for tables, formatting, images, lists
+- **Error Recovery**: Design robust error handling with proper cleanup mechanisms
+- **API Design**: Create intuitive APIs for both batch execution and manual start/end control
+
+### History Persistence Across Auto-Save
+- **Non-Destructive Saves**: Ensure auto-save operations don't interfere with undo/redo history
+- **Metadata Preservation**: Maintain transaction metadata during save operations
+- **State Consistency**: Keep history state synchronized across component lifecycle
+- **User Experience**: Prevent history loss during background save operations
+
+### Advanced History Navigation UI Patterns
+- **Dropdown Management**: Implement proper click-outside handling and accessibility
+- **Batch Operations**: Provide multi-step undo/redo options (1, 5, 10, 20 steps)
+- **Visual Hierarchy**: Display history depth and available actions clearly
+- **Keyboard Integration**: Support keyboard navigation within history panels
+
+### ProseMirror Integration Best Practices
+- **Transaction System**: Work with ProseMirror's transaction system for reliable operations
+- **Plugin Architecture**: Integrate cleanly with existing ProseMirror plugins
+- **State Management**: Handle editor state changes without breaking existing functionality
+- **Performance Considerations**: Optimize operations for large documents and complex editing
+
+These patterns emerged from implementing comprehensive undo/redo functionality with advanced features and should guide future editor enhancements requiring similar state management and user interaction patterns.
+
+## Enterprise Comment Resolution Workflow Patterns (Learned from Task 15)
+
+### Database-First Workflow Design
+- **Comprehensive Audit Trails**: Design complete status change tracking from day one with user attribution and timestamps
+- **Performance-Optimized Schema**: Create indexes specifically for analytics queries and frequent filtering operations
+- **RLS Security Model**: Implement row-level security policies that support both user access and admin oversight
+- **Analytics Views**: Pre-build database views for common reporting queries to optimize dashboard performance
+
+### Real-Time Collaboration Architecture
+- **Subscription Management**: Use Supabase real-time subscriptions for live status updates across team members
+- **State Synchronization**: Implement proper state sync between local UI and remote database changes
+- **Conflict Resolution**: Handle concurrent status changes gracefully with proper user feedback
+- **Performance Optimization**: Use efficient query patterns to minimize real-time update overhead
+
+### Template-Based Workflow Systems
+- **Pre-defined Resolution Templates**: Create structured templates for common resolution scenarios (Issue Fixed, Implemented Suggestion, etc.)
+- **Consistent Workflow Language**: Establish standard terminology and reasons across the team workflow
+- **Template Extensibility**: Design system to easily add new templates without code changes
+- **User Experience**: Make template selection intuitive while allowing custom reason input
+
+### Bulk Operations Design Patterns
+- **Selection Management**: Implement smart comment selection with visual feedback and state tracking
+- **Batch Processing**: Design efficient database operations for handling multiple records simultaneously
+- **Progress Indication**: Provide clear feedback during bulk operations with success/failure reporting
+- **Atomic Operations**: Ensure bulk operations either fully succeed or fail gracefully without partial states
+
+### Analytics Dashboard Architecture
+- **Real-Time Metrics**: Calculate and display resolution rates, timing, and performance metrics live
+- **Historical Trends**: Track resolution performance over time for team productivity analysis
+- **User-Specific Analytics**: Provide individual performance tracking without creating competitive pressure
+- **Export Capabilities**: Enable data export for external reporting and documentation needs
+
+### Status Management State Machine
+- **Clear State Transitions**: Define explicit rules for valid status changes (active → resolved → archived)
+- **Visual Status Indicators**: Use consistent visual language (badges, colors, icons) across all components
+- **Age-Based Warnings**: Implement intelligent alerts for comments requiring attention based on time
+- **Workflow Enforcement**: Prevent invalid status transitions while providing clear user feedback
+
+### Component Integration Patterns
+- **Resolution Panel Integration**: Design bulk operations panel that seamlessly integrates with existing comment system
+- **Enhanced Thread Display**: Extend existing components rather than replacing to maintain consistency
+- **Modal Workflow Design**: Create resolution dialogs that follow established UI patterns
+- **Contextual Actions**: Show relevant actions based on comment status and user permissions
+
+### Administrative Interface Design
+- **Role-Based Feature Access**: Show admin-only features conditionally based on user permissions
+- **Override Capabilities**: Provide admin override functionality with proper audit trail documentation
+- **Comprehensive Reporting**: Design admin interfaces for team oversight and performance management
+- **Bulk Management Tools**: Give admins efficient tools for managing large volumes of comments
+
+### Performance Optimization for Collaboration
+- **Efficient Database Queries**: Use joins and indexes optimally for comment resolution analytics
+- **Minimal Re-renders**: Optimize React components to prevent unnecessary re-renders during status updates
+- **Debounced Operations**: Use appropriate debouncing for user input while maintaining responsiveness
+- **Memory Management**: Properly cleanup subscriptions and event listeners in collaboration components
+
+### Error Handling in Collaborative Workflows
+- **Graceful Degradation**: Handle network issues and database errors without breaking the workflow
+- **User-Friendly Feedback**: Provide clear error messages that guide users toward resolution
+- **Retry Mechanisms**: Implement automatic retry for transient failures with user notification
+- **Conflict Prevention**: Design UI to minimize the chance of conflicting operations between users
+
+These patterns emerged from implementing enterprise-grade comment resolution workflow and should guide future collaborative features requiring similar database integration, real-time updates, and team workflow management. 

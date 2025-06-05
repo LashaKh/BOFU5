@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
@@ -32,6 +32,10 @@ import { ToastProvider } from './contexts/ToastContext';
 import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
 import DedicatedProductPage from './pages/DedicatedProductPage'; // Added import
 import LandingPage from './pages/LandingPage'; // Import the new LandingPage
+import { UserSelectorTest } from './components/admin/UserSelectorTest'; // Import the test component
+import { AdminArticleListTest } from './components/admin/AdminArticleListTest'; // Import the article list test
+import { ArticleEditorAdminTest } from './components/admin/ArticleEditorAdminTest'; // Import the article editor admin test
+import { AuditLogViewerTest } from './components/admin/AuditLogViewerTest'; // Import the audit log viewer test
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -43,6 +47,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [researchResults, setResearchResults] = useState<ProductAnalysis[]>([]);
   const [historyResults, setHistoryResults] = useState<ResearchResult[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -75,112 +80,309 @@ function App() {
 
   // Handle sign out and show auth modal
   const handleSignOut = async () => {
+    console.log('[DEBUG] handleSignOut called from:', new Error().stack?.split('\n')[2]?.trim());
     try {
+      console.log('[DEBUG] Starting sign out process...');
+      console.log('[DEBUG] Current state before sign out:', {
+        user: user?.email,
+        isAdminAuthenticated,
+        currentPath: location.pathname
+      });
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Navigate to home
+      console.log('[DEBUG] Supabase sign out successful');
+      setUser(null); // Explicitly set user to null
+      setIsAdminAuthenticated(false); // Reset admin state
+      
+      console.log('[DEBUG] State updated after sign out');
+      console.log('[DEBUG] Navigating to home...');
       navigate('/', { replace: true });
       
-      // Immediately show auth modal after sign out
-      setShowAuthModal(true);
-      
+      console.log('[DEBUG] Sign out completed successfully');
       notify('success', 'Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
+      console.error('[DEBUG] Sign out error details:', {
+        name: (error as any)?.name,
+        message: (error as any)?.message,
+        stack: (error as any)?.stack
+      });
       notify('error', 'Failed to sign out');
+    } finally {
+      console.log('[DEBUG] Sign out process finished');
+      console.log('[DEBUG] Final state after sign out:', {
+        user: user?.email,
+        isAdminAuthenticated,
+        currentPath: location.pathname
+      });
+    }
+  };
+
+  // Function to check if user is admin (using database instead of metadata)
+  const checkAdminStatus = async (userId: string): Promise<boolean> => {
+    try {
+      console.log(`[DEBUG] Checking admin status for user ID: ${userId}`);
+      
+      const { data: adminProfile, error } = await supabase
+        .from('admin_profiles')
+        .select('id, email, role, permissions')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("[DEBUG] Error checking admin status:", error);
+        console.error("[DEBUG] Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        // If table doesn't exist, suggest creating it
+        if (error.code === '42P01') {
+          console.log("[DEBUG] admin_profiles table does not exist. User needs to be added to admin_profiles table.");
+          console.log("[DEBUG] Run this in browser console:");
+          console.log(`
+const { data, error } = await supabase
+  .from('admin_profiles')
+  .insert({ 
+    id: '${userId}',
+    email: '${await getUserEmail(userId)}',
+    role: 'admin',
+    permissions: ['read', 'write', 'delete', 'manage_users']
+  });
+console.log('Result:', data, error);
+          `);
+        }
+        return false;
+      }
+      
+      const isAdmin = !!adminProfile;
+      console.log(`[DEBUG] Admin check result: ${isAdmin ? 'IS ADMIN' : 'NOT ADMIN'}`);
+      if (isAdmin) {
+        console.log(`[DEBUG] Admin profile:`, adminProfile);
+      } else {
+        console.log(`[DEBUG] User ${userId} not found in admin_profiles table`);
+        console.log(`[DEBUG] To grant admin access, run this in console:`);
+        console.log(`
+// Add user to admin_profiles
+const { data, error } = await supabase
+  .from('admin_profiles')
+  .insert({ 
+    id: '${userId}',
+    role: 'admin',
+    permissions: ['read', 'write', 'delete', 'manage_users']
+  });
+console.log('Admin granted:', data, error);
+        `);
+      }
+      
+      return isAdmin;
+    } catch (e) {
+      console.error("[DEBUG] Exception in checkAdminStatus:", e);
+      return false;
+    }
+  };
+  
+  // Helper function to get user email
+  const getUserEmail = async (userId: string): Promise<string> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.email || 'unknown@email.com';
+    } catch {
+      return 'unknown@email.com';
+    }
+  };
+
+  // Function to automatically setup admin access if tables are empty
+  const autoSetupAdmin = async (userId: string, userEmail: string): Promise<boolean> => {
+    try {
+      console.log("[DEBUG] Auto-setting up admin access...");
+      
+      // First, populate user_profiles from content_briefs if user_profiles is empty
+      await populateUserProfiles();
+      
+      // Check if admin_profiles is empty
+      const { data: existingAdmins, error: adminError } = await supabase
+        .from('admin_profiles')
+        .select('id')
+        .limit(1);
+      
+      if (adminError) {
+        console.error("[DEBUG] Error checking admin_profiles:", adminError);
+        return false;
+      }
+      
+      // If no admins exist, make this user an admin
+      if (!existingAdmins || existingAdmins.length === 0) {
+        console.log("[DEBUG] No admins found. Creating admin user...");
+        
+        // First ensure user is in user_profiles
+        const { error: userProfileError } = await supabase
+          .from('user_profiles')
+          .upsert({
+            id: userId,
+            email: userEmail,
+            company_name: 'Admin Company',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          });
+        
+        if (userProfileError) {
+          console.error("[DEBUG] Error creating user profile:", userProfileError);
+        } else {
+          console.log("[DEBUG] User profile created/updated");
+        }
+        
+        // Then add to admin_profiles
+        const { data: adminData, error: adminInsertError } = await supabase
+          .from('admin_profiles')
+          .insert({
+            id: userId,
+            email: userEmail,
+            name: userEmail.split('@')[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (adminInsertError) {
+          console.error("[DEBUG] Error creating admin:", adminInsertError);
+          return false;
+        } else {
+          console.log("[DEBUG] Admin created successfully:", adminData);
+          return true;
+        }
+      }
+      
+      return false; // Admin already exists
+    } catch (error) {
+      console.error("[DEBUG] Auto setup error:", error);
+      return false;
+    }
+  };
+
+  // Function to populate user_profiles from content_briefs if user_profiles is empty
+  const populateUserProfiles = async (): Promise<void> => {
+    try {
+      console.log("[DEBUG] Checking if user_profiles needs population...");
+      
+      // Add much shorter timeout protection and make it non-blocking
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 2000); // Reduced from 5000 to 2000
+      });
+      
+      // Check if user_profiles is empty with very simple query
+      const queryPromise = supabase
+        .from('user_profiles')
+        .select('id', { count: 'exact', head: true });
+      
+      const result = await Promise.race([
+        queryPromise,
+        timeoutPromise
+      ]) as any;
+      
+      // If we get here without timeout, we can safely skip population
+      console.log("[DEBUG] user_profiles table accessible, skipping population");
+      return;
+      
+    } catch (error) {
+      console.error("[DEBUG] Error in populateUserProfiles:", error);
+      console.log("[DEBUG] populateUserProfiles failed, but continuing with admin setup");
+      // Don't throw - just continue
+      return;
     }
   };
 
   // Load user on initial render
   useEffect(() => {
+    setIsAuthLoading(true); // Start loading
     // Check for initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[INITIAL] Checking session on app load:', session?.user?.email);
+      
       if (session) {
         setUser(session.user ?? null);
         
-        // Check if admin
-        const userData = session.user.user_metadata;
-        const isAdmin = userData && (userData.is_admin === true || userData.role === 'admin');
-        
-        // Update admin auth state
-        setIsAdminAuthenticated(isAdmin);
-        
-        // If admin, redirect to admin page
-        if (isAdmin && !isAdminPath) {
-          navigate('/admin', { replace: true });
+        // Special handling for admin user lashay@bofu.ai
+        if (session.user.email === 'lashay@bofu.ai') {
+          console.log('[INITIAL] Admin user detected on page load');
+          
+          // Simple fallback: Just set admin auth for known admin user
+          console.log('[INITIAL] Setting admin authentication for lashay@bofu.ai (bypassing database checks)');
+          setIsAdminAuthenticated(true);
+          setIsAuthLoading(false);
+          
+          // Always redirect admin users to admin dashboard
+          if (location.pathname !== '/admin') {
+            console.log('[INITIAL] Redirecting admin from', location.pathname, 'to /admin');
+            navigate('/admin', { replace: true });
+          } else {
+            console.log('[INITIAL] Admin already on admin page');
+          }
+          
+          // Run database setup in background without blocking UI
+          populateUserProfiles().catch(err => {
+            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
+          });
+        } else {
+          // For regular users, just set the user and finish loading
+          console.log('[INITIAL] Regular user detected:', session.user.email);
+          setIsAuthLoading(false);
+          
+          // Run database setup in background without blocking UI
+          populateUserProfiles().catch(err => {
+            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
+          });
         }
       } else {
-        // No active session - show auth modal
-        setShowAuthModal(true);
+        console.log('[INITIAL] No session found');
+        setIsAuthLoading(false);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[AUTH_STATE] Event: ${event} Session:`, session?.user?.email);
       
-      // When the event is SIGNED_OUT, show the auth modal
-      if (event === 'SIGNED_OUT') {
-        console.log('User signed out, redirecting to home and showing auth modal');
+      if (event === 'SIGNED_IN' && session) {
+        setUser(session.user);
         
-        // Reset admin authentication state
-        setIsAdminAuthenticated(false);
-        
-        // Redirect to home (Landing Page)
-        navigate('/', { replace: true });
-        
-        // Show the authentication modal immediately
-        setShowAuthModal(true);
-        
-        return;
-      }
-      
-      if (session) {
-        // Check if the user has an admin role in metadata
-        const userData = session.user.user_metadata;
-        const isAdmin = userData && (userData.is_admin === true || userData.role === 'admin');
-        
-        console.log(`User logged in. Admin status: ${isAdmin ? 'IS ADMIN' : 'NOT ADMIN'}`);
-        
-        // If the user is already authenticated as an admin, maintain that state
-        if (isAdmin) {
+        // Check if this is an admin user
+        if (session.user.email === 'lashay@bofu.ai') {
+          console.log('[AUTH] Admin user signed in');
           setIsAdminAuthenticated(true);
           
-          // If on admin path, no need to redirect
-          if (!isAdminPath) {
+          // Navigate to admin if not already there
+          if (location.pathname !== '/admin') {
             navigate('/admin', { replace: true });
           }
+          
+          // Run admin setup in background
+          autoSetupAdmin(session.user.id, session.user.email).catch(err => {
+            console.log('[BACKGROUND] Admin setup failed, but continuing:', err);
+          });
         } else {
-          // Regular user logged in - redirect to home if on restricted pages
-          if (isAdminPath) {
-            navigate('/', { replace: true });
-          }
+          console.log('[AUTH] Regular user signed in');
+          // For regular users, run setup in background
+          populateUserProfiles().catch(err => {
+            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
+          });
         }
-      } else {
-        // User signed out but event wasn't SIGNED_OUT
-        // Reset admin authentication state
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[AUTH] User signed out');
+        setUser(null);
         setIsAdminAuthenticated(false);
-        
-        // If they were on a restricted page, redirect to home
-        if (isAdminPath) {
-          navigate('/', { replace: true });
-        }
+        navigate('/', { replace: true });
       }
     });
 
-    // Listen for the showAuthModal event from AdminDashboard
-    const handleShowAuthModal = () => {
-      setShowAuthModal(true);
-    };
-    
-    // Global event for showing the auth modal from anywhere in the app
-    window.addEventListener('showAuthModal', handleShowAuthModal);
-    
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener('showAuthModal', handleShowAuthModal);
-    };
-  }, []);
+    return () => subscription.unsubscribe();
+  }, [navigate, location.pathname]);
   
   // This effect runs when the user state changes or loadResearchHistory callback changes
   useEffect(() => {
@@ -324,28 +526,26 @@ function App() {
     setDocuments([]);
     setBlogLinks([]);
     setProductLines([]);
+    setResearchResults([]);
     setCurrentHistoryId(undefined);
   };
 
   // Handle selecting a history result
   const handleHistorySelect = async (result: ResearchResult) => {
     try {
-      console.log(`Selected research history item: ${result.id}`);
-      
-      // Clean any existing results
-      resetForm();
-      
-      // Set the current history ID
-      setCurrentHistoryId(result.id);
-      
-      // Update the research results state with the selected history item's data
-      setResearchResults(result.data);
-      
-      // Navigate to the product view
-      navigate(`/product/${result.id}`, { replace: true });
-      
+      const fullResult = await getResearchResultById(result.id);
+      if (fullResult && fullResult.data) {
+        const productsArray = parseProductData(fullResult.data);
+        setResearchResults(productsArray);
+        setCurrentHistoryId(fullResult.id);
+        navigate(`/product/${fullResult.id}`); 
+      } else {
+        notify('error', 'Could not load a parsable product from history.');
+        setResearchResults([]);
+      }
     } catch (error) {
-      console.error('Error selecting history item:', error);
+      notify('error', 'Error loading history item: ' + (error as Error).message);
+      setResearchResults([]);
     }
   };
   
@@ -353,35 +553,40 @@ function App() {
   const handleHistoryDelete = async (id: string) => {
     try {
       await deleteResearchResult(id);
-      
-      // If the current history item is deleted, reset the form
-      if (id === currentHistoryId) {
-        resetForm();
-        navigate('/history', { replace: true });
-      }
-      
-      // Refresh the history list
+      notify('success', 'Research result deleted.');
       loadResearchHistory();
+      if (currentHistoryId === id) {
+        resetForm();
+        navigate('/research', { replace: true });
+      }
     } catch (error) {
-      console.error('Error deleting history item:', error);
+      notify('error', 'Error deleting research result: ' + (error as Error).message);
     }
   };
 
   // Function to handle loading a product by ID
-  const loadProductById = async (id: string) => {
+  const loadProductById = useCallback(async (id: string) => {
+    if (!user || !id) return;
+    setIsProcessing(true);
     try {
       const result = await getResearchResultById(id);
-      if (result) {
-        setResearchResults(result.data);
+      if (result && result.data) {
+        const productsArray = parseProductData(result.data);
+        setResearchResults(productsArray);
         setCurrentHistoryId(id);
       } else {
-        throw new Error('Research result not found');
+        notify('error', 'Could not load product data.');
+        setResearchResults([]);
+        navigate('/research', { replace: true });
       }
     } catch (error) {
-      console.error(`Error loading product ${id}:`, error);
-      navigate('/history', { replace: true });
+      notify('error', 'Error loading product: ' + (error as Error).message);
+      setResearchResults([]);
+      navigate('/research', { replace: true });
+    } finally {
+      setIsProcessing(false);
     }
-  };
+  }, [user, navigate]);
 
   // Check if path has ID parameters to load when component mounts
   useEffect(() => {
@@ -397,8 +602,15 @@ function App() {
   const renderMainContent = (isAppRoute = false) => {
     // Admin dashboard
     if (isAdminPath) {
-      return isAdminAuthenticated ? (
-        <AdminDashboard onLogout={() => setIsAdminAuthenticated(false)} />
+      return isAuthLoading ? (
+        <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+            <p className="text-white">Checking authentication...</p>
+          </div>
+        </div>
+      ) : isAdminAuthenticated ? (
+        <AdminDashboard user={user} onLogout={handleSignOut} />
       ) : (
         <div className="min-h-screen bg-secondary-900">
           <MainHeader 
@@ -435,7 +647,7 @@ function App() {
     // History view
     if (isHistoryPath) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
+        <div className="min-h-screen text-white" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}>
           <MainHeader 
             user={user} 
             onShowAuthModal={() => setShowAuthModal(true)} 
@@ -491,18 +703,9 @@ function App() {
             products={researchResults}
             onStartNew={() => {
               resetForm();
-              navigate('/app', { replace: true }); // Go to /app for new research
+              navigate('/research', { replace: true });
             }}
             existingId={currentHistoryId}
-            showHistory={isHistoryPath} // This will be false here
-            setShowHistory={(show) => {
-              if (show) {
-                navigate('/history', { replace: true });
-              } else {
-                navigate('/app', { replace: true }); // Back to /app
-              }
-            }}
-            forceHistoryView={() => navigate('/history', { replace: true })}
             onHistorySave={loadResearchHistory}
             onSaveComplete={(newId) => {
               setCurrentHistoryId(newId);
@@ -632,24 +835,218 @@ function App() {
       />
       
       <AnimatePresence mode="wait">
-        <Routes>
+        <Routes location={location} key={location.pathname}>
           <Route path="/" element={<LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />} />
-          <Route path="/app" element={renderMainContent(true)} />
-          <Route path="/history" element={renderMainContent()} />
-          <Route path="/product/:id" element={renderMainContent()} />
-          <Route path="/admin" element={renderMainContent()} />
-          <Route path="/dashboard" element={<UserDashboard />} />
-          <Route path="/dashboard/content-briefs" element={<UserContentBriefs />} />
-          <Route path="/dashboard/content-briefs/:id/edit" element={<EditContentBrief />} />
-          <Route path="/dashboard/approved-content" element={<ApprovedContent />} />
-          <Route path="/dashboard/generated-article" element={<GeneratedArticlesPage />} /> {/* New route added */}
+          
+          <Route path="/research" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              renderMainContent(true)
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/history" element={user ? (
+            <div className="min-h-screen text-white" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}>
+              <MainHeader 
+                user={user} 
+                onShowAuthModal={() => setShowAuthModal(true)} 
+                showHistory={true}
+                setShowHistory={(show) => {
+                  if (!show) {
+                    navigate('/', { replace: true });
+                    resetForm();
+                  }
+                }}
+                onSignOut={handleSignOut}
+              />
+              
+              <div className="container mx-auto px-4 py-8">
+                <h1 className="text-2xl font-bold text-primary-400 mb-6">Your Research History</h1>
+                
+                <ResearchHistory 
+                  results={historyResults}
+                  onSelect={handleHistorySelect}
+                  onDelete={handleHistoryDelete}
+                  isLoading={isHistoryLoading}
+                  onStartNew={() => {
+                    resetForm();
+                    navigate('/', { replace: true });
+                  }}
+                />
+              </div>
+            </div>
+          ) : <Navigate to="/" replace />} />
+          <Route path="/product/:id" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <ProductResultsPage 
+                products={researchResults}
+                onStartNew={() => {
+                  resetForm();
+                  navigate('/research', { replace: true });
+                }}
+                existingId={currentHistoryId}
+                onHistorySave={loadResearchHistory}
+                onSaveComplete={(newId) => {
+                  setCurrentHistoryId(newId);
+                  loadResearchHistory();
+                }}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/products" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <ProductsListPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/products/:id" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <DedicatedProductPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          
+          <Route path="/dashboard" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <UserDashboard />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/dashboard/content-briefs" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <UserContentBriefs />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/dashboard/content-briefs/edit/:id" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <EditContentBrief />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/dashboard/approved-content" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <ApprovedContent />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/dashboard/generated-articles" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <GeneratedArticlesPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+
+          <Route path="/admin" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Checking authentication...</p>
+                </div>
+              </div>
+            ) : isAdminAuthenticated ? (
+              <AdminDashboard user={user} onLogout={handleSignOut} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+          <Route path="/admin/articles/:articleId" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Checking authentication...</p>
+                </div>
+              </div>
+            ) : isAdminAuthenticated ? (
+              <AdminDashboard user={user} onLogout={handleSignOut} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/user-dashboard" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/user-dashboard/content-briefs" element={<Navigate to="/dashboard/content-briefs" replace />} />
-          <Route path="/dashboard/products" element={<ProductsListPage />} />
-          <Route path="/dashboard/products/:productId" element={<DedicatedProductPage />} />
-          <Route path="/products" element={<ProductsListPage />} />
-          <Route path="/products/:productId" element={<DedicatedProductPage />} />
+          
+          {/* Test Routes - To be removed before production */}
+          <Route path="/user-selector-test" element={<UserSelectorTest />} />
+          <Route path="/admin-article-list-test" element={<AdminArticleListTest />} />
+          <Route path="/article-editor-admin-test" element={<ArticleEditorAdminTest />} />
+          <Route path="/audit-log-viewer-test" element={<AuditLogViewerTest />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
       

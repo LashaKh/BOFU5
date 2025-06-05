@@ -224,7 +224,7 @@ const UserDashboardSidebar = () => {
                 </div>
               ))}
               <li>
-                <NavLink to="/dashboard/generated-article" title={collapsed ? "Generated Articles" : undefined}>
+                <NavLink to="/dashboard/generated-articles" title={collapsed ? "Generated Articles" : undefined}>
                   {({ isActive }) => (
                     <span
                       className={`nav-item group flex items-center rounded-md px-2 py-2 text-sm font-medium ${

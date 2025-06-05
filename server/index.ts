@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import adminRoutes from './adminRoutes.js';
 
 // Get the directory name in ES module scope
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +47,9 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Chat API Server is running!');
 });
 
+// Mount admin routes
+app.use('/api/admin', adminRoutes);
+
 // Chat API endpoint
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   const { message, productId, threadId } = req.body;
@@ -84,6 +88,17 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   res.json(assistantResponse);
 });
 
+// Error handling middleware
+app.use((error: any, req: Request, res: Response, next: any) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    errorCode: 'INTERNAL_ERROR',
+    details: error.message
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Backend server is running on http://localhost:${PORT}`);
+  console.log(`Admin API available at http://localhost:${PORT}/api/admin`);
 });

@@ -1,10 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Add bundle analyzer for development insights
+    visualizer({
+      filename: 'dist/bundle-analysis.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ],
   optimizeDeps: {
     exclude: ['lucide-react'],
     include: ['pdfjs-dist']
@@ -16,6 +26,10 @@ export default defineConfig({
         manualChunks: (id) => {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor';
+          }
+          // Split TipTap extensions for lazy loading
+          if (id.includes('@tiptap/') || id.includes('prosemirror-')) {
+            return 'editor';
           }
           if (id.includes('node_modules/framer-motion') || 
               id.includes('node_modules/react-hot-toast') || 
@@ -32,6 +46,17 @@ export default defineConfig({
           }
           if (id.includes('node_modules/lucide-react')) {
             return 'icons';
+          }
+          // Split large components into separate chunks
+          if (id.includes('/admin/') || id.includes('AdminPanel')) {
+            return 'admin';
+          }
+          if (id.includes('/ui/') && (
+            id.includes('CommentingSystem') || 
+            id.includes('VersionHistory') || 
+            id.includes('CollaborativeCursors')
+          )) {
+            return 'collaboration';
           }
         }
       }

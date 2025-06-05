@@ -34,9 +34,9 @@ export interface ProductAnalysis {
   features: string[];
   targetPersona: {
     primaryAudience: string;
-    demographics: string;
-    industrySegments: string;
-    psychographics: string;
+    demographics: string[];
+    industrySegments: string[];
+    psychographics: string[];
   };
   pricing: string;
   currentSolutions: {
@@ -130,9 +130,9 @@ export const defaultProduct: ProductAnalysis = {
   features: [],
   targetPersona: {
     primaryAudience: '',
-    demographics: '',
-    industrySegments: '',
-    psychographics: ''
+    demographics: [],
+    industrySegments: [],
+    psychographics: []
   },
   pricing: '',
   currentSolutions: {

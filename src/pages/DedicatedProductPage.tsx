@@ -91,8 +91,13 @@ const callUploadProductDocumentEdgeFunction = async (
 };
 
 const DedicatedProductPage: React.FC = () => {
-  const { productId } = useParams<{ productId: string }>();
+  const { id: productId } = useParams<{ id: string }>();
   const navigate = useNavigate(); 
+  
+  // Add debugging logs to track productId
+  console.log('DedicatedProductPage: productId from useParams:', productId);
+  console.log('DedicatedProductPage: current location:', window.location.pathname);
+  
   const [product, setProduct] = useState<PageProductData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +123,12 @@ const DedicatedProductPage: React.FC = () => {
 
   const [user, setUser] = useState<any>(null); // Add user state
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Changed default to false
+  
+  // Add editing state for product header
+  const [isEditingHeader, setIsEditingHeader] = useState<boolean>(false);
+  const [editName, setEditName] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [isSavingHeader, setIsSavingHeader] = useState<boolean>(false);
 
   useEffect(() => {
     const getUser = async () => {
@@ -148,6 +159,7 @@ const DedicatedProductPage: React.FC = () => {
   };
 
   const fetchProductDetailsAndDocs = useCallback(async () => {
+    console.log('fetchProductDetailsAndDocs: Starting with productId:', productId);
     if (!productId) {
       setError('Product ID is missing.');
       setIsLoading(false);
@@ -158,6 +170,7 @@ const DedicatedProductPage: React.FC = () => {
     setProduct(null);
 
     try {
+      console.log('fetchProductDetailsAndDocs: Fetching product with ID:', productId);
       const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*, generated_analysis_data') 
@@ -988,12 +1001,77 @@ ${document.extracted_text.substring(0, 500)}`);
     }
   }, [product]);
 
+  // Set page background
+  useEffect(() => {
+    // Set the body background
+    document.body.style.background = 'linear-gradient(to bottom right, #111827, #1f2937)';
+    document.body.style.minHeight = '100vh';
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.background = '';
+      document.body.style.minHeight = '';
+    };
+  }, []);
+
   useEffect(() => {
     // This useEffect is no longer needed as the one above directly sets parsedAnalysisData
     // and handles the fallback/error states for product.generated_analysis_data.
     // If analysisResults is set by handleGenerateAnalysis due to a parsing error of the webhook response,
     // that will be handled by the rendering logic checking analysisParsingError first.
   }, [analysisResults]);
+
+  // Add function to handle header editing
+  const handleSaveHeader = async () => {
+    if (!productId || !user) {
+      toast.error('Product ID or user authentication missing.');
+      return;
+    }
+
+    setIsSavingHeader(true);
+    
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: editName.trim(),
+          description: editDescription.trim()
+        })
+        .eq('id', productId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setProduct(prev => prev ? {
+        ...prev,
+        name: editName.trim(),
+        description: editDescription.trim()
+      } : null);
+
+      setIsEditingHeader(false);
+      toast.success('Product updated successfully!');
+    } catch (error: any) {
+      console.error('Error updating product:', error);
+      toast.error('Failed to update product: ' + error.message);
+    } finally {
+      setIsSavingHeader(false);
+    }
+  };
+
+  const handleStartEdit = () => {
+    if (product) {
+      setEditName(product.name);
+      setEditDescription(product.description || '');
+      setIsEditingHeader(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingHeader(false);
+    setEditName('');
+    setEditDescription('');
+  };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="loader">Loading product details...</div></div>;
   if (error && !product) {
@@ -1012,19 +1090,130 @@ ${document.extracted_text.substring(0, 500)}`);
   return (
     <>
       <MainHeader />
-      <div className="p-4 md:p-8 min-h-screen text-gray-100" style={{ backgroundColor: '#1f2937' }}>
+      <div 
+        className="p-4 md:p-8 min-h-screen text-gray-100" 
+        style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="max-w-4xl mx-auto">
-            <div className="flex items-center mb-8">
-              {product.logo_url && (
-                <img src={product.logo_url} alt={`${product.name} logo`} className="h-16 w-16 mr-6 rounded-md object-contain" />
-              )}
-              <div>
-                <h1 className="text-4xl font-bold text-gray-100">{product.name}</h1>
-                <p className="text-sm text-gray-400">ID: {product.id}</p>
+            {/* Clean Header Section with Edit Functionality */}
+            <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-600/30 shadow-lg mb-12">
+              {/* Content */}
+              <div className="p-8 md:p-12">
+                <div className="flex flex-col lg:flex-row lg:items-start gap-8">
+                  {/* Logo Section */}
+                  {product.logo_url && (
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={product.logo_url} 
+                        alt={`${product.name} logo`} 
+                        className="h-20 w-20 lg:h-24 lg:w-24 rounded-xl object-contain bg-white/10 border border-gray-500/20 shadow-md" 
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Text Content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Edit Controls */}
+                    <div className="flex justify-end mb-4">
+                      {!isEditingHeader ? (
+                        <button
+                          onClick={handleStartEdit}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveHeader}
+                            disabled={isSavingHeader}
+                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isSavingHeader ? (
+                              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
+                                <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/>
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={isSavingHeader}
+                            className="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product Name */}
+                    <div className="mb-6">
+                      {isEditingHeader ? (
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="text-3xl md:text-5xl lg:text-6xl font-bold bg-gray-700/50 text-white border border-gray-500 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                          placeholder="Product name"
+                        />
+                      ) : (
+                        <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
+                          {product.name}
+                        </h1>
+                      )}
+                      <div className="mt-3 h-1 w-24 bg-blue-500 rounded-full"></div>
+                    </div>
+                    
+                    {/* Metadata Pills */}
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <div className="inline-flex items-center px-4 py-2 bg-gray-700/60 rounded-full border border-gray-600/30">
+                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                        <span className="text-sm font-medium text-gray-300">Active Product</span>
+                      </div>
+                      
+                      {product.created_at && (
+                        <div className="inline-flex items-center px-4 py-2 bg-gray-700/60 rounded-full border border-gray-600/30">
+                          <svg className="w-4 h-4 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 110 2H7a1 1 0 00-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm text-gray-300">
+                            Created {new Date(product.created_at).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {product.associatedDocuments?.length > 0 && (
+                        <div className="inline-flex items-center px-4 py-2 bg-gray-700/60 rounded-full border border-gray-600/30">
+                          <svg className="w-4 h-4 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm text-gray-300">
+                            {product.associatedDocuments.length} Document{product.associatedDocuments.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="text-gray-300 mb-6 whitespace-pre-line">{product.description}</p>
 
             <div className="bg-gray-800/40 backdrop-blur-sm shadow-xl rounded-lg p-6 md:p-8 mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-6 border-b border-gray-700/50 pb-3">Upload & Associate Documents</h2>
@@ -1042,7 +1231,7 @@ ${document.extracted_text.substring(0, 500)}`);
                     value={blogUrlInput} 
                     onChange={(e) => setBlogUrlInput(e.target.value)} 
                     placeholder="https://example.com/blog-post" 
-                    className="w-full px-4 py-2.5 bg-secondary-700 border border-secondary-600 rounded-lg text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2.5 bg-white border border-secondary-600 rounded-lg text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
                 <button 
@@ -1144,7 +1333,7 @@ ${document.extracted_text.substring(0, 500)}`);
                         value={filterTerm} 
                         onChange={(e) => setFilterTerm(e.target.value)} 
                         placeholder="Search documents" 
-                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-3 py-2 bg-white border border-secondary-500 rounded-md text-sm text-black placeholder:text-gray-500 focus:ring-primary-500 focus:border-primary-500"
                       />
                     </div>
                     <div className='flex-1 min-w-[150px]'>
@@ -1153,7 +1342,7 @@ ${document.extracted_text.substring(0, 500)}`);
                         id="filterType" 
                         value={filterType} 
                         onChange={(e) => setFilterType(e.target.value)} 
-                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-3 py-2 bg-white border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="all">All Types</option>
                         {uniqueDocumentTypes.map(type => <option key={type} value={type}>{type}</option>)}
@@ -1165,7 +1354,7 @@ ${document.extracted_text.substring(0, 500)}`);
                         id="filterStatus" 
                         value={filterStatus} 
                         onChange={(e) => setFilterStatus(e.target.value)} 
-                        className="w-full px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-3 py-2 bg-white border border-secondary-500 rounded-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="all">All Statuses</option>
                         {uniqueDocumentStatuses.map(status => <option key={status} value={status}>{status}</option>)}
@@ -1178,7 +1367,7 @@ ${document.extracted_text.substring(0, 500)}`);
                           id="sortBy" 
                           value={sortConfig.field} 
                           onChange={(e) => handleSortChange(e.target.value as SortableField)} 
-                          className="flex-grow px-3 py-2 bg-secondary-600 border border-secondary-500 rounded-l-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
+                          className="flex-grow px-3 py-2 bg-white border border-secondary-500 rounded-l-md text-sm text-black focus:ring-primary-500 focus:border-primary-500"
                         >
                           <option value="created_at">Date Added</option>
                           <option value="file_name">Name</option>

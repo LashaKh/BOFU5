@@ -133,7 +133,7 @@ export function MainHeader({
             </motion.div>
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
               <button
-                onClick={() => handleNavigation('/app')}
+                onClick={() => handleNavigation('/research')}
                 className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-medium py-2 px-4 rounded-md text-sm inline-flex items-center transition-colors"
               >
                 <Search size={18} className="mr-2" />
@@ -141,7 +141,7 @@ export function MainHeader({
               </button>
               {user && (
                 <motion.button
-                  onClick={() => handleNavigation('/user-dashboard')}
+                  onClick={() => handleNavigation('/dashboard')}
                   className="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-gray-300 hover:text-primary-300 hover:bg-secondary-800/70"
                   whileHover={{ y: -1 }}
                   whileTap={{ y: 1 }}

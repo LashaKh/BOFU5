@@ -86,6 +86,14 @@ const ProductsListPage: React.FC = () => {
     }
   };
 
+  const handleProductUpdate = (updatedProduct: Product) => {
+    setProducts(currentProducts => 
+      currentProducts.map(p => 
+        p.id === updatedProduct.id ? updatedProduct : p
+      )
+    );
+  };
+
   // Skeleton loader for product cards
   const SkeletonCard = () => (
     <div className="bg-secondary-800/30 p-6 rounded-xl shadow-md animate-pulse">
@@ -155,7 +163,8 @@ const ProductsListPage: React.FC = () => {
                   <ProductCard 
                     key={product.id} 
                     product={product} 
-                    onDelete={handleDeleteProduct} 
+                    onDelete={handleDeleteProduct}
+                    onUpdate={handleProductUpdate}
                   />
                 ))}
               </motion.div>

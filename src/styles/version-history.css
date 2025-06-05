@@ -1,0 +1,226 @@
+/* Version History Diff Styles */
+
+.diff-content {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.diff-content .diff-added {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 2px 4px;
+  margin: 1px;
+  border-radius: 3px;
+  border-left: 3px solid #28a745;
+  display: inline-block;
+}
+
+.diff-content .diff-removed {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 2px 4px;
+  margin: 1px;
+  border-radius: 3px;
+  border-left: 3px solid #dc3545;
+  text-decoration: line-through;
+  display: inline-block;
+}
+
+.diff-content .diff-unchanged {
+  color: #6c757d;
+  padding: 1px 2px;
+}
+
+.diff-content .diff-line-number {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  padding: 2px 8px;
+  margin-right: 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  user-select: none;
+}
+
+/* Version tag styles */
+.version-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.version-tag.published {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.version-tag.review {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.version-tag.milestone {
+  background-color: #e2e3ff;
+  color: #4c63d2;
+}
+
+.version-tag.restored {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.version-tag.workflow_change {
+  background-color: #fdeaa7;
+  color: #b45309;
+}
+
+.version-tag.auto_save {
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
+
+.version-tag.manual_save {
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+/* Version history panel animations */
+.version-history-panel {
+  transition: all 0.2s ease-in-out;
+}
+
+.version-item {
+  transition: all 0.15s ease-in-out;
+}
+
+.version-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.version-item.selected {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Comparison view styles */
+.comparison-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.comparison-side {
+  position: relative;
+}
+
+.comparison-side::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+}
+
+.comparison-side.version-1::before {
+  background-color: #dc3545;
+}
+
+.comparison-side.version-2::before {
+  background-color: #28a745;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .version-history-panel {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+  }
+  
+  .comparison-view {
+    width: 100vw;
+    height: 100vh;
+  }
+  
+  .comparison-content {
+    flex-direction: column;
+  }
+  
+  .comparison-side {
+    flex: 1;
+    min-height: 50%;
+  }
+}
+
+/* Loading and error states */
+.version-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.version-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #dc3545;
+  text-align: center;
+}
+
+.version-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #6c757d;
+  text-align: center;
+}
+
+/* Animation for version restore */
+@keyframes restoreSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.restore-success {
+  animation: restoreSuccess 0.3s ease-in-out;
+}
+
+/* Scrollbar styling for panels */
+.version-history-panel::-webkit-scrollbar,
+.comparison-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.version-history-panel::-webkit-scrollbar-track,
+.comparison-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.version-history-panel::-webkit-scrollbar-thumb,
+.comparison-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.version-history-panel::-webkit-scrollbar-thumb:hover,
+.comparison-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+} 

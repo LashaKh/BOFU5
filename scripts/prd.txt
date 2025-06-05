@@ -1,219 +1,253 @@
-# Product Requirements Document: AI-Powered Product Management & Chat
+# BOFU AI Article Editing System PRD
 
 ## Overview
-This document outlines the requirements for a new "Products" feature within the user platform. This feature will allow users to manage a list of their company products, associate relevant documents (local files, blog links) with each product, and leverage AI for in-depth product research and contextual chat. The core value lies in centralizing product information, streamlining research workflows through existing automation, and enabling intelligent conversations about specific products via a dedicated AI assistant. This is targeted at users like content strategists, marketers, and product managers who need to quickly access, understand, and discuss product details.
+BOFU AI currently generates articles and provides Google Doc links in the Generated Articles page. This PRD outlines the expansion to include a comprehensive article editing system where users can receive article content in markdown format and edit it using a robust, Notion-like editor with commenting and collaboration features accessible to both users and admins.
+
+The system will store article content in the `content_briefs` table's `article_content` field and provide a production-ready editing experience with real-time collaboration, commenting, image insertion, and all modern text editing features.
 
 ## Core Features
 
-1.  **Product Profile Management**
-    *   **What it does:** Allows users to create, view, and list their company products. Each product will have a name and a description.
-    *   **Why it's important:** Provides a central repository for all product information, forming the foundation for document association and AI interactions.
-    *   **How it works at a high level:**
-        *   A new "Products" button in the main header navigates to a dedicated `/products` page.
-        *   The `/products` page displays a list of product cards (showing name and description).
-        *   Users can create new products (initially just name and description).
-        *   Clicking a product card navigates to a dedicated product page (`/products/:product_id`).
+### 1. Article Content Storage & Retrieval
+- **Article Content Field**: Add `article_content` TEXT field to `content_briefs` table to store generated markdown content
+- **Dual Content Delivery**: Continue providing Google Doc links while also storing article content in database
+- **Content Synchronization**: Ensure article content in database matches generated Google Doc content
+- **Version Management**: Track article content versions and editing history
 
-2.  **Product-Specific Document Management**
-    *   **What it does:** Enables users to upload and associate various documents (DOCX, TXT, PDF, blog links) with specific products. The system will extract text from these documents.
-    *   **Why it's important:** Consolidates all relevant information for a product in one place and prepares content for AI vector stores.
-    *   **How it works at a high level:**
-        *   On the dedicated product page (`/products/:product_id`), the existing `DocumentUploader.tsx` component will be utilized.
-        *   Supports `.pdf`, `.docx`, `.doc`, `.pptx`, and blog links.
-        *   Reuses existing client-side text extraction logic (including AI OCR for scanned PDFs).
-        *   Extracted text is saved in a new Supabase table, linked to the product and the original document.
-        *   Uploaded physical documents (if applicable) are stored in a Supabase bucket.
-        *   Deduplication logic prevents adding the same document/link or identical text content multiple times for the same product.
-        *   Uploaded documents for the selected product are displayed as "nicely formatted cards."
+### 2. Rich Text Article Editor
+- **Notion-like Interface**: Full-featured rich text editor with modern UI/UX patterns
+- **Markdown Support**: Native markdown input/output with live preview capabilities
+- **Text Formatting**: Bold, italic, underline, strikethrough, headers, lists, quotes, code blocks
+- **Advanced Features**: 
+  - Tables with editing capabilities
+  - Nested lists and indentation
+  - Link insertion and management
+  - Text alignment and spacing controls
+  - Undo/redo functionality with command history
 
-3.  **AI-Powered Product Research (Reuse Existing Workflow)**
-    *   **What it does:** Allows users to trigger an in-depth research analysis for a selected product, reusing the platform's existing multi-step Make.com webhook process.
-    *   **Why it's important:** Automates the research process, providing users with structured insights, competitor identification, and analysis directly within the product context.
-    *   **How it works at a high level:**
-        *   On the dedicated product page (`/products/:product_id`), a mechanism will trigger the existing research workflow using the specified Make.com webhooks:
-            1.  Product research: `https://hook.us2.make.com/dmgxx97dencaquxi9vr9khxrr71kotpm`
-            2.  Competitors identification: `https://hook.us2.make.com/n4kuyrqovr1ndwj9nsodio7th70wbm6i`
-            3.  Competitors analysis: `https://hook.us2.make.com/qjbyl0g1d1ailgmnn2p9pjmcu888xe43`
-        *   Research results will be displayed using the existing "Product Analysis card" style with collapsible sections.
+### 3. Image Management System
+- **Image Upload**: Direct image upload to articles with drag-and-drop support
+- **Image Optimization**: Automatic image compression and format optimization
+- **Image Insertion**: Insert images inline, as blocks, or in galleries
+- **Image Editing**: Basic image editing (crop, resize, filters) within the editor
+- **Storage Integration**: Integrate with Supabase storage for image hosting
 
-4.  **Product-Specific AI Chat**
-    *   **What it does:** Provides a chat interface where users can select a product and have a contextual conversation with a universal AI assistant. The assistant will be dynamically connected to that product's specific information (via its vector store and description).
-    *   **Why it's important:** Enables users to quickly get answers, generate content ideas, or discuss specific aspects of a product with AI support.
-    *   **How it works at a high level:**
-        *   The chat window will be located on the main products list page (`/products`).
-        *   A dropdown menu in the chat UI will list all created products.
-        *   When a product is selected from the dropdown:
-            *   The pre-configured universal AI assistant (ID to be provided by the user) is connected to the selected product's dedicated OpenAI vector store.
-            *   The selected product's description and relevant context are injected into the assistant's system prompt.
-        *   The user can then interact with the assistant regarding the chosen product.
+### 4. Commenting & Collaboration System
+- **Inline Comments**: Add comments to specific text selections or paragraphs
+- **Comment Threads**: Nested comment discussions with reply functionality
+- **Comment Status**: Mark comments as resolved, pending, or archived
+- **Comment Types**: Text comments, image attachments, suggestions, and approvals
+- **User Attribution**: Track comment authors with timestamps and user profiles
 
-5.  **OpenAI Vector Store Management**
-    *   **What it does:** Creates and manages dedicated OpenAI vector stores for each product, populated with the content of its associated documents.
-    *   **Why it's important:** Provides the knowledge base for the AI assistant to have informed conversations about specific products.
-    *   **How it works at a high level:**
-        *   An OpenAI vector store is created when a new product profile is first created. The ID of this vector store is stored with the product in Supabase.
-        *   When a new document is uploaded and processed for a product, its extracted text is added to that product's existing vector store.
-        *   If a document linked to a product is updated (implying its content changes) or deleted, the entire vector store for that product is deleted and recreated with the updated set of documents.
+### 5. Admin Dashboard Integration
+- **Admin Article Access**: Admins can view and edit any user's articles from admin dashboard
+- **Admin Editing Window**: Same editing interface available to admins with enhanced permissions
+- **Admin Comment System**: Admins can add priority comments and approval notes
+- **Bulk Management**: Admin tools for managing multiple articles, comments, and user content
+- **User Activity Tracking**: Monitor user editing patterns and collaboration metrics
 
 ## User Experience
 
-*   **User Personas:**
-    *   **Content Strategists/Marketers:** Utilize the feature to research products, understand their selling points and competitive landscape, and generate content ideas with AI assistance.
-    *   **Product Managers:** Employ it to consolidate product information, track associated documents, and quickly get answers to product-specific questions.
-*   **Key User Flows:**
-    1.  **Creating a Product & Initial Setup:**
-        *   User navigates to the "Products" page via the main header.
-        *   User clicks a "Create New Product" button.
-        *   User enters the product name and description.
-        *   The system creates the product record in Supabase and an empty OpenAI vector store, associating its ID with the product.
-    2.  **Adding Documents to a Product:**
-        *   User navigates to the "Products" list page and clicks on a specific product card.
-        *   User is taken to the dedicated page for that product.
-        *   User utilizes the `DocumentUploader.tsx` to add files or blog links.
-        *   The system extracts text, saves it to Supabase (with a hash for deduplication), links it to the product, and adds the text to the product's OpenAI vector store. Uploaded documents appear as cards.
-    3.  **Initiating Product Research:**
-        *   User is on a dedicated product page.
-        *   User clicks a "Start Research" (or similar) button.
-        *   The system triggers the sequence of Make.com webhooks.
-        *   Results are displayed in the `ProductAnalysis` card format on the page.
-    4.  **Chatting about a Product:**
-        *   User is on the "Products" list page.
-        *   User opens the chat window.
-        *   User selects a product from the dropdown menu within the chat interface.
-        *   The system dynamically configures the universal AI assistant with the selected product's description and connects it to the product's vector store.
-        *   User types a query and interacts with the AI assistant about the selected product.
-*   **UI/UX Considerations:**
-    *   **Consistency:** Leverage existing UI patterns (e.g., `UserDashboardLayout`, card styles from `UserContentBriefs.tsx`, `ProductAnalysis` card style) for a familiar and cohesive experience.
-    *   **Clarity:** Clearly indicate the currently selected product context, especially when uploading documents or interacting with the chat. Provide clear visual feedback during processing states (uploads, research, vector store updates).
-    *   **Efficiency:** Implement simple name-based filtering for the product list. Ensure intuitive navigation between the product list and individual product pages.
-    *   **Responsiveness:** Design UI elements to adapt gracefully to various screen sizes.
+### User Personas
+- **Content Creators**: Business users who generate and edit articles for their companies
+- **Collaborators**: Team members who review, comment, and suggest edits on articles
+- **Administrators**: Platform admins who oversee content quality and user management
 
-# Technical Architecture
+### Key User Flows
 
-*   **System Components (Frontend - React/TypeScript):**
-    *   **New Pages:**
-        *   `ProductsListPage.tsx`: Displays product cards, implements name filtering, and hosts the chat window.
-        *   `DedicatedProductPage.tsx`: Displays detailed information for a single product, including research results, the list of associated documents, and the document uploader.
-    *   **Modified Components:**
-        *   `MainHeader.tsx`: Add a new navigation button for "Products."
-    *   **Reused Components:**
-        *   `UserDashboardLayout.tsx`: Provides the overall page structure (header, sidebar, content area) for the new product pages.
-        *   `DocumentUploader.tsx`: For handling file and blog link uploads and text extraction.
-        *   `ProductAnalysis` card component (or its structural/styling equivalent): For displaying research results.
-    *   **New Components:**
-        *   `ProductCard.tsx`: A reusable component for displaying individual products in the list on `ProductsListPage.tsx`.
-        *   `DocumentCard.tsx`: A reusable component for displaying details of uploaded documents on `DedicatedProductPage.tsx`.
-        *   `ChatWindow.tsx`: A component for the chat interface, including the product selection dropdown and message
-*   **Data Models (Supabase):**
-    *   **`products` Table:**
-        *   `id` (uuid, primary key)
-        *   `user_id` (uuid, foreign key to `users.id`)
-        *   `name` (text, not null)
-        *   `description` (text)
-        *   `openai_vector_store_id` (text)
-        *   `created_at` (timestamp with time zone)
-        *   `updated_at` (timestamp with time zone)
-    *   **`product_documents` Table:**
-        *   `id` (uuid, primary key)
-        *   `product_id` (uuid, foreign key to `products.id`)
-        *   `user_id` (uuid, foreign key to `users.id`)
-        *   `file_name` (text) - Original name of the uploaded file or a title derived from a blog link.
-        *   `document_type` (enum: 'pdf', 'docx', 'doc', 'pptx', 'blog_link', 'txt', etc.)
-        *   `source_url` (text, nullable) - For blog links.
-        *   `storage_path` (text, nullable) - Path in Supabase storage if it's a physical file.
-        *   `extracted_text` (text) - Full extracted text content.
-        *   `content_hash` (text) - MD5 or SHA256 hash of `extracted_text` for deduplication purposes.
-        *   `status` (enum: 'processing', 'processed', 'error')
-        *   `error_message` (text, nullable)
-        *   `created_at` (timestamp with time zone)
-        *   `updated_at` (timestamp with time zone)
-*   **APIs and Integrations:**
-    *   **Supabase:** For user authentication, data storage (products, product documents), and potentially file storage.
-    *   **OpenAI API:**
-        *   Vector Store API: To create, manage (add files, delete/recreate), and associate vector stores with products.
-        *   Assistants API: To interact with the pre-configured universal assistant, dynamically providing it with product context (description) and connecting it to the relevant vector store ID.
-    *   **Make.com Webhooks (Existing):**
-        *   Product research: `https://hook.us2.make.com/dmgxx97dencaquxi9vr9khxrr71kotpm`
-        *   Competitors identification: `https://hook.us2.make.com/n4kuyrqovr1ndwj9nsodio7th70wbm6i`
-        *   Competitors analysis: `https://hook.us2.make.com/qjbyl0g1d1ailgmnn2p9pjmcu888xe43`
-*   **Infrastructure Requirements:**
-    *   Existing Supabase project.
-    *   Access to OpenAI API with necessary permissions for Assistants and Vector Stores.
-    *   Environment variables to securely store API keys (OpenAI) and other configurations (universal assistant ID).
+#### Content Creator Flow
+1. Generate article through existing BOFU AI workflow
+2. Receive notification of completed article with both Google Doc link and in-app editing option
+3. Open article in built-in editor with markdown content pre-loaded
+4. Edit content using rich text features, add images, format text
+5. Collaborate with team members through commenting system
+6. Save changes with automatic version tracking
+7. Export or publish final article
 
-# Development Roadmap
+#### Admin Oversight Flow
+1. Access admin dashboard and view user articles list
+2. Select specific user and their articles for review
+3. Open article in admin editing mode with full editing capabilities
+4. Add admin comments, suggestions, or approval notes
+5. Track editing progress and collaboration metrics
+6. Manage content quality and user permissions
 
-*   **Phase 1: Foundation & Core Product Management (MVP)**
-    1.  **Supabase Schema:** Create `products` and `product_documents` tables.
-    2.  **Navigation & Routing:**
-        *   Add "Products" button to `MainHeader.tsx`.
-        *   Define routes for `/products` and `/products/:product_id` in `App.tsx`.
-        *   Create basic `ProductsListPage.tsx` and `DedicatedProductPage.tsx` components wrapped in `UserDashboardLayout`.
-    3.  **Product Creation & Listing:**
-        *   Implement UI on `ProductsListPage.tsx` to create new products (name, description).
-        *   On product creation, also create an empty OpenAI vector store and save its ID.
-        *   Display created products as cards (name, description) on `ProductsListPage.tsx`.
-        *   Implement navigation from product card to `DedicatedProductPage.tsx`.
-    4.  **Basic Product Detail View:**
-        *   On `DedicatedProductPage.tsx`, display the selected product's name and description.
-*   **Phase 2: Document Upload & Basic Vector Store Integration**
-    1.  **Document Upload UI:** Integrate `DocumentUploader.tsx` onto `DedicatedProductPage.tsx`.
-    2.  **Text Extraction & Supabase Storage:**
-        *   Implement logic to save extracted text and document metadata (including `content_hash`) to the `product_documents` table, linking to the product.
-        *   Store physical files in Supabase storage (if applicable).
-    3.  **Basic Vector Store Population:**
-        *   When a document is successfully processed, add its extracted text to the product's OpenAI vector store.
-    4.  **Display Uploaded Documents:** Show uploaded documents as cards on `DedicatedProductPage.tsx`.
-    5.  **Deduplication:** Implement basic deduplication for documents based on `content_hash` for the same product.
-*   **Phase 3: Product Research Integration**
-    1.  **Trigger Research:** Add UI elements on `DedicatedProductPage.tsx` to initiate the product research workflow.
-    2.  **Webhook Calls:** Implement logic to call the three Make.com webhooks sequentially.
-    3.  **Display Results:** Integrate/reuse the `ProductAnalysis` card component to display research findings on `DedicatedProductPage.tsx`.
-*   **Phase 4: Chat Functionality & Advanced Vector Store Management**
-    1.  **Chat UI:** Develop the `ChatWindow.tsx` component with product selection dropdown on `ProductsListPage.tsx`.
-    2.  **Assistant Integration:**
-        *   On product selection in chat, dynamically connect the universal assistant ID to the product's vector store ID.
-        *   Inject the product's description into the assistant's system prompt.
-    3.  **Advanced Vector Store Management:**
-        *   Implement logic to delete and recreate the vector store if a linked document is updated (content changes) or deleted.
-        *   Ensure adding new documents only appends to the existing store (if no deletion/recreation is triggered).
-*   **Phase 5: Refinements & Polish**
-    1.  Implement simple name-based filtering on `ProductsListPage.tsx`.
-    2.  Thorough testing of all user flows.
-    3.  UI/UX polishing, error handling, and performance optimization.
-    4.  Ensure consistent styling and responsiveness.
+### UI/UX Considerations
+- **Responsive Design**: Editor works seamlessly on desktop, tablet, and mobile devices
+- **Performance Optimization**: Fast loading and smooth editing experience even with large articles
+- **Accessibility**: Full keyboard navigation, screen reader support, and WCAG compliance
+- **Real-time Collaboration**: Live editing with multiple users and conflict resolution
+- **Auto-save**: Automatic content saving with visual indicators of save status
 
-# Logical Dependency Chain
+## Technical Architecture
 
-1.  **Backend Setup (Supabase):** Tables `products`, `product_documents`. (Phase 1)
-2.  **Core Navigation & Page Structure:** Header button, routes, basic `ProductsListPage`, `DedicatedProductPage`. (Phase 1)
-3.  **Product CRUD (Create/Read):** Ability to create a product, see it listed, and view its basic detail page. OpenAI vector store placeholder created. (Phase 1)
-4.  **Document Upload & Text Extraction:** Integrate `DocumentUploader`, save extracted text to Supabase. (Phase 2)
-5.  **Initial Vector Store Population:** Add extracted text from new documents to the product's vector store. (Phase 2)
-6.  **Product Research Flow:** Trigger webhooks and display results. (Phase 3)
-7.  **Chat UI & Basic Interaction:** Develop chat window, product dropdown, basic message display. (Phase 4)
-8.  **Dynamic Assistant Connection:** Link selected product's vector store to the universal assistant. (Phase 4)
-9.  **Full Vector Store Management:** Implement update/delete/recreate logic. (Phase 4)
-10. **UI Enhancements:** Filtering, display polish. (Phase 5)
+### System Components
+- **Article Editor Component**: React-based rich text editor using TipTap or similar framework
+- **Comment System**: Real-time commenting infrastructure with WebSocket support
+- **Image Service**: Image upload, storage, and optimization service
+- **Version Control**: Article version management with diff tracking
+- **Collaboration Engine**: Real-time multi-user editing with operational transformation
 
-This order prioritizes getting a visible frontend with core data management capabilities first, then layering on the AI and advanced features.
+### Data Models
 
-# Risks and Mitigations
+#### Enhanced ContentBrief Interface
+```typescript
+interface ContentBrief {
+  // Existing fields...
+  article_content?: string; // NEW: Markdown content of generated article
+  article_version?: number; // NEW: Version tracking
+  last_edited_at?: string; // NEW: Last edit timestamp
+  last_edited_by?: string; // NEW: Last editor user ID
+  editing_status?: 'draft' | 'editing' | 'review' | 'final'; // NEW: Editing workflow status
+}
+```
 
-*   **Technical Challenges:**
-    *   **OpenAI API Quotas/Rate Limits:** Monitor usage, implement retries or queuing if necessary. Mitigation: Start with conservative usage patterns, optimize API calls.
-    *   **Vector Store Management Complexity:** Deleting/recreating stores can be slow or costly. Mitigation: Carefully design the conditions for full recreation vs. appending. Explore OpenAI API options for more granular updates if available and suitable. For MVP, full recreation on significant change is acceptable.
-    *   **Deduplication Robustness:** Simple content hash might not catch all semantic duplicates. Mitigation: For MVP, content hash is sufficient. Future enhancements could explore semantic similarity if needed.
-*   **Figuring out the MVP that we can build upon:**
-    *   The roadmap (Phases 1 & 2) defines a clear MVP focusing on product creation, document upload, and basic vector store population. Mitigation: Stick to this defined MVP scope to ensure timely delivery of core functionality.
-*   **Resource Constraints:**
-    *   **Development Time:** This is a feature-rich addition. Mitigation: Phased development allows for iterative progress and potential adjustments.
-    *   **API Costs (OpenAI, Make.com):** Monitor usage to manage costs. Mitigation: Optimize the frequency of webhook calls or AI interactions where possible without degrading user experience.
+#### New Comment System
+```typescript
+interface ArticleComment {
+  id: string;
+  article_id: string;
+  user_id: string;
+  parent_comment_id?: string; // For threaded comments
+  content: string;
+  content_type: 'text' | 'image' | 'suggestion';
+  selection_start?: number; // Text selection for inline comments
+  selection_end?: number;
+  status: 'active' | 'resolved' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+```
 
-# Appendix
+#### Image Attachment System
+```typescript
+interface ArticleImage {
+  id: string;
+  article_id: string;
+  storage_path: string;
+  filename: string;
+  alt_text?: string;
+  caption?: string;
+  position_data?: object; // Editor-specific positioning
+  created_at: string;
+}
+```
 
-*   **Research Findings:** Existing codebase analysis has identified reusable components like `MainHeader.tsx`, `UserDashboardLayout.tsx`, `DocumentUploader.tsx`, and patterns for Supabase interaction and `react-router-dom` usage.
-*   **Technical Specifications:**
-    *   **OpenAI Assistant ID:** To be provided by the user/stakeholder.
-    *   **OpenAI API Version:** Use the latest stable version that supports the required Vector Store and Assistant functionalities.
-    *   **Text Extraction Libraries:** Continue using `pdfjs-dist`, `mammoth`, `jszip` as currently implemented in `DocumentUploader.tsx`.
+### APIs and Integrations
+- **Supabase Database**: Extended schema for article content, comments, and images
+- **Supabase Storage**: Image and file storage with CDN delivery
+- **Real-time Subscriptions**: Live collaboration using Supabase real-time features
+- **Editor Framework**: TipTap or similar for rich text editing capabilities
+- **Image Processing**: Sharp or similar for image optimization
+
+### Infrastructure Requirements
+- **Database Updates**: Add new tables and columns to existing Supabase instance
+- **Storage Configuration**: Set up Supabase storage buckets for images and files
+- **Real-time Setup**: Configure Supabase real-time for live collaboration
+- **CDN Integration**: Image delivery optimization through Supabase CDN
+
+## Development Roadmap
+
+### Phase 1: Foundation (MVP)
+**Core Article Editing Infrastructure**
+- Add `article_content` field to `content_briefs` table
+- Create basic rich text editor component using TipTap
+- Implement article content loading and saving
+- Add basic text formatting features (bold, italic, headers, lists)
+- Integrate with existing Generated Articles page
+- Basic auto-save functionality
+
+### Phase 2: Enhanced Editing
+**Advanced Editor Features**
+- Complete rich text formatting toolbar
+- Markdown input/output support
+- Image upload and insertion capabilities
+- Tables and advanced formatting options
+- Undo/redo functionality
+- Editor performance optimization
+
+### Phase 3: Collaboration System
+**Comments and Multi-user Features**
+- Implement comment system database schema
+- Add inline commenting interface
+- Comment thread management
+- Real-time comment updates
+- Comment resolution and status tracking
+- User notification system for comments
+
+### Phase 4: Admin Integration
+**Admin Dashboard Features**
+- Admin article viewing interface
+- Admin editing capabilities
+- User article management tools
+- Admin comment system with elevated permissions
+- Bulk content management features
+- Analytics and usage tracking
+
+### Phase 5: Advanced Features
+**Production-ready Enhancements**
+- Real-time collaborative editing
+- Advanced image editing tools
+- Version history and diff viewing
+- Export functionality (PDF, Word, etc.)
+- Advanced search and filtering
+- Performance monitoring and optimization
+
+## Logical Dependency Chain
+
+### Foundation First (Critical Path)
+1. **Database Schema Updates** - Must be completed before any feature development
+2. **Basic Editor Component** - Core editing interface foundation
+3. **Content Loading/Saving** - Basic CRUD operations for article content
+4. **Integration with Existing UI** - Connect to Generated Articles page
+
+### Feature Development (Can be parallel)
+1. **Rich Text Features** - Build upon basic editor foundation
+2. **Image System** - Independent image upload and management
+3. **Comment Infrastructure** - Database and API for commenting system
+
+### Advanced Integration (Depends on foundation)
+1. **Real-time Features** - Requires both editor and comment systems
+2. **Admin Integration** - Requires complete editor and comment systems
+3. **Collaboration Features** - Requires all previous systems working together
+
+### Polish and Optimization (Final phase)
+1. **Performance Optimization** - Fine-tune all systems
+2. **Advanced Features** - Export, analytics, advanced editing tools
+3. **Mobile Optimization** - Responsive design refinements
+
+## Risks and Mitigations
+
+### Technical Challenges
+- **Editor Performance**: Large articles may cause performance issues
+  - *Mitigation*: Implement virtual scrolling and content lazy loading
+- **Real-time Collaboration**: Conflict resolution in multi-user editing
+  - *Mitigation*: Use operational transformation or CRDT for conflict resolution
+- **Image Storage Costs**: Large number of images could increase storage costs
+  - *Mitigation*: Implement image compression and usage monitoring
+
+### MVP Scope Management
+- **Feature Creep**: Notion-like features can be extensive
+  - *Mitigation*: Start with core editing features, add advanced features incrementally
+- **Integration Complexity**: Connecting with existing systems
+  - *Mitigation*: Maintain backward compatibility, gradual migration approach
+
+### Resource Constraints
+- **Development Time**: Rich text editors are complex to implement
+  - *Mitigation*: Use proven libraries like TipTap, focus on customization over building from scratch
+- **Testing Requirements**: Editing systems require extensive user testing
+  - *Mitigation*: Implement comprehensive test coverage, staged rollout approach
+
+## Appendix
+
+### Research Findings
+- **Current System Analysis**: BOFU AI uses content_briefs table with existing editing interface
+- **User Workflow**: Users currently receive Google Doc links, want in-app editing
+- **Admin Requirements**: Admins need oversight capabilities and editing permissions
+- **Technical Stack**: React, TypeScript, Supabase, TipTap editor already in use
+
+### Technical Specifications
+- **Editor Framework**: TipTap v2 with React integration
+- **Database**: Supabase PostgreSQL with real-time capabilities
+- **Storage**: Supabase Storage for images and files
+- **Authentication**: Existing Supabase auth system
+- **Styling**: Tailwind CSS for consistent UI/UX

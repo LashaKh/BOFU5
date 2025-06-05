@@ -351,7 +351,7 @@ export default function EditContentBrief() {
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-50 via-blue-50 to-purple-50 rounded-2xl opacity-80"></div>
                 <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
-                  <div className="bg-gradient-to-r from-indigo-500 via-blue-600 to-purple-600 px-8 py-6">
+                  <div className="bg-blue-600 px-8 py-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl">

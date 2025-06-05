@@ -1,0 +1,210 @@
+/* Image Editor Styles */
+
+/* Image figure with caption */
+.image-figure {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.image-figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-caption {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Image resize handles */
+.image-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+
+.image-controls {
+  position: relative;
+  display: inline-block;
+}
+
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.resize-handle:hover {
+  opacity: 1;
+  transform: scale(1.2);
+  background: #2563eb;
+}
+
+.resize-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nw-resize;
+}
+
+.resize-ne {
+  top: -4px;
+  right: -4px;
+  cursor: ne-resize;
+}
+
+.resize-sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: sw-resize;
+}
+
+.resize-se {
+  bottom: -4px;
+  right: -4px;
+  cursor: se-resize;
+}
+
+/* Image toolbar */
+.image-toolbar {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+.image-toolbar button {
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  color: #6b7280;
+}
+
+.image-toolbar button:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.image-edit-caption:hover {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.image-delete:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+/* Selected image highlight */
+.ProseMirror .selectedImage {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Image drag handle */
+.ProseMirror img {
+  cursor: grab;
+}
+
+.ProseMirror img:active {
+  cursor: grabbing;
+}
+
+/* Responsive image handling */
+@media (max-width: 768px) {
+  .resize-handle {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .image-toolbar {
+    top: -45px;
+    padding: 6px;
+  }
+  
+  .image-toolbar button {
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+}
+
+/* Image upload modal enhancements */
+.image-upload-modal .image-preview {
+  position: relative;
+}
+
+.image-upload-modal .image-preview img {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Animation for image insertion */
+@keyframes imageInsert {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ProseMirror img {
+  animation: imageInsert 0.3s ease-out;
+}
+
+/* Image loading state */
+.image-loading {
+  position: relative;
+  background: #f3f4f6;
+  border-radius: 8px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-loading::after {
+  content: "Loading image...";
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Image error state */
+.image-error {
+  position: relative;
+  background: #fee2e2;
+  border: 2px dashed #fca5a5;
+  border-radius: 8px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+}
+
+.image-error::after {
+  content: "Failed to load image";
+} 

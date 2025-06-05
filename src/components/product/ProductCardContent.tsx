@@ -845,7 +845,7 @@ export function ProductCardContent({
                         {/* Detailed Content */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Detailed Content
+                            Detailed Description
                           </label>
                           <EditableField
                             label=""
