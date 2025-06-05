@@ -4,6 +4,23 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 
+// Ensure React is globally available for all contexts and libraries
+// This fixes production bundling issues where createContext becomes undefined
+if (typeof window !== 'undefined') {
+  (window as any).React = React;
+  (window as any).ReactCreateContext = React.createContext;
+}
+
+// Additional defensive check for module systems
+if (typeof global !== 'undefined') {
+  (global as any).React = React;
+}
+
+// Verify React is properly available before proceeding
+if (typeof React === 'undefined' || typeof React.createContext === 'undefined') {
+  throw new Error('React is not properly loaded. This indicates a critical bundling issue.');
+}
+
 // Main app root
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -26,11 +43,10 @@ if (import.meta.env.DEV) {
     toolbarContainer.id = 'stagewise-toolbar-root';
     document.body.appendChild(toolbarContainer);
 
-    // Create separate React root for toolbar
+    // Mount the toolbar
     const toolbarRoot = createRoot(toolbarContainer);
     toolbarRoot.render(<StagewiseToolbar config={stagewiseConfig} />);
   }).catch((error) => {
-    // Gracefully handle if stagewise package is not available
-    console.warn('Stagewise toolbar could not be loaded:', error);
+    console.log('Stagewise toolbar not available in development:', error);
   });
 }

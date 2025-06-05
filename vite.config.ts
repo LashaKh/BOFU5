@@ -15,9 +15,21 @@ export default defineConfig({
       brotliSize: true,
     })
   ],
+  define: {
+    // Ensure React is available globally for context creation
+    global: 'globalThis',
+  },
   optimizeDeps: {
     exclude: ['lucide-react'],
-    include: ['pdfjs-dist', 'react', 'react-dom']
+    include: ['react', 'react-dom', '@tiptap/react', '@tiptap/starter-kit']
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+      'react': resolve('./node_modules/react'),
+      'react-dom': resolve('./node_modules/react-dom'),
+    },
+    dedupe: ['react', 'react-dom']
   },
   build: {
     // Break into more chunks to reduce individual file sizes
@@ -25,98 +37,57 @@ export default defineConfig({
       external: [],
       output: {
         manualChunks: (id) => {
-          // Keep React and React-DOM together in vendor chunk
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+          // React core
+          if (id.includes('react') || id.includes('react-dom')) {
+            return 'react-vendor';
+          }
+          
+          // TipTap editor libraries
+          if (id.includes('@tiptap') || id.includes('prosemirror')) {
+            return 'editor-vendor';
+          }
+          
+          // UI/styling libraries
+          if (id.includes('framer-motion') || id.includes('lucide-react')) {
+            return 'ui-vendor';
+          }
+          
+          // Supabase and other APIs
+          if (id.includes('@supabase') || id.includes('supabase')) {
+            return 'supabase-vendor';
+          }
+          
+          // Large utility libraries
+          if (id.includes('lodash') || id.includes('date-fns')) {
+            return 'utils-vendor';
+          }
+          
+          // PDF and document processing
+          if (id.includes('pdfjs') || id.includes('pdf')) {
+            return 'pdf-vendor';
+          }
+          
+          // Node modules that aren't separated above
+          if (id.includes('node_modules')) {
             return 'vendor';
           }
-          // Split TipTap extensions for lazy loading
-          if (id.includes('@tiptap/') || id.includes('prosemirror-')) {
-            return 'editor';
-          }
-          if (id.includes('node_modules/framer-motion') || 
-              id.includes('node_modules/react-hot-toast') || 
-              id.includes('node_modules/clsx')) {
-            return 'ui';
-          }
-          if (id.includes('node_modules/pdfjs-dist')) {
-            return 'pdf';
-          }
-          if (id.includes('node_modules/mammoth') || 
-              id.includes('node_modules/jszip') || 
-              id.includes('node_modules/base64-arraybuffer')) {
-            return 'utils';
-          }
-          if (id.includes('node_modules/lucide-react')) {
-            return 'icons';
-          }
-          // Split large components into separate chunks
-          if (id.includes('/admin/') || id.includes('AdminPanel')) {
-            return 'admin';
-          }
-          if (id.includes('/ui/') && (
-            id.includes('CommentingSystem') || 
-            id.includes('VersionHistory') || 
-            id.includes('CollaborativeCursors')
-          )) {
-            return 'collaboration';
-          }
+        },
+        // Ensure globals are properly defined
+        globals: {
+          'react': 'React',
+          'react-dom': 'ReactDOM'
         }
       }
     },
-    // Set a high limit to avoid warnings
-    chunkSizeWarningLimit: 3000,
-    // Use terser for better minification
-    minify: 'terser',
-    // Disable source maps to reduce build size and complexity
-    sourcemap: false,
-    // Target a more compatible ES version
-    target: 'es2018',
-    // Break CSS into smaller files
-    cssCodeSplit: true,
-    // Reduce the default module size for better chunking
-    assetsInlineLimit: 2048,
-    // Configure Terser to be more aggressive
-    terserOptions: {
-      compress: {
-        // Aggressive size optimizations
-        passes: 2,
-        drop_console: true,
-        drop_debugger: true
-      },
-      format: {
-        comments: false
-      }
-    }
+    // Target modern browsers for better performance
+    target: 'es2020',
+    // Ensure source maps for debugging
+    sourcemap: true,
+    // Optimize chunk size warnings
+    chunkSizeWarningLimit: 1000
   },
-  // Configure esbuild for stability
-  esbuild: {
-    logOverride: {
-      'this-is-undefined-in-esm': 'silent'
-    },
-    // Disable JSX factory as we're using React 18
-    jsx: 'automatic',
-    // Ensure we're not using too many resources during build
-    treeShaking: true,
-    target: 'es2018',
-    // Reduce memory usage
-    legalComments: 'none',
-    // Avoid too many workers
-    supported: {
-      'dynamic-import': true
-    }
-  },
-  // Adjust server options
   server: {
-    hmr: {
-      overlay: false
-    }
-  },
-  // Add resolver for PDF worker and fix module resolution
-  resolve: {
-    alias: {
-      'pdfjs-dist/build/pdf.worker.mjs': resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs')
-    },
-    // Ensure React is properly resolved
-    dedupe: ['react', 'react-dom']
+    port: 5173,
+    hmr: true
   }
 });
