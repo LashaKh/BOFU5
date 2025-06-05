@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+// Defensive check for React availability
+if (typeof React === 'undefined' || typeof React.createContext === 'undefined') {
+  console.error('React or React.createContext is undefined. This indicates a bundling issue.');
+  throw new Error('React is not properly imported or bundled');
+}
+
 // Theme detection and adaptive styling system
 export interface ProductCardTheme {
   // Context detection
@@ -107,7 +113,7 @@ interface ProductCardThemeContextType {
   isReducedMotion: boolean;
 }
 
-const ProductCardThemeContext = createContext<ProductCardThemeContextType | undefined>(undefined);
+const ProductCardThemeContext = React.createContext<ProductCardThemeContextType | undefined>(undefined);
 
 // Auto-detect background context based on parent element
 const detectBackgroundContext = (): ProductCardTheme['background'] => {

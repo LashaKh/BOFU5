@@ -17,13 +17,15 @@ export default defineConfig({
   ],
   optimizeDeps: {
     exclude: ['lucide-react'],
-    include: ['pdfjs-dist']
+    include: ['pdfjs-dist', 'react', 'react-dom']
   },
   build: {
     // Break into more chunks to reduce individual file sizes
     rollupOptions: {
+      external: [],
       output: {
         manualChunks: (id) => {
+          // Keep React and React-DOM together in vendor chunk
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor';
           }
@@ -109,10 +111,12 @@ export default defineConfig({
       overlay: false
     }
   },
-  // Add resolver for PDF worker - this is crucial for the fix
+  // Add resolver for PDF worker and fix module resolution
   resolve: {
     alias: {
       'pdfjs-dist/build/pdf.worker.mjs': resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs')
-    }
+    },
+    // Ensure React is properly resolved
+    dedupe: ['react', 'react-dom']
   }
 });
