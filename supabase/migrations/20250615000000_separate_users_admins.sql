@@ -143,4 +143,52 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Run the migration function
-SELECT migrate_existing_users(); 
+SELECT migrate_existing_users();
+
+-- Create a function to safely check if a user is an admin and get display info
+-- This function bypasses RLS and is safe to call by anyone
+CREATE OR REPLACE FUNCTION get_user_display_info(user_id uuid)
+RETURNS jsonb AS $$
+DECLARE
+  result jsonb;
+  admin_record RECORD;
+  user_record RECORD;
+BEGIN
+  -- First check if user is in admin_profiles
+  SELECT id, name, email INTO admin_record
+  FROM public.admin_profiles 
+  WHERE id = user_id;
+  
+  IF FOUND THEN
+    -- User is an admin
+    result := jsonb_build_object(
+      'is_admin', true,
+      'display_name', COALESCE(admin_record.name, 'Admin User'),
+      'email', admin_record.email
+    );
+  ELSE
+    -- Check if user is in user_profiles
+    SELECT id, company_name, email INTO user_record
+    FROM public.user_profiles 
+    WHERE id = user_id;
+    
+    IF FOUND THEN
+      -- User is a regular user
+      result := jsonb_build_object(
+        'is_admin', false,
+        'display_name', COALESCE(user_record.company_name, 'User'),
+        'email', user_record.email
+      );
+    ELSE
+      -- User not found in either table
+      result := jsonb_build_object(
+        'is_admin', false,
+        'display_name', 'Anonymous User',
+        'email', 'user@example.com'
+      );
+    END IF;
+  END IF;
+  
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER; 

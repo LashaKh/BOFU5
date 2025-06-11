@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { createVersionHistory } from './versionHistoryApi';
 import { toast } from 'react-hot-toast';
 import { auditLogger } from './auditLogger';
+import { deleteAllCommentsForArticle } from './commentApi';
 
 export interface ArticleContent {
   id: string;
@@ -655,4 +656,157 @@ export const autoSaveArticleContentAsAdmin = async (
     console.error('Error auto-saving article content as admin:', error);
     return false;
   }
-}; 
+};
+
+/**
+ * Delete article content and link by ID (preserves original brief)
+ */
+export async function deleteArticle(articleId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get the current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'User not authenticated'
+      };
+    }
+
+    console.log('🗑️ Clearing article content and all article metadata:', { articleId, userId: user.id });
+
+    // First, get the article to verify ownership and get metadata for cleanup
+    const { data: articleData, error: fetchError } = await supabase
+      .from('content_briefs')
+      .select('id, product_name, user_id, article_content, link')
+      .eq('id', articleId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching article for deletion:', fetchError);
+      return {
+        success: false,
+        error: `Article not found or access denied: ${fetchError.message}`
+      };
+    }
+
+    if (!articleData) {
+      return {
+        success: false,
+        error: 'Article not found or you do not have permission to delete it'
+      };
+    }
+
+    // Delete related data first (comments, images, etc.)
+    try {
+      console.log('🔍 Starting comment cleanup process...');
+      
+      // Delete all comments for this article using the dedicated function
+      const commentDeletionResult = await deleteAllCommentsForArticle(articleId);
+      
+      if (!commentDeletionResult.success) {
+        console.warn('⚠️ Comment deletion had issues:', commentDeletionResult.error);
+        // Continue with article deletion even if comment deletion fails
+        if (commentDeletionResult.deletedCount === 0) {
+          console.warn('❌ No comments were deleted, but continuing with article deletion');
+        }
+      } else {
+        console.log(`✅ Successfully deleted ${commentDeletionResult.deletedCount} comments`);
+      }
+
+      // Delete article images and their metadata
+      const { data: imageData, error: imagesError } = await supabase
+        .from('article_images')
+        .select('storage_path')
+        .eq('article_id', articleId);
+
+      if (imagesError) {
+        console.warn('Warning: Could not fetch article images for cleanup:', imagesError);
+      } else if (imageData && imageData.length > 0) {
+        // Delete images from storage
+        const imagePaths = imageData.map(img => img.storage_path);
+        const { error: storageError } = await supabase
+          .storage
+          .from('article-images')
+          .remove(imagePaths);
+
+        if (storageError) {
+          console.warn('Warning: Could not delete images from storage:', storageError);
+        }
+
+        // Delete image metadata
+        const { error: imageMetaError } = await supabase
+          .from('article_images')
+          .delete()
+          .eq('article_id', articleId);
+
+        if (imageMetaError) {
+          console.warn('Warning: Could not delete image metadata:', imageMetaError);
+        }
+      }
+
+      // Delete version history if it exists
+      const { error: versionError } = await supabase
+        .from('article_version_history')
+        .delete()
+        .eq('article_id', articleId);
+
+      if (versionError) {
+        console.warn('Warning: Could not delete version history:', versionError);
+      }
+
+    } catch (cleanupError) {
+      console.warn('Warning: Some cleanup operations failed:', cleanupError);
+      // Continue with main article content deletion even if cleanup fails
+    }
+
+    // Clear article content and all related metadata (reset to original brief state)
+    const { error: updateError } = await supabase
+      .from('content_briefs')
+      .update({
+        article_content: null,
+        link: null,
+        editing_status: null,
+        last_edited_at: null,
+        last_edited_by: null,
+        article_version: null,
+        current_version: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', articleId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('Error clearing article content:', updateError);
+      return {
+        success: false,
+        error: `Failed to clear article content: ${updateError.message}`
+      };
+    }
+
+    // Log successful deletion
+    await auditLogger.logAction(
+      articleId,
+      'delete',
+      `Article content and metadata completely cleared for "${articleData.product_name}" by user`,
+      {
+        product_name: articleData.product_name,
+        user_id: user.id,
+        action_type: 'complete_article_reset'
+      }
+    );
+
+    console.log('✅ Article content and metadata cleared successfully:', articleId);
+
+    return {
+      success: true
+    };
+
+  } catch (error) {
+    console.error('Unexpected error clearing article content:', error);
+    return {
+      success: false,
+      error: 'Unexpected error occurred while clearing article content'
+    };
+  }
+} 

@@ -126,19 +126,75 @@ USING (
 
 -- Update article_comments RLS policies to handle admin-only comments
 DROP POLICY IF EXISTS "Users can view comments on accessible articles" ON article_comments;
-CREATE POLICY "Users can view non-admin comments on accessible articles" 
+DROP POLICY IF EXISTS "Users can view non-admin comments on accessible articles" ON article_comments;
+
+-- New comprehensive policy for users to view all comments on their articles
+CREATE POLICY "Users can view all comments on their articles" 
 ON article_comments FOR SELECT 
 USING (
-  (is_admin_only = false OR is_admin_only IS NULL) AND
   article_id IN (
     SELECT id FROM content_briefs 
     WHERE user_id = auth.uid()
   )
 );
 
--- New policy for admins to view all comments including admin-only ones
-CREATE POLICY "Admins can view all comments"
+-- New policy for admins to view all comments everywhere
+CREATE POLICY "Admins can view all comments everywhere"
 ON article_comments FOR SELECT 
+USING (
+  EXISTS (SELECT 1 FROM admin_profiles WHERE id = auth.uid())
+);
+
+-- Allow users to create comments on their own articles
+CREATE POLICY "Users can create comments on their articles"
+ON article_comments FOR INSERT
+WITH CHECK (
+  article_id IN (
+    SELECT id FROM content_briefs 
+    WHERE user_id = auth.uid()
+  )
+);
+
+-- Allow admins to create comments on any article
+CREATE POLICY "Admins can create comments on any article"
+ON article_comments FOR INSERT
+WITH CHECK (
+  EXISTS (SELECT 1 FROM admin_profiles WHERE id = auth.uid())
+);
+
+-- Allow users to update their own comments
+CREATE POLICY "Users can update their own comments"
+ON article_comments FOR UPDATE
+USING (user_id = auth.uid());
+
+-- Allow admins to update any comment
+CREATE POLICY "Admins can update any comment"
+ON article_comments FOR UPDATE
+USING (
+  EXISTS (SELECT 1 FROM admin_profiles WHERE id = auth.uid())
+);
+
+-- ========================================
+-- ADD ADMIN PROFILES READ ACCESS FOR COMMENT ATTRIBUTION
+-- ========================================
+
+-- Allow users to read basic admin profile info for comment attribution
+-- This is needed so users can see admin names on comments in their articles
+CREATE POLICY "Users can read admin profile names for comments" 
+ON admin_profiles FOR SELECT 
+USING (
+  -- Allow reading name and email only when the admin has commented on user's articles
+  id IN (
+    SELECT DISTINCT ac.user_id 
+    FROM article_comments ac
+    JOIN content_briefs cb ON ac.article_id = cb.id
+    WHERE cb.user_id = auth.uid()
+  )
+);
+
+-- Admins can view all admin profiles
+CREATE POLICY "Admins can view all admin profiles"
+ON admin_profiles FOR SELECT
 USING (
   EXISTS (SELECT 1 FROM admin_profiles WHERE id = auth.uid())
 );

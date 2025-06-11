@@ -18,6 +18,11 @@ interface ProductCardContentProps {
   isExpanded?: boolean;
   maxItems?: number;
   showExpandButton?: boolean;
+  researchResultId?: string;
+  // User information for AirOps integration
+  userUUID?: string;
+  userEmail?: string;
+  userCompanyName?: string;
   // Phase 2 action handlers
   onSave?: (product: ProductAnalysis) => Promise<void>;
   onApprove?: (product: ProductAnalysis) => Promise<void>;
@@ -223,6 +228,10 @@ export function ProductCardContent({
   isExpanded = false,
   maxItems = 3,
   showExpandButton = true,
+  researchResultId,
+  userUUID,
+  userEmail,
+  userCompanyName,
   onSave,
   onApprove,
   onExport,
@@ -456,40 +465,6 @@ export function ProductCardContent({
           </div>
         </motion.div>
 
-        {/* Product Description - Enhanced */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="space-y-6"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Product Description</h4>
-              <p className="text-sm text-gray-500">Detailed overview of your product</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Description</label>
-            <EditableField
-              label=""
-              value={editableProduct.productDetails?.description || ''}
-              onSave={(value) => updateNestedField('productDetails', 'description', value as string)}
-              type="textarea"
-              placeholder="Describe your product in detail - its purpose, key functionality, and what makes it unique..."
-              maxLength={1000}
-              multiline
-              disabled={!enableEditing}
-            />
-          </div>
-        </motion.div>
-
         {/* Business Overview - Enhanced */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -623,7 +598,7 @@ export function ProductCardContent({
           </div>
         </motion.div>
 
-        {/* Value Propositions - Enhanced */}
+        {/* Value Propositions - Enhanced Production-Ready Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -663,26 +638,6 @@ export function ProductCardContent({
               />
             </div>
 
-            {/* Key Features */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-1.5 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg border border-emerald-200">
-                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                  </svg>
-                </div>
-                <label className="block text-sm font-semibold text-gray-700">Key Features</label>
-              </div>
-              <EditableField
-                label=""
-                value={editableProduct.features || []}
-                onSave={(value) => updateField('features', value)}
-                type="array"
-                arrayItemPlaceholder="Add key feature (e.g., Real-time analytics, API integration)..."
-                disabled={!enableEditing}
-              />
-            </div>
-
             {/* Pain Points */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
               <div className="flex items-center gap-3 mb-4">
@@ -705,7 +660,7 @@ export function ProductCardContent({
           </div>
         </motion.div>
 
-        {/* Core Capabilities - Enhanced Production-Ready Section */}
+        {/* Features and Capabilities - Enhanced Production-Ready Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -723,7 +678,7 @@ export function ProductCardContent({
                 </svg>
               </div>
               <div className="flex-1">
-                <h4 className="text-xl font-semibold text-gray-900">Core Capabilities</h4>
+                <h4 className="text-xl font-semibold text-gray-900">Features and Capabilities</h4>
                 <p className="text-sm text-gray-500">Define your product's key capabilities and features</p>
               </div>
               <div className="ml-auto">
@@ -734,24 +689,6 @@ export function ProductCardContent({
                 )}
               </div>
             </button>
-            {enableEditing && isCapabilitiesExpanded && (
-              <button
-                onClick={() => {
-                  const newCapability = {
-                    title: '',
-                    description: '',
-                    content: '',
-                    images: []
-                  };
-                  const updatedCapabilities = [...(editableProduct.capabilities || []), newCapability];
-                  updateField('capabilities', updatedCapabilities);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-              >
-                <Plus size={18} />
-                Add Capability
-              </button>
-            )}
           </div>
 
           {/* Capability Items */}
@@ -819,29 +756,6 @@ export function ProductCardContent({
 
                       {/* Capability Content */}
                       <div className="p-6 space-y-6">
-                        {/* Description */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Description
-                          </label>
-                          <EditableField
-                            label=""
-                            value={capability.description || ''}
-                            onSave={(value) => {
-                              const updatedCapabilities = [...(editableProduct.capabilities || [])];
-                              updatedCapabilities[index] = {
-                                ...updatedCapabilities[index],
-                                description: value as string
-                              };
-                              updateField('capabilities', updatedCapabilities);
-                            }}
-                            type="textarea"
-                            placeholder="Brief description of this capability..."
-                            maxLength={300}
-                            disabled={!enableEditing}
-                          />
-                        </div>
-
                         {/* Detailed Content */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -911,7 +825,7 @@ export function ProductCardContent({
                           )}
                           
                           {/* Images Display */}
-                          {capability.images && capability.images.length > 0 ? (
+                          {capability.images && capability.images.length > 0 && (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                               {capability.images.map((imageUrl, imageIndex) => (
                                 <div key={imageIndex} className="relative group">
@@ -987,15 +901,6 @@ export function ProductCardContent({
                                 </div>
                               ))}
                             </div>
-                          ) : (
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              <p className="mt-2 text-sm text-gray-500">
-                                {enableEditing ? 'Use the uploader above to add visual examples' : 'No images added yet'}
-                              </p>
-                            </div>
                           )}
                         </div>
                       </div>
@@ -1054,6 +959,7 @@ export function ProductCardContent({
                           updateField('capabilities', updatedCapabilities);
                         }}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                        style={{ background: 'linear-gradient(to right, #2563eb, #9333ea)' }}
                       >
                         <Plus size={18} />
                         Add Your First Capability
@@ -1139,6 +1045,10 @@ export function ProductCardContent({
               onEdit={onEdit}
               onDelete={onDelete}
               onShare={onShare}
+              researchResultId={researchResultId}
+              userUUID={userUUID}
+              userEmail={userEmail}
+              userCompanyName={userCompanyName}
             />
           )}
         </div>

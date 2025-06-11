@@ -810,7 +810,15 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
             ) : userProducts.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {userProducts.map(product => (
-                  <ProductCard key={product.id} product={product.product_data} researchResultId={product.research_result_id} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product.product_data} 
+                    researchResultId={product.research_result_id}
+                    context="admin"
+                    userUUID={selectedUser?.id}
+                    userEmail={selectedUser?.email}
+                    userCompanyName={selectedUser?.company_name}
+                  />
                 ))}
               </div>
             ) : (

@@ -323,6 +323,10 @@ export function ProductCard(props: any) {
           maxItems={props.maxItems || 3}
           showExpandButton={false} // Remove the "more" button as requested
           context={context}
+          researchResultId={props.researchResultId} // Pass through researchResultId for AirOps
+          userUUID={props.userUUID} // Pass through user information for AirOps
+          userEmail={props.userEmail}
+          userCompanyName={props.userCompanyName}
           onSave={props.onSave}
           onApprove={props.onApprove}
           onExport={props.onExport}

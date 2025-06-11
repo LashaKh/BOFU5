@@ -44,28 +44,6 @@ async function checkAdminPermission(): Promise<boolean> {
 
 const USER_PROFILE_SELECT_QUERY = 'id,email,company_name,created_at,updated_at,content_briefs(count)';
 
-// Define an interface for the raw Supabase article data with joined user_profiles
-interface SupabaseArticleWithUser {
-  id: string;
-  product_name: string;
-  article_content: string | null;
-  article_version: number | null;
-  editing_status: ArticleListItem['editing_status'] | null;
-  last_edited_at: string;
-  last_edited_by: string;
-  created_at: string;
-  updated_at: string;
-  user_id: string; // From content_briefs, represents the foreign key to user_profiles via user_presence
-  user_presence: { // Joined from user_presence table
-    user_profiles: { // Nested join from user_profiles table
-      id: string;
-      email: string;
-      company_name: string | null;
-    };
-  };
-}
-
-
 // Admin Articles API
 export const adminArticlesApi = {
   // Get list of articles with filtering and pagination
@@ -214,42 +192,67 @@ export const adminArticlesApi = {
         };
       }
 
-      const selectQuery = 'id,product_name,article_content,article_version,editing_status,last_edited_at,last_edited_by,created_at,updated_at,user_id,user_presence!inner(user_profiles!inner(id,email,company_name))';
+      console.log('DEBUG: Fetching content_briefs article without joins...');
 
+      // Step 1: Fetch content_brief without any joins (proven to work)
       const { data: fetchedArticle, error } = await supabase
         .from('content_briefs')
-        .select(selectQuery)
+        .select('*')
         .eq('id', articleId)
-        .returns<SupabaseArticleWithUser>()
         .single();
 
       if (error) {
         console.error("Supabase error in getArticle:", error);
-        if (error.message.includes("Could not find a relationship")) {
-             return { error: { error: 'Failed to fetch article due to incorrect table relationship in query.', errorCode: 'QUERY_RELATIONSHIP_ERROR', details: error.message }};
-        }
         throw error;
       }
-      if (!fetchedArticle) return { error: { error: 'Article not found or access denied', errorCode: 'NOT_FOUND'}};
-      
-      const article: SupabaseArticleWithUser = fetchedArticle;
+      if (!fetchedArticle) {
+        return { error: { error: 'Article not found or access denied', errorCode: 'NOT_FOUND'}};
+      }
 
+      console.log('DEBUG: Fetched content_brief:', fetchedArticle.id);
+
+      // Step 2: Fetch user profile separately if user_id exists
+      let userEmail = '';
+      let userCompany = '';
+      let userId = fetchedArticle.user_id || '';
+
+      if (fetchedArticle.user_id) {
+        console.log('DEBUG: Fetching user profile for:', fetchedArticle.user_id);
+        const { data: userData, error: userError } = await supabase
+          .from('user_profiles')
+          .select('id,email,company_name')
+          .eq('id', fetchedArticle.user_id)
+          .single();
+
+        if (!userError && userData) {
+          userEmail = userData.email || '';
+          userCompany = userData.company_name || '';
+          userId = userData.id;
+          console.log('DEBUG: Fetched user profile:', userData.email);
+        } else {
+          console.warn('DEBUG: Could not fetch user profile:', userError);
+        }
+      }
+
+      // Step 3: Combine the data
       const response: ArticleDetail = {
-        id: article.id,
-        title: article.product_name,
-        article_content: article.article_content || '',
-        article_version: article.article_version || 1,
-        editing_status: (article.editing_status || 'draft'),
-        last_edited_at: article.last_edited_at,
-        last_edited_by: article.last_edited_by,
-        created_at: article.created_at,
-        updated_at: article.updated_at,
-        user_id: article.user_presence.user_profiles.id,
-        user_email: article.user_presence.user_profiles.email || '',
-        user_company: article.user_presence.user_profiles.company_name || '',
-        product_name: article.product_name
+        id: fetchedArticle.id,
+        title: fetchedArticle.product_name || 'Untitled',
+        content: fetchedArticle.article_content || '',
+        article_content: fetchedArticle.article_content || '',
+        article_version: fetchedArticle.article_version || 1,
+        editing_status: (fetchedArticle.editing_status || 'draft'),
+        last_edited_at: fetchedArticle.last_edited_at || new Date().toISOString(),
+        last_edited_by: fetchedArticle.last_edited_by || '',
+        created_at: fetchedArticle.created_at || new Date().toISOString(),
+        updated_at: fetchedArticle.updated_at || new Date().toISOString(),
+        user_id: userId,
+        user_email: userEmail,
+        user_company: userCompany,
+        product_name: fetchedArticle.product_name || ''
       };
 
+      console.log('DEBUG: Successfully assembled article detail for:', response.id);
       return { data: response };
     } catch (error: any) {
       console.error("Error in getArticle:", error);
@@ -306,15 +309,11 @@ export const adminArticlesApi = {
         .from('content_briefs')
         .update(updateData)
         .eq('id', articleId)
-        .select('id,product_name,article_content,article_version,editing_status,last_edited_at,last_edited_by,created_at,updated_at,user_id,user_presence!inner(user_profiles!inner(id,email,company_name))')
-        .returns<SupabaseArticleWithUser>()
+        .select('*')
         .single();
       
       if (error) {
         console.error("Supabase error in updateArticle:", error);
-        if (error.message.includes("Could not find a relationship")) {
-          return { error: { error: 'Failed to update article due to incorrect table relationship in query.', errorCode: 'QUERY_RELATIONSHIP_ERROR', details: error.message }};
-        }
         throw error;
       }
 
@@ -322,23 +321,42 @@ export const adminArticlesApi = {
         return { error: { error: 'Failed to update article or article not found', errorCode: 'UPDATE_FAILED' } };
       }
       
-      const article: SupabaseArticleWithUser = data;
+      console.log('DEBUG: Updated content_brief:', data.id);
+
+      // Step 2: Fetch user profile separately if user_id exists
+      let userEmail = '';
+      let userCompany = '';
+      let userId = data.user_id || '';
+
+      if (data.user_id) {
+        const { data: userData, error: userError } = await supabase
+          .from('user_profiles')
+          .select('id,email,company_name')
+          .eq('id', data.user_id)
+          .single();
+
+        if (!userError && userData) {
+          userEmail = userData.email || '';
+          userCompany = userData.company_name || '';
+          userId = userData.id;
+        }
+      }
 
       const response: ArticleDetail = {
-        id: article.id,
-        title: article.product_name,
-        article_content: article.article_content || '',
-        article_version: article.article_version || 1,
-        editing_status: (article.editing_status || 'draft'),
-        last_edited_at: article.last_edited_at,
-        last_edited_by: article.last_edited_by,
-        created_at: article.created_at,
-        updated_at: article.updated_at,
-        user_id: article.user_presence.user_profiles.id,
-        user_email: article.user_presence.user_profiles.email || '',
-        user_company: article.user_presence.user_profiles.company_name || '',
-        product_name: article.product_name,
-        // notes are not directly part of the article table, handle separately if needed
+        id: data.id,
+        title: data.product_name || 'Untitled',
+        content: data.article_content || '',
+        article_content: data.article_content || '',
+        article_version: data.article_version || 1,
+        editing_status: (data.editing_status || 'draft'),
+        last_edited_at: data.last_edited_at || new Date().toISOString(),
+        last_edited_by: data.last_edited_by || '',
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+        user_id: userId,
+        user_email: userEmail,
+        user_company: userCompany,
+        product_name: data.product_name || ''
       };
 
       return { data: response };
@@ -412,6 +430,7 @@ export const adminArticlesApi = {
       const response: ArticleDetail = {
         id: updatedArticle.id,
         title: updatedArticle.product_name,
+        content: updatedArticle.article_content || '',
         article_content: updatedArticle.article_content || '',
         article_version: updatedArticle.article_version || 1,
         editing_status: (updatedArticle.editing_status || 'draft'),
@@ -487,35 +506,51 @@ export const adminArticlesApi = {
           updated_at: new Date().toISOString(),
         })
         .eq('id', articleId)
-        .select('id,product_name,article_content,article_version,editing_status,last_edited_at,last_edited_by,created_at,updated_at,user_id,user_presence!inner(user_profiles!inner(id,email,company_name))')
-        .returns<SupabaseArticleWithUser>()
+        .select('*')
         .single();
 
       if (error) {
         console.error("Supabase error in transferOwnership:", error);
-        if (error.message.includes("Could not find a relationship")) {
-          return { error: { error: 'Failed to transfer ownership due to incorrect table relationship in query.', errorCode: 'QUERY_RELATIONSHIP_ERROR', details: error.message }};
-        }
         throw error;
       }
       if (!data) return { error: { error: 'Failed to transfer ownership or article not found', errorCode: 'UPDATE_FAILED'}};
 
-      const article: SupabaseArticleWithUser = data;
+      console.log('DEBUG: Transferred ownership for:', data.id, 'to user:', newUserId);
+
+      // Step 2: Fetch user profile separately for the new owner
+      let userEmail = '';
+      let userCompany = '';
+      let userId = data.user_id || '';
+
+      if (data.user_id) {
+        const { data: userData, error: userError } = await supabase
+          .from('user_profiles')
+          .select('id,email,company_name')
+          .eq('id', data.user_id)
+          .single();
+
+        if (!userError && userData) {
+          userEmail = userData.email || '';
+          userCompany = userData.company_name || '';
+          userId = userData.id;
+        }
+      }
       
       const response: ArticleDetail = {
-        id: article.id,
-        title: article.product_name,
-        article_content: article.article_content || '',
-        article_version: article.article_version || 1,
-        editing_status: (article.editing_status || 'draft'),
-        last_edited_at: article.last_edited_at,
-        last_edited_by: article.last_edited_by,
-        created_at: article.created_at,
-        updated_at: article.updated_at,
-        user_id: article.user_presence.user_profiles.id, // Reflects the new owner's ID from the joined data
-        user_email: article.user_presence.user_profiles.email || '',
-        user_company: article.user_presence.user_profiles.company_name || '',
-        product_name: article.product_name
+        id: data.id,
+        title: data.product_name || 'Untitled',
+        content: data.article_content || '',
+        article_content: data.article_content || '',
+        article_version: data.article_version || 1,
+        editing_status: (data.editing_status || 'draft'),
+        last_edited_at: data.last_edited_at || new Date().toISOString(),
+        last_edited_by: data.last_edited_by || '',
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+        user_id: userId, // Reflects the new owner's ID
+        user_email: userEmail,
+        user_company: userCompany,
+        product_name: data.product_name || ''
       };
 
       // TODO: Handle 'notes' - perhaps log them to an audit trail or a separate notes table.

@@ -36,6 +36,7 @@ import { UserSelectorTest } from './components/admin/UserSelectorTest'; // Impor
 import { AdminArticleListTest } from './components/admin/AdminArticleListTest'; // Import the article list test
 import { ArticleEditorAdminTest } from './components/admin/ArticleEditorAdminTest'; // Import the article editor admin test
 import { AuditLogViewerTest } from './components/admin/AuditLogViewerTest'; // Import the audit log viewer test
+import ArticleEditorPage from './pages/ArticleEditorPage'; // Import the new dedicated article editor page
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -1045,6 +1046,21 @@ console.log('Admin granted:', data, error);
           <Route path="/admin-article-list-test" element={<AdminArticleListTest />} />
           <Route path="/article-editor-admin-test" element={<ArticleEditorAdminTest />} />
           <Route path="/audit-log-viewer-test" element={<AuditLogViewerTest />} />
+
+          <Route path="/article-editor/:id" element={
+            isAuthLoading ? (
+              <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-white">Loading...</p>
+                </div>
+              </div>
+            ) : user ? (
+              <ArticleEditorPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

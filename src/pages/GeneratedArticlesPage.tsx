@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth'; // Assuming useAuth provides the user object
-import { ExternalLink, CalendarDays, FileText, Edit3, X, Save } from 'lucide-react'; // Added Edit3, X, Save icons
+import { ExternalLink, CalendarDays, FileText, Edit3, Trash2 } from 'lucide-react'; // Added Trash2 icon
 import { UserDashboardLayout } from '../components/user-dashboard/UserDashboardLayout';
-import { ArticleEditor } from '../components/ArticleEditor';
-import { ArticleContent } from '../lib/articleApi';
+import { useNavigate } from 'react-router-dom'; // Added for navigation
+import { deleteArticle } from '../lib/articleApi'; // Import delete function
+import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'; // Import confirmation dialog
+import { toast } from 'react-hot-toast'; // For user feedback
 
 interface GeneratedArticle {
   id: string;
@@ -14,22 +16,17 @@ interface GeneratedArticle {
   updated_at: string;
 }
 
-interface EditModalState {
-  isOpen: boolean;
-  articleId: string | null;
-  articleTitle: string;
-}
-
 const GeneratedArticlesPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate(); // Added for navigation
   const [articles, setArticles] = useState<GeneratedArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editModal, setEditModal] = useState<EditModalState>({
-    isOpen: false,
-    articleId: null,
-    articleTitle: ''
-  });
+  
+  // Delete functionality state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [articleToDelete, setArticleToDelete] = useState<GeneratedArticle | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchArticles = async () => {
@@ -90,25 +87,43 @@ const GeneratedArticlesPage: React.FC = () => {
     fetchArticles();
   }, [user]);
 
-  const handleEditArticle = (articleId: string, title: string) => {
-    setEditModal({
-      isOpen: true,
-      articleId,
-      articleTitle: title
-    });
+  const handleEditArticle = (articleId: string) => {
+    // Navigate to the dedicated editor page
+    navigate(`/article-editor/${articleId}`);
   };
 
-  const handleCloseEditor = () => {
-    setEditModal({
-      isOpen: false,
-      articleId: null,
-      articleTitle: ''
-    });
+  const handleDeleteClick = (article: GeneratedArticle) => {
+    setArticleToDelete(article);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleArticleSave = (data: ArticleContent) => {
-    console.log('Article saved:', data);
-    // Optionally refresh the articles list or show a success message
+  const handleDeleteConfirm = async () => {
+    if (!articleToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteArticle(articleToDelete.id);
+      
+      if (result.success) {
+        // Remove the article from the local state
+        setArticles(prev => prev.filter(article => article.id !== articleToDelete.id));
+        toast.success(`Article content and metadata cleared for "${articleToDelete.title}"`);
+        setDeleteConfirmOpen(false);
+        setArticleToDelete(null);
+      } else {
+        toast.error(result.error || 'Failed to clear article data');
+      }
+    } catch (error) {
+      console.error('Error clearing article content:', error);
+      toast.error('An unexpected error occurred while clearing the article data');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+    setArticleToDelete(null);
   };
 
   // If user is not available yet, show loading state within layout
@@ -156,7 +171,7 @@ const GeneratedArticlesPage: React.FC = () => {
               Generated Articles
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Access and edit your generated articles using our built-in editor or open them in Google Docs.
+              Access and edit your generated articles using our professional editor or open them in Google Docs.
             </p>
           </div>
           {/* Optional: Add a total count here if desired later */}
@@ -197,13 +212,12 @@ const GeneratedArticlesPage: React.FC = () => {
                 {/* Action buttons */}
                 <div className="bg-gray-50 border-t border-gray-200 p-3 space-y-2">
                   <button
-                    onClick={() => {
-                      handleEditArticle(article.id, article.title);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors duration-200"
+                    onClick={() => handleEditArticle(article.id)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 group"
                   >
                     <Edit3 size={16} />
-                    Edit in App
+                    Edit Article
+                    <span className="text-xs opacity-80 ml-1">(New Editor)</span>
                   </button>
                   <a
                     href={article.link}
@@ -214,58 +228,36 @@ const GeneratedArticlesPage: React.FC = () => {
                     <ExternalLink size={16} />
                     Open Google Doc
                   </a>
+                  <button
+                    onClick={() => handleDeleteClick(article)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors duration-200 group"
+                  >
+                    <Trash2 size={16} />
+                    Clear All Article Data
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* Article Editor Modal */}
-      {editModal.isOpen && editModal.articleId && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            {/* Background overlay */}
-            <div 
-              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-              onClick={handleCloseEditor}
-            />
-
-            {/* Modal content */}
-            <div className="inline-block w-full max-w-6xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
-              {/* Modal header */}
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Edit Article
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {editModal.articleTitle}
-                  </p>
-                </div>
-                <button
-                  onClick={handleCloseEditor}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-
-              {/* Article Editor */}
-              <div className="h-[70vh] overflow-hidden">
-                <ArticleEditor
-                  articleId={editModal.articleId}
-                  className="h-full"
-                  onSave={(content: string) => {
-                    console.log('Article saved:', content);
-                    // Optionally refresh the articles list or show a success message
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteConfirmOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Clear All Article Data"
+        message={
+          articleToDelete
+            ? `Are you sure you want to clear all article content and metadata for "${articleToDelete.title}"? This will remove the generated article content, Google Doc link, editing history, version information, and all related article metadata, but preserve the original brief. This action cannot be undone.`
+            : ''
+        }
+        confirmText="Clear All Data"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </UserDashboardLayout>
   );
 };

@@ -481,7 +481,10 @@ function ProductResultsPage({
   }, [editedProducts]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-gray-900 to-secondary-900 text-white"
+      style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}
+    >
       <MainHeader 
         user={user} 
         showHistory={showHistory} 

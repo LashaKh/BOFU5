@@ -22,6 +22,7 @@ import { VersionHistoryModal } from '../components/admin/VersionHistoryModal';
 import { MetadataEditorModal } from '../components/admin/MetadataEditorModal';
 import { ArticleEditor } from '../components/ArticleEditor';
 import type { ArticleListItem, UserProfile } from '../types/adminApi';
+import { ArticleContent, loadArticleContentAsAdmin } from '../lib/articleApi';
 import { toast } from 'react-hot-toast';
 import { 
   auditLogger, 
@@ -45,6 +46,9 @@ interface ArticleEditingState {
   isOpen: boolean;
   article: ArticleListItem | null;
   originalAuthor: UserProfile | null;
+  articleContent: ArticleContent | null;
+  isLoadingContent: boolean;
+  contentError: string | null;
 }
 
 const mockArticles: ArticleListItem[] = Array.from({ length: 15 }, (_, i) => ({
@@ -74,7 +78,10 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
   const [articleEditing, setArticleEditing] = useState<ArticleEditingState>({
     isOpen: false,
     article: null,
-    originalAuthor: null
+    originalAuthor: null,
+    articleContent: null,
+    isLoadingContent: true,
+    contentError: null
   });
 
   useEffect(() => {
@@ -282,16 +289,69 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
       setArticleEditing({
         isOpen: true,
         article,
-        originalAuthor
+        originalAuthor,
+        articleContent: null,
+        isLoadingContent: true,
+        contentError: null
       });
 
-      console.log('🔥 Modal should now be open, articleEditing state set');
+      console.log('🔥 Modal should now be open, loading article content...');
+
+      // Load the actual article content using admin API
+      if (adminProfile?.id) {
+        try {
+          const articleContent = await loadArticleContentAsAdmin(article.id, adminProfile.id);
+          
+          if (articleContent) {
+            console.log('🔥 Article content loaded successfully:', {
+              id: articleContent.id,
+              title: articleContent.title,
+              contentLength: articleContent.content?.length || 0,
+              contentPreview: articleContent.content?.substring(0, 100)
+            });
+            
+            setArticleEditing(prev => ({
+              ...prev,
+              articleContent,
+              isLoadingContent: false,
+              contentError: null
+            }));
+          } else {
+            throw new Error('Failed to load article content');
+          }
+        } catch (contentError) {
+          console.error('❌ Error loading article content:', contentError);
+          setArticleEditing(prev => ({
+            ...prev,
+            articleContent: null,
+            isLoadingContent: false,
+            contentError: contentError instanceof Error ? contentError.message : 'Failed to load article content'
+          }));
+          toast.error('Failed to load article content for editing');
+        }
+      } else {
+        setArticleEditing(prev => ({
+          ...prev,
+          articleContent: null,
+          isLoadingContent: false,
+          contentError: 'Admin profile not available'
+        }));
+        toast.error('Admin profile not available');
+      }
 
       // Log article editing access
       await logArticleView(article.id, 'Admin opened article for editing');
     } catch (error) {
       console.error('Error opening article for editing:', error);
       toast.error('Failed to open article for editing');
+      setArticleEditing({
+        isOpen: false,
+        article: null,
+        originalAuthor: null,
+        articleContent: null,
+        isLoadingContent: false,
+        contentError: null
+      });
     }
   };
 
@@ -299,7 +359,10 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
     setArticleEditing({
       isOpen: false,
       article: null,
-      originalAuthor: null
+      originalAuthor: null,
+      articleContent: null,
+      isLoadingContent: true,
+      contentError: null
     });
   };
 
@@ -537,12 +600,12 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="relative w-full h-full max-w-7xl max-h-[96vh] bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 border border-gray-600/50 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
+              className="relative w-full h-full max-w-[98vw] max-h-[98vh] bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 border border-gray-600/50 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Beautiful Header */}
               <div className="flex-shrink-0 border-b border-gray-700/50 bg-gradient-to-r from-gray-800 via-gray-800 to-gray-700">
-                <div className="px-4 sm:px-8 py-4 sm:py-6">
+                <div className="px-3 sm:px-6 py-3 sm:py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                       <div className="p-2 sm:p-3 bg-yellow-400/10 rounded-lg sm:rounded-xl border border-yellow-400/20 shadow-lg flex-shrink-0">
@@ -594,35 +657,111 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
 
               {/* Editor Content */}
               <div className="flex-1 flex flex-col min-h-0 bg-gray-900">
-                <div className="flex-1 p-4 sm:p-8 overflow-auto">
-                  <div className="h-auto min-h-[500px] w-full rounded-xl bg-white border border-gray-700/50 shadow-inner overflow-auto">
-                    {(() => {
-                      console.log('🔥 About to render ArticleEditor with props:', {
-                        articleId: articleEditing.article.id,
-                        adminMode: true,
-                        hasAdminUser: !!adminProfile,
-                        hasOriginalAuthor: !!articleEditing.originalAuthor
-                      });
-                      return (
-                        <ArticleEditor
-                          articleId={articleEditing.article.id}
-                          adminMode={true}
-                          adminUser={adminProfile}
-                          originalAuthor={articleEditing.originalAuthor}
-                          onStatusChange={handleArticleStatusChange}
-                          onOwnershipTransfer={handleArticleOwnershipTransfer}
-                          onAdminNote={handleAdminNote}
-                          className="w-full min-h-[500px] overflow-auto"
+                <div className="flex-1 p-2 sm:p-4 overflow-auto">
+                  <div className="h-auto min-h-[600px] w-full rounded-xl bg-white border border-gray-700/50 shadow-inner overflow-auto">
+                    {articleEditing.isLoadingContent ? (
+                      // Loading state
+                      <div className="flex flex-col items-center justify-center h-full min-h-[600px] text-gray-500">
+                        <motion.div 
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mb-6"
                         />
-                      );
-                    })()}
+                        <motion.p 
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.2 }}
+                          className="text-lg font-medium mb-2"
+                        >
+                          Loading article content...
+                        </motion.p>
+                        <motion.p 
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.4 }}
+                          className="text-sm text-gray-400"
+                        >
+                          Syncing with user's latest version
+                        </motion.p>
+                      </div>
+                    ) : articleEditing.contentError ? (
+                      // Error state
+                      <div className="flex flex-col items-center justify-center h-full min-h-[600px] text-gray-500">
+                        <motion.div
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6"
+                        >
+                          <AlertTriangle className="w-8 h-8 text-red-500" />
+                        </motion.div>
+                        <motion.p 
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.1 }}
+                          className="text-lg font-medium mb-2 text-red-600"
+                        >
+                          Failed to load article content
+                        </motion.p>
+                        <motion.p 
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.2 }}
+                          className="text-sm text-gray-400 mb-4 text-center max-w-md"
+                        >
+                          {articleEditing.contentError}
+                        </motion.p>
+                        <motion.button
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.3 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleEditArticle(articleEditing.article!)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Retry Loading
+                        </motion.button>
+                      </div>
+                    ) : articleEditing.articleContent ? (
+                      // Article editor with content
+                      (() => {
+                        console.log('🔥 About to render ArticleEditor with props:', {
+                          articleId: articleEditing.article.id,
+                          adminMode: true,
+                          hasAdminUser: !!adminProfile,
+                          hasOriginalAuthor: !!articleEditing.originalAuthor,
+                          hasArticleContent: !!articleEditing.articleContent,
+                          initialContentLength: articleEditing.articleContent.content?.length || 0
+                        });
+                        return (
+                          <ArticleEditor
+                            articleId={articleEditing.article.id}
+                            initialContent={articleEditing.articleContent.content || ''}
+                            adminMode={true}
+                            adminUser={adminProfile}
+                            originalAuthor={articleEditing.originalAuthor}
+                            onStatusChange={handleArticleStatusChange}
+                            onOwnershipTransfer={handleArticleOwnershipTransfer}
+                            onAdminNote={handleAdminNote}
+                            className="w-full min-h-[600px] overflow-auto"
+                          />
+                        );
+                      })()
+                    ) : (
+                      // Fallback state
+                      <div className="flex flex-col items-center justify-center h-full min-h-[600px] text-gray-500">
+                        <AlertTriangle className="w-12 h-12 text-gray-400 mb-4" />
+                        <p className="text-lg font-medium mb-2">No content available</p>
+                        <p className="text-sm text-gray-400">Unable to load article content</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Enhanced Footer with Admin Badge */}
               <div className="flex-shrink-0 border-t border-gray-700/50 bg-gradient-to-r from-gray-800/80 to-gray-800/60 backdrop-blur-sm">
-                <div className="px-4 sm:px-8 py-3 sm:py-5">
+                <div className="px-3 sm:px-6 py-2 sm:py-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                       <div className="flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500/10 border border-red-500/20 rounded-full shadow-lg">

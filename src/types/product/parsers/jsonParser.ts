@@ -262,7 +262,22 @@ export function parseJsonFormat(data: any): ProductAnalysis | null {
     }
     
     // Parse capabilities with safety checks
-    if (data.capabilities) {
+    if (data.features_and_capabilities && Array.isArray(data.features_and_capabilities)) {
+      // Handle new combined features_and_capabilities format
+      product.capabilities = data.features_and_capabilities
+        .slice(0, 20) // Limit array size for safety
+        .filter((item: any) => 
+          item && 
+          typeof item === 'object' && 
+          (item.feature || item.capability)
+        )
+        .map((item: any, index: number) => ({
+          title: typeof item.feature === 'string' ? item.feature.trim() : `Feature #${index + 1}`,
+          description: typeof item.capability === 'string' ? item.capability.trim() : '',
+          content: typeof item.capability === 'string' ? item.capability.trim() : '',
+          images: []
+        }));
+    } else if (data.capabilities) {
       if (Array.isArray(data.capabilities)) {
         product.capabilities = (data.capabilities as any[]) // Type assertion for item in filter/map
           .slice(0, 20) // Limit array size for safety

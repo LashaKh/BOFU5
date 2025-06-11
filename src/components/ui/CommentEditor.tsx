@@ -45,12 +45,14 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full p-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-400 min-h-[80px] max-h-[200px] ${
-          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+        className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 min-h-[80px] max-h-[200px] text-gray-900 dark:text-gray-100 ${
+          disabled 
+            ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' 
+            : 'bg-white dark:bg-gray-800'
         }`}
         maxLength={1000}
       />
-      <div className="absolute bottom-2 right-2 text-xs text-gray-400 pointer-events-none">
+      <div className="absolute bottom-2 right-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">
         {value.length}/1000
       </div>
     </div>

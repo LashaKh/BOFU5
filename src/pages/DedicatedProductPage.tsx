@@ -435,6 +435,9 @@ const DedicatedProductPage: React.FC = () => {
     // productId is from useParams()
     // 'product' is the state variable holding the fetched data from 'research_results' table.
     const currentProductIdFromUrl = productId; 
+    
+    // Ensure productIndex has a valid value (default to 0 for single product page)
+    const safeProductIndex = productIndex ?? 0;
 
     if (!product || !product.id) {
       toast.error('Cannot approve: Product data is not fully loaded or the main research record is missing.');
@@ -447,6 +450,7 @@ const DedicatedProductPage: React.FC = () => {
       {
         'prod.research_result_id': prod.research_result_id,
         'productIndex': productIndex,
+        'safeProductIndex': safeProductIndex,
         'currentProductIdFromUrl (expected parent ID)': currentProductIdFromUrl,
         'prod.productDetails.name': prod.productDetails?.name,
         'prod.companyName': prod.companyName,
@@ -477,9 +481,9 @@ const DedicatedProductPage: React.FC = () => {
 
       if (newApprovedState) { // Product is being approved or re-approved
         const dataToUpsert = {
-          research_result_id: prod.research_result_id, // Use the ID from the prod object. This ID MUST exist in research_results table.
+          research_result_id: product.id, // Use product.id since we already validated it exists above
           approved_by: session.user.id,
-          product_index: productIndex,
+          product_index: safeProductIndex, // Use the safe product index
           product_name: prod.productDetails.name,
           product_description: prod.productDetails.description,
           company_name: prod.companyName, // Product's own company name
@@ -490,7 +494,7 @@ const DedicatedProductPage: React.FC = () => {
         const { data: existingApproval, error: fetchError } = await supabase
           .from('approved_products')
           .select('id')
-          .eq('research_result_id', prod.research_result_id!)
+          .eq('research_result_id', product.id)
           .eq('approved_by', session.user.id!)
           .single();
 
@@ -509,7 +513,7 @@ const DedicatedProductPage: React.FC = () => {
           const { error: updateError } = await supabase
             .from('approved_products')
             .update({
-              product_index: productIndex,
+              product_index: safeProductIndex, // Use the safe product index
               product_name: prod.productDetails.name,
               product_description: prod.productDetails.description,
               company_name: prod.companyName,
@@ -549,7 +553,7 @@ const DedicatedProductPage: React.FC = () => {
         const { error: deleteError } = await supabase
           .from('approved_products')
           .delete()
-          .eq('research_result_id', prod.research_result_id!)
+          .eq('research_result_id', product.id)
           .eq('approved_by', session.user.id!);
 
         if (deleteError) {

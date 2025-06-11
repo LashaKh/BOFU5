@@ -1,6 +1,29 @@
 import React, { useState } from 'react';
-import { MessageCircle, CheckCircle, Archive, MoreHorizontal, Edit2, Trash2, Reply, Clock, AlertTriangle, Calendar, User } from 'lucide-react';
+import { MessageCircle, CheckCircle, Archive, MoreHorizontal, Edit2, Trash2, Reply, Clock, AlertTriangle, Calendar, User, Edit3 } from 'lucide-react';
 import { ArticleComment } from '../../lib/commentApi';
+
+// Custom scrollbar styles for dropdown menu
+const scrollbarStyles = `
+  .comment-menu-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .comment-menu-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .comment-menu-scroll::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+  .comment-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+  .dark .comment-menu-scroll::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+  .dark .comment-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+`;
 
 interface CommentThreadProps {
   comment: ArticleComment;
@@ -12,6 +35,8 @@ interface CommentThreadProps {
   showActions?: boolean;
   depth?: number;
   showResolutionDetails?: boolean;
+  loadingAction?: string | null;
+  highlightedCommentId?: string | null;
 }
 
 // Resolution templates for quick actions
@@ -32,7 +57,9 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   onResolveWithReason,
   showActions = true,
   depth = 0,
-  showResolutionDetails = true
+  showResolutionDetails = true,
+  loadingAction,
+  highlightedCommentId
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -172,282 +199,284 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   const typeInfo = getTypeLabel(comment.content_type);
 
   return (
-    <div className={`border-l-2 ${depth > 0 ? 'ml-4 pl-3 border-gray-200' : 'border-transparent'}`}>
-      {/* Main Comment */}
-      <div className={`p-3 border rounded-lg ${getStatusColor(comment.status)} ${depth === 0 ? 'mb-2' : 'mb-1'} transition-all duration-200`}>
-        {/* Header */}
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2 flex-1">
-            {/* User Avatar */}
-            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
-              {comment.user?.name?.charAt(0) || comment.user?.email?.charAt(0) || '?'}
-            </div>
-            
-            {/* User Info */}
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-900">
-                  {comment.user?.name || comment.user?.email || 'Unknown User'}
-                </span>
-                <span className={`px-2 py-0.5 text-xs rounded-full ${typeInfo.color}`}>
-                  {typeInfo.label}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Clock size={10} />
-                <span>{formatDate(comment.created_at)}</span>
-                {comment.updated_at !== comment.created_at && (
-                  <span className="text-gray-400">• edited</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Status Badge and Actions */}
-          <div className="flex items-center gap-2">
-            {showResolutionDetails && getStatusBadge(comment.status)}
-            
-            {showActions && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <MoreHorizontal size={14} className="text-gray-500" />
-                </button>
-
-                {showMenu && (
-                  <div className="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          onReply(comment);
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Reply size={12} />
-                        Reply
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          onEdit(comment);
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Edit2 size={12} />
-                        Edit
-                      </button>
-                      
-                      <div className="border-t border-gray-100 my-1" />
-                      
-                      {comment.status !== 'resolved' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setShowResolutionDialog(true);
-                              setShowMenu(false);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
-                          >
-                            <CheckCircle size={12} />
-                            Resolve with Reason
-                          </button>
-                          <button
-                            onClick={() => {
-                              onStatusChange(comment.id, 'resolved');
-                              setShowMenu(false);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
-                          >
-                            <CheckCircle size={12} />
-                            Quick Resolve
-                          </button>
-                        </>
+    <div className="w-full">
+      {/* Inject custom scrollbar styles */}
+      <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
+      
+      {/* Main Comment Card - only for top-level comments */}
+      {depth === 0 ? (
+        <div className={`
+          relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm transition-all duration-300
+          ${highlightedCommentId === comment.id 
+            ? 'ring-2 ring-blue-200 dark:ring-blue-700 border-blue-200 dark:border-blue-700' 
+            : 'hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600'
+          }
+        `}>
+          {/* Main Comment Content */}
+          <div className="p-6">
+            {/* Comment Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center space-x-4 flex-1">
+                {/* User Avatar */}
+                <div className={`
+                  relative w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold shadow-lg
+                  ${comment.user?.isAdmin 
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-700' 
+                    : 'bg-gradient-to-br from-blue-500 to-blue-700'
+                  }
+                `}>
+                  {comment.user?.name?.charAt(0)?.toUpperCase() || comment.user?.email?.charAt(0)?.toUpperCase() || '?'}
+                  {comment.user?.isAdmin && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                      <span className="text-xs">👑</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* User Information */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-3 mb-1">
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                      {comment.user?.name || comment.user?.email || 'Anonymous User'}
+                    </h4>
+                    
+                    {/* Badges */}
+                    <div className="flex items-center space-x-2">
+                      {comment.user?.isAdmin && (
+                        <span className="px-2.5 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-medium">
+                          Admin
+                        </span>
                       )}
                       
-                      {comment.status === 'resolved' && (
-                        <button
-                          onClick={() => {
-                            onStatusChange(comment.id, 'active');
-                            setShowMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
-                        >
-                          <MessageCircle size={12} />
-                          Reopen
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => {
-                          onStatusChange(comment.id, 'archived');
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-600"
-                      >
-                        <Archive size={12} />
-                        Archive
-                      </button>
-                      
-                      <div className="border-t border-gray-100 my-1" />
-                      
-                      <button
-                        onClick={() => {
-                          onDelete(comment.id);
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
+                      <span className={`
+                        px-2.5 py-1 rounded-lg text-xs font-medium
+                        ${typeInfo.color}
+                      `}>
+                        {typeInfo.label}
+                      </span>
                     </div>
                   </div>
-                )}
+                  
+                  {/* Timestamp */}
+                  <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{formatDate(comment.created_at)}</span>
+                    </div>
+                    
+                    {comment.updated_at !== comment.created_at && (
+                      <span className="flex items-center space-x-1">
+                        <Edit2 className="w-3 h-3" />
+                        <span>edited</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions Menu */}
+              {showActions && (
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(!showMenu);
+                    }}
+                    className={`
+                      p-2 rounded-lg transition-all duration-200 
+                      ${showMenu 
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }
+                    `}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden max-h-60">
+                      <div 
+                        className="py-2 max-h-48 overflow-y-auto comment-menu-scroll"
+                        style={{
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: '#d1d5db transparent'
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            onReply(comment);
+                            setShowMenu(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-3 transition-colors"
+                        >
+                          <Reply className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <div className="font-medium">Reply</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Respond to this comment</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            onEdit(comment);
+                            setShowMenu(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-3 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4 text-gray-500" />
+                          <div>
+                            <div className="font-medium">Edit</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Modify this comment</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            onDelete(comment.id);
+                            setShowMenu(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-3 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <div>
+                            <div className="font-medium">Delete</div>
+                            <div className="text-xs text-red-500 dark:text-red-400">Remove permanently</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Main Comment Content */}
+            <div className="mb-4">
+              <div className="prose prose-sm max-w-none">
+                <p className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap m-0">
+                  {comment.content}
+                </p>
+              </div>
+
+              {/* Selection Context */}
+              {comment.selection_start !== undefined && comment.selection_end !== undefined && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
+                  <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    <span className="font-medium">Inline comment</span>
+                    <span>•</span>
+                    <span>Characters {comment.selection_start}-{comment.selection_end}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Replies Section - render inside the same card */}
+            {comment.replies && comment.replies.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center space-x-2 mb-4">
+                  <MessageCircle className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {comment.replies.length} {comment.replies.length === 1 ? 'Reply' : 'Replies'}
+                  </span>
+                </div>
+                
+                <div className="space-y-4">
+                  {comment.replies.map((reply) => (
+                    <div key={reply.id} className="pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                      {/* Reply Content */}
+                      <div className="flex items-start space-x-3">
+                        {/* Reply Avatar */}
+                        <div className={`
+                          relative w-8 h-8 rounded-lg flex items-center justify-center text-white font-semibold shadow-sm flex-shrink-0
+                          ${reply.user?.isAdmin 
+                            ? 'bg-gradient-to-br from-purple-500 to-purple-600' 
+                            : 'bg-gradient-to-br from-green-500 to-green-600'
+                          }
+                        `}>
+                          {reply.user?.name?.charAt(0)?.toUpperCase() || reply.user?.email?.charAt(0)?.toUpperCase() || '?'}
+                          {reply.user?.isAdmin && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full flex items-center justify-center">
+                              <span className="text-xs">👑</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Reply Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {reply.user?.name || reply.user?.email || 'Anonymous User'}
+                            </span>
+                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium">
+                              Reply
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatDate(reply.created_at)}
+                            </span>
+                          </div>
+                          
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                            {reply.content}
+                          </p>
+                          
+                          {/* Reply Actions */}
+                          {showActions && (
+                            <div className="flex items-center space-x-3 mt-2">
+                              <button
+                                onClick={() => onReply(reply)}
+                                className="text-xs text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                              >
+                                Reply
+                              </button>
+                              <button
+                                onClick={() => onEdit(reply)}
+                                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => onDelete(reply.id)}
+                                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Footer Actions */}
+            {showActions && (
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700 mt-4">
+                <button
+                  onClick={() => onReply(comment)}
+                  className="flex items-center space-x-2 px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                >
+                  <Reply className="w-4 h-4" />
+                  <span className="text-sm font-medium">Reply</span>
+                </button>
+                
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                  ID: {comment.id.slice(-8)}
+                </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Comment Content */}
-        <div className="text-sm text-gray-700 whitespace-pre-wrap">
-          {comment.content}
-        </div>
-
-        {/* Text Selection Info */}
-        {comment.selection_start !== undefined && comment.selection_end !== undefined && (
-          <div className="mt-2 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
-            📍 Inline comment (characters {comment.selection_start}-{comment.selection_end})
-          </div>
-        )}
-
-        {/* Actions Bar */}
-        {showActions && depth === 0 && (
-          <div className="flex items-center gap-4 mt-3 pt-2 border-t border-gray-100">
-            <button
-              onClick={() => onReply(comment)}
-              className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
-            >
-              <Reply size={12} />
-              Reply
-            </button>
-            
-            {comment.replies && comment.replies.length > 0 && (
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
-              >
-                {isExpanded ? '▼' : '▶'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
-              </button>
-            )}
-
-            {/* Quick resolution for urgent comments */}
-            {comment.status === 'active' && getCommentAge() > 7 && (
-              <button
-                onClick={() => setShowResolutionDialog(true)}
-                className="text-xs text-orange-600 hover:text-orange-700 flex items-center gap-1 transition-colors"
-              >
-                <AlertTriangle size={12} />
-                Resolve
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Resolution Dialog */}
-      {showResolutionDialog && (
-        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <div className="mb-3">
-            <h4 className="text-sm font-medium text-green-800 mb-2">Resolve Comment</h4>
-            <p className="text-xs text-green-700">Choose a resolution template or provide a custom reason:</p>
-          </div>
-
-          {/* Resolution Templates */}
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Quick Templates:</label>
-            <select
-              value={selectedTemplate}
-              onChange={(e) => setSelectedTemplate(e.target.value)}
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-            >
-              <option value="">Select a template...</option>
-              {resolutionTemplates.map(template => (
-                <option key={template.id} value={template.id}>
-                  {template.label}
-                </option>
-              ))}
-            </select>
-            {selectedTemplate && (
-              <p className="text-xs text-gray-600 mt-1">
-                {resolutionTemplates.find(t => t.id === selectedTemplate)?.reason}
-              </p>
-            )}
-          </div>
-
-          {/* Custom Reason */}
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Custom Reason:</label>
-            <textarea
-              value={customReason}
-              onChange={(e) => setCustomReason(e.target.value)}
-              placeholder="Provide a custom resolution reason..."
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1 h-16 resize-none"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleResolveWithTemplate}
-              disabled={!selectedTemplate && !customReason.trim()}
-              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Resolve
-            </button>
-            <button
-              onClick={() => {
-                setShowResolutionDialog(false);
-                setSelectedTemplate('');
-                setCustomReason('');
-              }}
-              className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            >
-              Cancel
-            </button>
+      ) : (
+        // This is a nested reply (shouldn't happen with new structure, but keeping for safety)
+        <div className="pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Nested reply: {comment.content}
           </div>
         </div>
-      )}
-
-      {/* Replies */}
-      {comment.replies && comment.replies.length > 0 && isExpanded && (
-        <div className="space-y-2">
-          {comment.replies.map((reply) => (
-            <CommentThread
-              key={reply.id}
-              comment={reply}
-              onReply={onReply}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-              onResolveWithReason={onResolveWithReason}
-              showActions={showActions}
-              depth={depth + 1}
-              showResolutionDetails={showResolutionDetails}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Click outside handler */}
-      {showMenu && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => setShowMenu(false)}
-        />
       )}
     </div>
   );

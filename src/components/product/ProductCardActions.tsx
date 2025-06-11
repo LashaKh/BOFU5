@@ -14,12 +14,20 @@ import {
   Star,
   Edit,
   Trash2,
-  Archive
+  Archive,
+  Send
 } from 'lucide-react';
+import { sendToAirOps } from '../../lib/airops';
+import { toast } from 'react-hot-toast';
 
 interface ProductCardActionsProps {
   product: ProductAnalysis;
   context?: 'history' | 'product' | 'admin';
+  researchResultId?: string; // Add research result ID for AirOps integration
+  // User information for AirOps integration
+  userUUID?: string;
+  userEmail?: string;
+  userCompanyName?: string;
   onSave?: (product: ProductAnalysis) => Promise<void>;
   onApprove?: (product: ProductAnalysis) => Promise<void>;
   onExport?: (product: ProductAnalysis, format: 'pdf' | 'json' | 'csv') => Promise<void>;
@@ -346,6 +354,10 @@ const MoreActionsDropdown = ({
 export function ProductCardActions({
   product,
   context = 'product',
+  researchResultId,
+  userUUID,
+  userEmail,
+  userCompanyName,
   onSave,
   onApprove,
   onExport,
@@ -378,6 +390,42 @@ export function ProductCardActions({
     if (onExport) {
       await handleAction('export', () => onExport(product, format));
     }
+  };
+
+  const handleSendToAirOps = async () => {
+    if (!researchResultId) {
+      toast.error('Research result ID is required for AirOps integration');
+      return;
+    }
+
+    // Use the action handler for proper loading state management
+    await handleAction('sendToAirOps', async () => {
+      try {
+        // Format data according to AirOpsProductInput interface
+        const airOpsData = {
+          product_card_information: {
+            ...product,
+            google_doc: product.google_doc || product.competitorAnalysisUrl || '',
+            userUUID,
+            userEmail,
+            userCompanyName
+          },
+          research_result_Id: researchResultId
+        };
+
+        await sendToAirOps(airOpsData);
+        toast.success('Product data sent to AirOps successfully!');
+      } catch (error: any) {
+        console.error('Error sending to AirOps:', error);
+        
+        if (error.message.includes('ACCOUNT_LIMITATION')) {
+          toast.error('AirOps account requires upgrade. Please contact support.');
+        } else {
+          toast.error(`Failed to send to AirOps: ${error.message}`);
+        }
+        throw error; // Re-throw to ensure the action handler catches it
+      }
+    });
   };
 
   return (
@@ -425,6 +473,20 @@ export function ProductCardActions({
             variant="secondary"
             disabled={disabled}
             onClick={() => window.open(product.competitorAnalysisUrl || product.google_doc, '_blank')}
+            styles={styles}
+            isReducedMotion={isReducedMotion}
+          />
+        )}
+
+        {/* AirOps action */}
+        {context === 'admin' && (
+          <ActionButton
+            icon={<Send className="w-4 h-4" />}
+            label="Send to AirOps"
+            variant="secondary"
+            isLoading={actionStates.sendToAirOps}
+            disabled={disabled}
+            onClick={() => handleSendToAirOps()}
             styles={styles}
             isReducedMotion={isReducedMotion}
           />

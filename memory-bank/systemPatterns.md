@@ -625,3 +625,27 @@ App.tsx (Primary Router & Route Definitions)
     - **Conflict Resolution Strategy:** Successfully overrode Tailwind CSS classes that weren't applying properly in production environment
     - **Maintainable Pattern:** Established consistent pattern for background styling across similar pages throughout application
     - **Immediate Feedback:** Instant visual response without dependency on build process or external CSS compilation order
+
+### AirOps Integration Restoration Patterns (January 2025 - NEW)
+- **Component Refactoring Recovery Strategy:** Systematic approach to restoring functionality lost during architectural changes:
+    - **Root Cause Analysis Methodology:** Identifying missing functionality by tracing component refactoring history
+    - **Component Architecture Mapping:** Analyzing new component structures to understand prop flow and integration points
+    - **API Function Discovery:** Leveraging existing API functions that remain functional but disconnected
+    - **Data Flow Restoration:** Rebuilding complete prop chains through component hierarchies
+- **Admin Feature Integration Patterns:** Secure integration of administrative functionality within component architectures:
+    - **Context-Based Visibility:** Admin-only features using context checks for proper access control
+    - **Prop Chain Management:** Systematic prop passing through multi-level component hierarchies
+    - **Security Implementation:** Admin context validation ensuring proper feature visibility and access
+    - **Component Interface Enhancement:** Extending interfaces to support administrative functionality
+- **API Integration & Data Formatting Excellence:** Professional API compliance and error handling implementation:
+    - **Interface Compliance:** Strict adherence to API input interfaces (AirOpsProductInput format)
+    - **Data Validation Patterns:** Comprehensive validation for required fields and data presence
+    - **Error Handling Standards:** Professional error handling with user-friendly feedback systems
+    - **Toast Notification Integration:** Success/error feedback with account limitation handling
+- **Component Integration Recovery Patterns:** Proven strategies for restoring lost functionality in refactored architectures:
+    - **ProductCard Component Chain:** ProductCard → ProductCardContent → ProductCardActions with prop flow restoration
+    - **Button Integration Strategy:** Adding new functionality buttons within existing action systems
+    - **Data Flow Architecture:** Ensuring complete data flow from parent components through child hierarchies
+    - **Interface Extension Methodology:** Extending component interfaces without breaking existing functionality
+
+### Admin UI/UX Enhancement Patterns (January 2025)
