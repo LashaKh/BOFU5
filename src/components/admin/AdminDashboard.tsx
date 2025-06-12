@@ -6,12 +6,18 @@ import { ProductAnalysis } from '../../types/product/types';
 import { ResearchResult, getApprovedProducts, updateApprovedProductStatus, getResearchResultById, deleteApprovedProduct } from '../../lib/research';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
-import { Eye, CheckCircle, XCircle, Loader2, RefreshCw, UserCircle, ArrowLeft, Users, FileText, Settings, Shield, MessageSquare, BarChart3, TrendingUp, Clock, Star, AlertCircle, Plus, Search, Filter, Download, Calendar, Bell, LogOut, Home, Zap, Globe, Activity, BookOpen, PieChart, Award, Crown } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Loader2, RefreshCw, UserCircle, ArrowLeft, Users, FileText, Shield, MessageSquare, BarChart3, TrendingUp, Clock, Star, AlertCircle, Plus, Search, Filter, Download, Calendar, Bell, LogOut, Home, Zap, Globe, Activity, BookOpen, PieChart, Award, UserPlus, TestTube, Crown } from 'lucide-react';
 import { ProductCard } from '../product/ProductCard';
 import { AuditLogViewer } from './AuditLogViewer';
 import { EnhancedCommentDashboard } from './EnhancedCommentDashboard';
+import { useAdminContext } from '../../contexts/AdminContext';
+import { adminArticlesApi, adminUsersApi } from '../../lib/adminApi';
+import { ClientAssignmentManager } from './ClientAssignmentManager';
+import { SubAdminAccountManager } from './SubAdminAccountManager';
+import { BulkAssignmentManager } from './BulkAssignmentManager';
+import { AssignmentNotificationCenter } from './AssignmentNotificationCenter';
 
-type AdminView = 'dashboard' | 'productReview' | 'userManagement' | 'articleManagement' | 'commentManagement' | 'auditLogs' | 'settings';
+type AdminView = 'dashboard' | 'productReview' | 'userManagement' | 'articleManagement' | 'commentManagement' | 'auditLogs' | 'clientAssignment' | 'subAdminManagement' | 'bulkAssignment';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -174,6 +180,19 @@ const QuickActions = () => (
 // Simplified component - no complex grouping by approver
 export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   const navigate = useNavigate();
+  const { 
+    adminRole, 
+    adminEmail, 
+    assignedClients, 
+    assignedClientIds, 
+    allAdmins, 
+    unassignedClients,
+    refreshAdminData,
+    assignClient,
+    unassignClient,
+    error: adminError 
+  } = useAdminContext();
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingApproved, setIsLoadingApproved] = useState(true);
   const [isSetupMode, setIsSetupMode] = useState(false);
@@ -195,6 +214,11 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoadingIndex, setActionLoadingIndex] = useState<number | null>(null);
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
+  const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const [showClientAssignmentManager, setShowClientAssignmentManager] = useState(false);
+  const [showSubAdminAccountManager, setShowSubAdminAccountManager] = useState(false);
+  const [showBulkAssignmentManager, setShowBulkAssignmentManager] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
 
   const refreshData = () => {
     console.log('[AdminDashboard] Manually refreshing data...');
@@ -476,35 +500,42 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
       }
     };
 
-    // Fetch all non-admin users
+    // Fetch all non-admin users (updated to use role-based API)
     const fetchUsers = async () => {
       try {
-        console.log('[AdminDashboard] Fetching users from user_profiles table...');
+        console.log(`[AdminDashboard] Fetching users via role-based API (Role: ${adminRole})...`);
         
-        // Basic query without count first to check access
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*');
+        // Use the role-based admin API
+        const { data: usersData, error } = await adminUsersApi.getUsers();
 
         if (error) {
-          console.error('[AdminDashboard] Error accessing user_profiles:', error);
-          console.log('[AdminDashboard] Continuing without user data');
+          console.error('[AdminDashboard] Error accessing users via API:', error);
+          setSetupError(error.error || 'Failed to fetch users');
           return;
         }
         
-        console.log('[AdminDashboard] Successfully fetched user_profiles:', data);
-        console.log('[AdminDashboard] Users count:', data?.length || 0);
+        console.log('[AdminDashboard] Successfully fetched users via API:', usersData);
+        console.log('[AdminDashboard] Users count:', usersData?.users?.length || 0);
         
-        // Set users only if we got data
-        if (data && Array.isArray(data)) {
-          setUsers(data);
+        // Transform admin API response to UserProfile format
+        if (usersData?.users && Array.isArray(usersData.users)) {
+          const transformedUsers: UserProfile[] = usersData.users.map(user => ({
+            id: user.id,
+            email: user.email,
+            company_name: user.company_name || '',
+            created_at: user.created_at,
+            updated_at: user.updated_at
+          }));
+          
+          setUsers(transformedUsers);
+          console.log(`[AdminDashboard] Role ${adminRole} can see ${transformedUsers.length} users`);
         } else {
-          console.error('[AdminDashboard] Unexpected data format:', data);
+          console.log('[AdminDashboard] No users returned from API');
           setUsers([]);
         }
       } catch (error) {
-        console.error('[AdminDashboard] Error fetching users:', error);
-        console.log('[AdminDashboard] Continuing without user data');
+        console.error('[AdminDashboard] Exception fetching users:', error);
+        setSetupError(`Failed to fetch users: ${(error as any)?.message || String(error)}`);
       }
     };
 
@@ -732,6 +763,19 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
     }
   };
 
+  // Handle navigation
+  const handleNavigation = (view: AdminView) => {
+    if (view === 'clientAssignment') {
+      setShowClientAssignmentManager(true);
+    } else if (view === 'subAdminManagement') {
+      setShowSubAdminAccountManager(true);
+    } else if (view === 'bulkAssignment') {
+      setShowBulkAssignmentManager(true);
+    } else {
+      setCurrentView(view);
+    }
+  };
+
   const renderMainContent = () => {
     // Show setup mode or error messages
     if (setupError) {
@@ -889,16 +933,6 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
         return <EnhancedCommentDashboard />;
       case 'auditLogs':
         return <AuditLogViewer />;
-      case 'settings':
-        return (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-600 to-gray-700 rounded-3xl flex items-center justify-center shadow-xl mx-auto mb-6">
-              <Settings className="h-12 w-12 text-gray-300" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Settings</h3>
-            <p className="text-gray-300">Admin settings panel coming soon.</p>
-          </div>
-        );
       case 'productReview':
       default:
         return (
@@ -1112,34 +1146,41 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1">
-            {[
-              { view: 'dashboard', label: 'Dashboard', icon: Home },
-              { view: 'productReview', label: 'Product Review', icon: Eye },
-              { view: 'userManagement', label: 'User Management', icon: Users },
-              { view: 'articleManagement', label: 'Content Hub', icon: BookOpen },
-              { view: 'commentManagement', label: 'Engagement', icon: MessageSquare },
-              { view: 'auditLogs', label: 'Security Logs', icon: Shield },
-              { view: 'settings', label: 'Settings', icon: Settings },
-            ].map((item, index) => (
-              <motion.button
-                key={item.view}
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
-                onClick={() => { setCurrentView(item.view as any); setSelectedUser(null); }}
-                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                  currentView === item.view
-                    ? 'bg-gray-700/80 text-white border border-gray-600/50'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                }`}
-              >
-                <item.icon size={18} />
-                <span className="font-medium">{item.label}</span>
-                {currentView === item.view && (
-                  <div className="ml-auto w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                )}
-              </motion.button>
-            ))}
+            {/* Navigation Menu */}
+            <div className="space-y-2">
+              {[
+                { view: 'dashboard', label: 'Dashboard', icon: Home },
+                { view: 'productReview', label: 'Product Review', icon: CheckCircle },
+                { view: 'userManagement', label: 'User Management', icon: Users },
+                { view: 'articleManagement', label: 'Article Management', icon: FileText },
+                { view: 'commentManagement', label: 'Comment Management', icon: MessageSquare },
+                { view: 'auditLogs', label: 'Security Logs', icon: Shield },
+                ...(adminRole === 'super_admin' ? [
+                  { view: 'clientAssignment' as AdminView, label: 'Client Assignment', icon: Users },
+                  { view: 'subAdminManagement' as AdminView, label: 'Sub-Admin Accounts', icon: UserPlus },
+                  { view: 'bulkAssignment' as AdminView, label: 'Bulk Assignment', icon: Users },
+                ] : []),
+              ].map((item, index) => (
+                <motion.button
+                  key={item.view}
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: index * 0.1 }}
+                  onClick={() => handleNavigation(item.view as AdminView)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                    currentView === item.view
+                      ? 'bg-primary-500/20 text-primary-300 border border-primary-500/30'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+                  }`}
+                >
+                  <item.icon size={18} />
+                  <span className="font-medium">{item.label}</span>
+                  {currentView === item.view && (
+                    <div className="ml-auto w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                  )}
+                </motion.button>
+              ))}
+            </div>
           </nav>
 
           {/* User Profile & Logout */}
@@ -1153,10 +1194,62 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                 <UserCircle className="h-4 w-4 text-gray-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">Admin User</p>
-                <p className="text-xs text-gray-400">lashay@bofu.ai</p>
+                <p className="text-sm font-medium text-white truncate">
+                  {adminEmail || 'Admin User'}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    adminRole === 'super_admin' 
+                      ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' 
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  }`}>
+                    {adminRole === 'super_admin' ? 'Super Admin' : 'Sub Admin'}
+                  </span>
+                  {adminRole === 'sub_admin' && (
+                    <span className="text-xs text-gray-400">
+                      {assignedClients.length} clients
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+            
+            {/* Assignment Summary for Sub-Admins */}
+            {adminRole === 'sub_admin' && assignedClients.length > 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <h4 className="text-sm font-medium text-blue-300 mb-2">Your Assigned Clients</h4>
+                <div className="space-y-1">
+                  {assignedClients.slice(0, 3).map(client => (
+                    <div key={client.id} className="text-xs text-gray-300 truncate">
+                      {client.client_email}
+                    </div>
+                  ))}
+                  {assignedClients.length > 3 && (
+                    <div className="text-xs text-blue-400">
+                      +{assignedClients.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Admin Error Display */}
+            {adminError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <span className="text-sm text-red-300">Admin Error</span>
+                </div>
+                <p className="text-xs text-red-400 mt-1">{adminError}</p>
+                <button
+                  onClick={refreshAdminData}
+                  className="mt-2 text-xs text-red-300 hover:text-red-200 underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -1187,7 +1280,6 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                  currentView === 'articleManagement' ? 'Content Management Hub' :
                  currentView === 'commentManagement' ? 'Engagement Center' :
                  currentView === 'auditLogs' ? 'Security & Audit Logs' :
-                 currentView === 'settings' ? 'System Settings' :
                  'Admin Dashboard'}
               </h1>
               <p className="text-gray-400 mt-1">
@@ -1207,13 +1299,23 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
               >
                 <RefreshCw size={18} className="text-gray-300 hover:text-white transition-colors" />
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-3 rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Bell size={18} />
-              </motion.button>
+              
+              {/* Notification Bell - Super Admin Only */}
+              {adminRole === 'super_admin' && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowNotificationCenter(true)}
+                  className="relative p-3 rounded-xl bg-gray-700/60 hover:bg-gray-600/60 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-600/30 hover:border-blue-500/30"
+                  title="Assignment Notifications"
+                >
+                  <Bell size={18} className="text-gray-300 hover:text-white transition-colors" />
+                  {/* Unread notification badge */}
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
+                    3
+                  </div>
+                </motion.button>
+              )}
             </div>
           </div>
         </motion.header>
@@ -1351,6 +1453,30 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           </motion.div>
         </motion.div>
       )}
+
+      {/* Client Assignment Manager Modal */}
+      <ClientAssignmentManager
+        isVisible={showClientAssignmentManager}
+        onClose={() => setShowClientAssignmentManager(false)}
+      />
+
+      {/* Sub-Admin Account Manager Modal */}
+      <SubAdminAccountManager
+        isVisible={showSubAdminAccountManager}
+        onClose={() => setShowSubAdminAccountManager(false)}
+      />
+
+      {/* Bulk Assignment Manager Modal */}
+      <BulkAssignmentManager
+        isVisible={showBulkAssignmentManager}
+        onClose={() => setShowBulkAssignmentManager(false)}
+      />
+
+      {/* Assignment Notification Center */}
+      <AssignmentNotificationCenter
+        isVisible={showNotificationCenter}
+        onClose={() => setShowNotificationCenter(false)}
+      />
     </div>
   );
 }

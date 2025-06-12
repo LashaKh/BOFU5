@@ -13,44 +13,101 @@ import type {
   UserProfile
 } from '../types/adminApi';
 
+// Enhanced admin role types
+export interface AdminRole {
+  id: string;
+  email: string;
+  name?: string;
+  admin_role: 'super_admin' | 'sub_admin';
+  assigned_clients_count?: number;
+}
+
+export interface ClientAssignment {
+  id: string;
+  admin_id: string;
+  client_user_id: string;
+  client_email: string;
+  client_company: string;
+  assigned_at: string;
+  assigned_by: string;
+}
+
+export interface AssignmentRequest {
+  adminId: string;
+  clientUserId: string;
+}
+
 // Get current user
 async function getCurrentUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
 
-// Check if user is admin
-async function checkAdminPermission(): Promise<boolean> {
+// Enhanced admin permission checking with role information
+async function checkAdminPermission(): Promise<{ isAdmin: boolean; role?: 'super_admin' | 'sub_admin'; adminId?: string }> {
   const user = await getCurrentUser();
-  if (!user) return false;
+  if (!user) return { isAdmin: false };
 
   try {
     const { data: adminProfile, error } = await supabase
       .from('admin_profiles')
-      .select('id')
+      .select('id, admin_role')
       .eq('id', user.id)
       .maybeSingle();
 
     if (error) {
       console.error("Error checking admin permission:", error);
-      return false;
+      return { isAdmin: false };
     }
-    return !!adminProfile;
+
+    if (!adminProfile) {
+      return { isAdmin: false };
+    }
+
+    return { 
+      isAdmin: true, 
+      role: adminProfile.admin_role,
+      adminId: adminProfile.id
+    };
   } catch (e) {
     console.error("Exception in checkAdminPermission:", e);
-    return false;
+    return { isAdmin: false };
   }
 }
 
-const USER_PROFILE_SELECT_QUERY = 'id,email,company_name,created_at,updated_at,content_briefs(count)';
+// Get assigned client IDs for current sub-admin
+async function getAssignedClientIds(): Promise<string[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  try {
+    const { data: assignments, error } = await supabase
+      .from('admin_client_assignments')
+      .select('client_user_id')
+      .eq('admin_id', user.id);
+
+    if (error) {
+      console.error("Error fetching assigned clients:", error);
+      return [];
+    }
+
+    return assignments?.map(a => a.client_user_id) || [];
+  } catch (e) {
+    console.error("Exception in getAssignedClientIds:", e);
+    return [];
+  }
+}
+
+// Constants
+const USER_PROFILE_SELECT_QUERY = 'id,email,company_name,created_at,updated_at';
 
 // Admin Articles API
 export const adminArticlesApi = {
-  // Get list of articles with filtering and pagination
+  // Get list of articles with filtering and pagination (enhanced with role-based access)
   async getArticles(params: ArticleListParams = {}): Promise<{ data?: AdminArticlesResponse; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -69,14 +126,37 @@ export const adminArticlesApi = {
         sort_order = 'desc'
       } = params;
 
-      console.log('DEBUG: Fetching content_briefs without joins...');
+      console.log('DEBUG: Fetching content_briefs with role-based filtering...');
+      console.log('DEBUG: Admin role:', adminCheck.role);
 
-      // Step 1: Fetch content_briefs without any joins
+      // Step 1: Fetch content_briefs with role-based filtering
       let query = supabase
         .from('content_briefs')
         .select('*', { count: 'exact' });
 
-      // Apply filters
+      // Apply role-based filtering
+      if (adminCheck.role === 'sub_admin') {
+        const assignedClientIds = await getAssignedClientIds();
+        console.log('DEBUG: Sub-admin assigned clients:', assignedClientIds);
+        
+        if (assignedClientIds.length === 0) {
+          // Sub-admin has no assigned clients, return empty result
+          return {
+            data: {
+              articles: [],
+              total: 0,
+              page,
+              limit,
+              totalPages: 0
+            }
+          };
+        }
+        
+        query = query.in('user_id', assignedClientIds);
+      }
+      // Super admins see all articles (no additional filtering)
+
+      // Apply other filters
       if (search) {
         query = query.or(`product_name.ilike.%${search}%,article_content.ilike.%${search}%`);
       }
@@ -179,11 +259,11 @@ export const adminArticlesApi = {
     }
   },
 
-  // Get specific article details
+  // Get specific article details (enhanced with role-based access)
   async getArticle(articleId: string): Promise<{ data?: ArticleDetail; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -192,73 +272,80 @@ export const adminArticlesApi = {
         };
       }
 
-      console.log('DEBUG: Fetching content_briefs article without joins...');
+      console.log('DEBUG: Fetching content_briefs article with role-based access...');
 
-      // Step 1: Fetch content_brief without any joins (proven to work)
+      // Step 1: Fetch content_brief
       const { data: fetchedArticle, error } = await supabase
         .from('content_briefs')
         .select('*')
         .eq('id', articleId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.error("Supabase error in getArticle:", error);
+        console.error("Supabase error fetching article:", error);
         throw error;
       }
+
       if (!fetchedArticle) {
-        return { error: { error: 'Article not found or access denied', errorCode: 'NOT_FOUND'}};
+        return {
+          error: {
+            error: 'Article not found',
+            errorCode: 'NOT_FOUND'
+          }
+        };
       }
 
-      console.log('DEBUG: Fetched content_brief:', fetchedArticle.id);
-
-      // Step 2: Fetch user profile separately if user_id exists
-      let userEmail = '';
-      let userCompany = '';
-      let userId = fetchedArticle.user_id || '';
-
-      if (fetchedArticle.user_id) {
-        console.log('DEBUG: Fetching user profile for:', fetchedArticle.user_id);
-        const { data: userData, error: userError } = await supabase
-          .from('user_profiles')
-          .select('id,email,company_name')
-          .eq('id', fetchedArticle.user_id)
-          .single();
-
-        if (!userError && userData) {
-          userEmail = userData.email || '';
-          userCompany = userData.company_name || '';
-          userId = userData.id;
-          console.log('DEBUG: Fetched user profile:', userData.email);
-        } else {
-          console.warn('DEBUG: Could not fetch user profile:', userError);
+      // Step 2: Check role-based access for sub-admins
+      if (adminCheck.role === 'sub_admin') {
+        const assignedClientIds = await getAssignedClientIds();
+        if (!assignedClientIds.includes(fetchedArticle.user_id)) {
+          return {
+            error: {
+              error: 'Access denied - Article not assigned to this admin',
+              errorCode: 'ACCESS_DENIED'
+            }
+          };
         }
       }
 
-      // Step 3: Combine the data
+      // Step 3: Fetch user profile separately
+      const { data: userProfile, error: userError } = await supabase
+        .from('user_profiles')
+        .select('id,email,company_name')
+        .eq('id', fetchedArticle.user_id)
+        .maybeSingle();
+
+      if (userError) {
+        console.error("Error fetching user profile:", userError);
+        // Continue without user data
+      }
+
+      console.log('DEBUG: Successfully fetched article and user profile');
+
       const response: ArticleDetail = {
         id: fetchedArticle.id,
         title: fetchedArticle.product_name || 'Untitled',
         content: fetchedArticle.article_content || '',
         article_content: fetchedArticle.article_content || '',
-        article_version: fetchedArticle.article_version || 1,
-        editing_status: (fetchedArticle.editing_status || 'draft'),
+        user_id: fetchedArticle.user_id || '',
+        user_email: userProfile?.email || 'Unknown User',
+        user_company: userProfile?.company_name || '',
+        product_name: fetchedArticle.product_name || '',
+        editing_status: fetchedArticle.editing_status || 'draft',
         last_edited_at: fetchedArticle.last_edited_at || new Date().toISOString(),
         last_edited_by: fetchedArticle.last_edited_by || '',
+        article_version: fetchedArticle.article_version || 1,
         created_at: fetchedArticle.created_at || new Date().toISOString(),
         updated_at: fetchedArticle.updated_at || new Date().toISOString(),
-        user_id: userId,
-        user_email: userEmail,
-        user_company: userCompany,
-        product_name: fetchedArticle.product_name || ''
+        link: fetchedArticle.link || null
       };
 
-      console.log('DEBUG: Successfully assembled article detail for:', response.id);
       return { data: response };
     } catch (error: any) {
       console.error("Error in getArticle:", error);
       return {
         error: {
-          error: 'Failed to fetch article',
+          error: 'Failed to fetch article details',
           errorCode: 'FETCH_ERROR',
           details: error.message || String(error)
         }
@@ -266,14 +353,14 @@ export const adminArticlesApi = {
     }
   },
 
-  // Update article content and metadata
+  // Update article (enhanced with role-based access)
   async updateArticle(
     articleId: string, 
     updates: ArticleUpdateRequest
   ): Promise<{ data?: ArticleDetail; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -282,81 +369,86 @@ export const adminArticlesApi = {
         };
       }
 
-      const currentUser = await getCurrentUser();
-      if (!currentUser) {
-        return {
-          error: {
-            error: 'User not authenticated',
-            errorCode: 'UNAUTHORIZED'
-          }
-        };
+      // Check role-based access for sub-admins
+      if (adminCheck.role === 'sub_admin') {
+        // First check if article exists and is assigned to this admin
+        const { data: article, error: fetchError } = await supabase
+          .from('content_briefs')
+          .select('user_id')
+          .eq('id', articleId)
+          .maybeSingle();
+
+        if (fetchError || !article) {
+          return {
+            error: {
+              error: 'Article not found',
+              errorCode: 'NOT_FOUND'
+            }
+          };
+        }
+
+        const assignedClientIds = await getAssignedClientIds();
+        if (!assignedClientIds.includes(article.user_id)) {
+          return {
+            error: {
+              error: 'Access denied - Article not assigned to this admin',
+              errorCode: 'ACCESS_DENIED'
+            }
+          };
+        }
       }
 
-      const updateData: Partial<typeof updates & { last_edited_by: string, updated_at: string }> = {
+      // Prepare the update object
+      const updateData: any = {
         ...updates,
-        last_edited_by: currentUser.id,
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      // If user_id is part of updates, ensure it's handled correctly.
-      // The content_briefs table has a user_id column that can be updated.
-      if (updates.user_id) {
-        updateData.user_id = updates.user_id;
-      }
-
-
+      // Perform the update
       const { data, error } = await supabase
         .from('content_briefs')
         .update(updateData)
         .eq('id', articleId)
         .select('*')
-        .single();
-      
+        .maybeSingle();
+
       if (error) {
-        console.error("Supabase error in updateArticle:", error);
+        console.error("Supabase error updating article:", error);
         throw error;
       }
 
       if (!data) {
-        return { error: { error: 'Failed to update article or article not found', errorCode: 'UPDATE_FAILED' } };
+        return {
+          error: {
+            error: 'Article not found after update',
+            errorCode: 'NOT_FOUND'
+          }
+        };
       }
-      
-      console.log('DEBUG: Updated content_brief:', data.id);
 
-      // Step 2: Fetch user profile separately if user_id exists
-      let userEmail = '';
-      let userCompany = '';
-      let userId = data.user_id || '';
-
-      if (data.user_id) {
-        const { data: userData, error: userError } = await supabase
-          .from('user_profiles')
-          .select('id,email,company_name')
-          .eq('id', data.user_id)
-          .single();
-
-        if (!userError && userData) {
-          userEmail = userData.email || '';
-          userCompany = userData.company_name || '';
-          userId = userData.id;
-        }
-      }
+      // Fetch user profile for the response
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('id,email,company_name')
+        .eq('id', data.user_id)
+        .maybeSingle();
 
       const response: ArticleDetail = {
         id: data.id,
         title: data.product_name || 'Untitled',
         content: data.article_content || '',
         article_content: data.article_content || '',
-        article_version: data.article_version || 1,
-        editing_status: (data.editing_status || 'draft'),
+        user_id: data.user_id || '',
+        user_email: userProfile?.email || 'Unknown User',
+        user_company: userProfile?.company_name || '',
+        product_name: data.product_name || '',
+        editing_status: data.editing_status || 'draft',
         last_edited_at: data.last_edited_at || new Date().toISOString(),
         last_edited_by: data.last_edited_by || '',
+        article_version: data.article_version || 1,
         created_at: data.created_at || new Date().toISOString(),
         updated_at: data.updated_at || new Date().toISOString(),
-        user_id: userId,
-        user_email: userEmail,
-        user_company: userCompany,
-        product_name: data.product_name || ''
+        link: data.link || null
       };
 
       return { data: response };
@@ -372,15 +464,15 @@ export const adminArticlesApi = {
     }
   },
 
-  // Change article status
+  // Change article status (enhanced with role-based access)
   async changeStatus(
     articleId: string, 
     status: ArticleUpdateRequest['editing_status'],
-    notes?: string // notes are passed but not directly used in content_briefs update here
+    notes?: string
   ): Promise<{ data?: ArticleDetail; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -388,90 +480,57 @@ export const adminArticlesApi = {
           }
         };
       }
-      const currentUser = await getCurrentUser();
-      if (!currentUser) {
-        return { error: { error: 'User not authenticated', errorCode: 'UNAUTHORIZED'}};
-      }
 
-      // Step 1: Update the article status without joins
-      const { data: updatedArticle, error } = await supabase
-        .from('content_briefs')
-        .update({ 
-          editing_status: status,
-          last_edited_by: currentUser.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', articleId)
-        .select('*')
-        .single();
+      // Check role-based access for sub-admins
+      if (adminCheck.role === 'sub_admin') {
+        const { data: article, error: fetchError } = await supabase
+          .from('content_briefs')
+          .select('user_id')
+          .eq('id', articleId)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Supabase error in changeStatus:", error);
-        throw error;
-      }
-      if (!updatedArticle) return { error: { error: 'Failed to change status or article not found', errorCode: 'UPDATE_FAILED'}};
+        if (fetchError || !article) {
+          return {
+            error: {
+              error: 'Article not found',
+              errorCode: 'NOT_FOUND'
+            }
+          };
+        }
 
-      // Step 2: Fetch user profile separately
-      let userEmail = '';
-      let userCompany = '';
-      if (updatedArticle.user_id) {
-        const { data: userData, error: userError } = await supabase
-          .from('user_profiles')
-          .select('id,email,company_name')
-          .eq('id', updatedArticle.user_id)
-          .single();
-
-        if (!userError && userData) {
-          userEmail = userData.email || '';
-          userCompany = userData.company_name || '';
+        const assignedClientIds = await getAssignedClientIds();
+        if (!assignedClientIds.includes(article.user_id)) {
+          return {
+            error: {
+              error: 'Access denied - Article not assigned to this admin',
+              errorCode: 'ACCESS_DENIED'
+            }
+          };
         }
       }
 
-      const response: ArticleDetail = {
-        id: updatedArticle.id,
-        title: updatedArticle.product_name,
-        content: updatedArticle.article_content || '',
-        article_content: updatedArticle.article_content || '',
-        article_version: updatedArticle.article_version || 1,
-        editing_status: (updatedArticle.editing_status || 'draft'),
-        last_edited_at: updatedArticle.last_edited_at,
-        last_edited_by: updatedArticle.last_edited_by,
-        created_at: updatedArticle.created_at,
-        updated_at: updatedArticle.updated_at,
-        user_id: updatedArticle.user_id || '',
-        user_email: userEmail,
-        user_company: userCompany,
-        product_name: updatedArticle.product_name
-      };
-
-      // TODO: Handle 'notes' - perhaps log them to an audit trail or a separate notes table.
-      if (notes) {
-        console.log(`Admin note for status change on article ${articleId} to ${status}: ${notes}`);
-        // Placeholder for actual note logging
-      }
-
-      return { data: response };
+      return this.updateArticle(articleId, { editing_status: status });
     } catch (error: any) {
       console.error("Error in changeStatus:", error);
       return {
         error: {
           error: 'Failed to change status',
-          errorCode: 'UPDATE_ERROR',
+          errorCode: 'STATUS_CHANGE_ERROR',
           details: error.message || String(error)
         }
       };
     }
   },
 
-  // Transfer article ownership (admin feature)
+  // Transfer ownership (enhanced with role-based access)
   async transferOwnership(
     articleId: string,
     newUserId: string,
-    notes?: string // notes are passed but not directly used in content_briefs update here
+    notes?: string
   ): Promise<{ data?: ArticleDetail; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -480,109 +539,68 @@ export const adminArticlesApi = {
         };
       }
 
-      const currentUser = await getCurrentUser();
-      if (!currentUser) {
-        return { error: { error: 'User not authenticated', errorCode: 'UNAUTHORIZED'}};
-      }
-      
-      // Verify the new user exists (optional, but good practice)
-      const { data: newUserData, error: newUserError } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('id', newUserId)
-        .single();
+      // Only super admins can transfer ownership between different clients
+      if (adminCheck.role === 'sub_admin') {
+        // Sub-admins can only transfer within their assigned clients
+        const assignedClientIds = await getAssignedClientIds();
+        
+        // Check current article owner
+        const { data: article, error: fetchError } = await supabase
+          .from('content_briefs')
+          .select('user_id')
+          .eq('id', articleId)
+          .maybeSingle();
 
-      if (newUserError || !newUserData) {
-        console.error("Error fetching new user for ownership transfer:", newUserError);
-        return { error: { error: 'New user not found or error fetching user.', errorCode: 'INVALID_TARGET_USER' } };
-      }
+        if (fetchError || !article) {
+          return {
+            error: {
+              error: 'Article not found',
+              errorCode: 'NOT_FOUND'
+            }
+          };
+        }
 
-
-      const { data, error } = await supabase
-        .from('content_briefs')
-        .update({ 
-          user_id: newUserId, // This updates the direct user_id foreign key on content_briefs
-          last_edited_by: currentUser.id, // Log who made the change
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', articleId)
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error("Supabase error in transferOwnership:", error);
-        throw error;
-      }
-      if (!data) return { error: { error: 'Failed to transfer ownership or article not found', errorCode: 'UPDATE_FAILED'}};
-
-      console.log('DEBUG: Transferred ownership for:', data.id, 'to user:', newUserId);
-
-      // Step 2: Fetch user profile separately for the new owner
-      let userEmail = '';
-      let userCompany = '';
-      let userId = data.user_id || '';
-
-      if (data.user_id) {
-        const { data: userData, error: userError } = await supabase
-          .from('user_profiles')
-          .select('id,email,company_name')
-          .eq('id', data.user_id)
-          .single();
-
-        if (!userError && userData) {
-          userEmail = userData.email || '';
-          userCompany = userData.company_name || '';
-          userId = userData.id;
+        // Check if both current and new owner are assigned to this sub-admin
+        if (!assignedClientIds.includes(article.user_id) || !assignedClientIds.includes(newUserId)) {
+          return {
+            error: {
+              error: 'Access denied - Can only transfer between assigned clients',
+              errorCode: 'ACCESS_DENIED'
+            }
+          };
         }
       }
-      
-      const response: ArticleDetail = {
-        id: data.id,
-        title: data.product_name || 'Untitled',
-        content: data.article_content || '',
-        article_content: data.article_content || '',
-        article_version: data.article_version || 1,
-        editing_status: (data.editing_status || 'draft'),
-        last_edited_at: data.last_edited_at || new Date().toISOString(),
-        last_edited_by: data.last_edited_by || '',
-        created_at: data.created_at || new Date().toISOString(),
-        updated_at: data.updated_at || new Date().toISOString(),
-        user_id: userId, // Reflects the new owner's ID
-        user_email: userEmail,
-        user_company: userCompany,
-        product_name: data.product_name || ''
-      };
 
-      // TODO: Handle 'notes' - perhaps log them to an audit trail or a separate notes table.
-      if (notes) {
-        console.log(`Admin note for ownership transfer of article ${articleId} to user ${newUserId}: ${notes}`);
-        // Placeholder for actual note logging
-      }
-
-      return { data: response };
+      return this.updateArticle(articleId, { user_id: newUserId });
     } catch (error: any) {
       console.error("Error in transferOwnership:", error);
-      return { error: { error: 'Failed to transfer ownership', errorCode: 'TRANSFER_ERROR', details: error.message || String(error) } };
+      return {
+        error: {
+          error: 'Failed to transfer ownership',
+          errorCode: 'TRANSFER_ERROR',
+          details: error.message || String(error)
+        }
+      };
     }
   }
 };
 
+// Interface for Supabase response
 interface SupabaseUserProfileWithCount {
   id: string;
   email: string;
   company_name: string | null;
   created_at: string;
   updated_at: string;
-  content_briefs: { count: number }[] | { count: number };
 }
 
-// Admin Users API
+// Enhanced Admin Users API with role-based filtering
 export const adminUsersApi = {
-  // Get list of users for selection
+  // Get list of users for selection (enhanced with role-based access)
   async getUsers(params: UserSearchParams = {}): Promise<{ data?: AdminUsersResponse; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -600,6 +618,23 @@ export const adminUsersApi = {
         .from('user_profiles')
         .select(USER_PROFILE_SELECT_QUERY, { count: 'exact' });
 
+      // Apply role-based filtering
+      if (adminCheck.role === 'sub_admin') {
+        const assignedClientIds = await getAssignedClientIds();
+        console.log('DEBUG: Sub-admin viewing assigned clients:', assignedClientIds);
+        
+        if (assignedClientIds.length === 0) {
+          return {
+            data: {
+              users: []
+            }
+          };
+        }
+        
+        query = query.in('id', assignedClientIds);
+      }
+      // Super admins see all users (no additional filtering)
+
       if (search) {
         query = query.or(`email.ilike.%${search}%,company_name.ilike.%${search}%`);
       }
@@ -607,20 +642,16 @@ export const adminUsersApi = {
       query = query.limit(limit);
       query = query.order('email', { ascending: true });
 
-      const { data: users, error } = await query.returns<SupabaseUserProfileWithCount[]>();
+      const { data: users, error } = await query;
 
       if (error) throw error;
 
       const response: AdminUsersResponse = {
-        users: users?.map((user) => {
-          let articleCount = 0;
-          if (user.content_briefs) {
-            if (Array.isArray(user.content_briefs)) {
-              articleCount = user.content_briefs[0]?.count || 0;
-            } else {
-              articleCount = user.content_briefs.count;
-            }
-          }
+        users: users?.map((user: any) => {
+          // Note: Article count removed since content_briefs relationship doesn't exist
+          // This can be implemented later with proper database relationships
+          const articleCount = 0;
+          
           return {
             id: user.id,
             email: user.email,
@@ -646,13 +677,76 @@ export const adminUsersApi = {
   }
 };
 
-// Admin Audit Logs API
-export const adminAuditApi = {
-  // Get audit logs with filtering
-  async getAuditLogs(params: AuditLogParams = {}): Promise<{ data?: AdminAuditLogsResponse; error?: ErrorResponse }> {
+// Client Assignment Management API
+export const adminClientAssignmentApi = {
+  // Get all admins with their roles and assignment counts
+  async getAdmins(): Promise<{ data?: AdminRole[]; error?: ErrorResponse }> {
     try {
-      const isAdmin = await checkAdminPermission();
-      if (!isAdmin) {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin || adminCheck.role !== 'super_admin') {
+        return {
+          error: {
+            error: 'Unauthorized - Super admin access required',
+            errorCode: 'UNAUTHORIZED'
+          }
+        };
+      }
+
+      const { data: admins, error } = await supabase
+        .from('admin_profiles')
+        .select(`
+          id,
+          email,
+          name,
+          admin_role
+        `)
+        .order('email', { ascending: true });
+
+      if (error) throw error;
+
+      // Get assignment counts for each admin
+      const { data: assignmentCounts, error: countError } = await supabase
+        .from('admin_client_assignments')
+        .select('admin_id, client_user_id')
+        .order('admin_id');
+
+      if (countError) {
+        console.error("Error fetching assignment counts:", countError);
+      }
+
+      // Create count map
+      const countMap = new Map<string, number>();
+      assignmentCounts?.forEach(assignment => {
+        const current = countMap.get(assignment.admin_id) || 0;
+        countMap.set(assignment.admin_id, current + 1);
+      });
+
+      const response: AdminRole[] = admins?.map(admin => ({
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        admin_role: admin.admin_role,
+        assigned_clients_count: countMap.get(admin.id) || 0
+      })) || [];
+
+      return { data: response };
+    } catch (error: any) {
+      console.error("Error in getAdmins:", error);
+      return {
+        error: {
+          error: 'Failed to fetch admins',
+          errorCode: 'FETCH_ERROR',
+          details: error.message || String(error)
+        }
+      };
+    }
+  },
+
+  // Get client assignments for a specific admin or all assignments
+  async getClientAssignments(adminId?: string): Promise<{ data?: ClientAssignment[]; error?: ErrorResponse }> {
+    try {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
         return {
           error: {
             error: 'Unauthorized - Admin access required',
@@ -661,6 +755,259 @@ export const adminAuditApi = {
         };
       }
 
+      // Sub-admins can only view their own assignments
+      if (adminCheck.role === 'sub_admin') {
+        adminId = adminCheck.adminId;
+      }
+
+      let query = supabase
+        .from('admin_client_assignments')
+        .select(`
+          id,
+          admin_id,
+          client_user_id,
+          assigned_at,
+          assigned_by,
+          user_profiles!admin_client_assignments_client_user_id_fkey (
+            email,
+            company_name
+          )
+        `);
+
+      if (adminId) {
+        query = query.eq('admin_id', adminId);
+      }
+
+      query = query.order('assigned_at', { ascending: false });
+
+      const { data: assignments, error } = await query;
+
+      if (error) throw error;
+
+      const response: ClientAssignment[] = assignments?.map((assignment: any) => ({
+        id: assignment.id,
+        admin_id: assignment.admin_id,
+        client_user_id: assignment.client_user_id,
+        client_email: assignment.user_profiles?.email || 'Unknown',
+        client_company: assignment.user_profiles?.company_name || '',
+        assigned_at: assignment.assigned_at,
+        assigned_by: assignment.assigned_by
+      })) || [];
+
+      return { data: response };
+    } catch (error: any) {
+      console.error("Error in getClientAssignments:", error);
+      return {
+        error: {
+          error: 'Failed to fetch client assignments',
+          errorCode: 'FETCH_ERROR',
+          details: error.message || String(error)
+        }
+      };
+    }
+  },
+
+  // Assign a client to a sub-admin
+  async assignClient(request: AssignmentRequest): Promise<{ data?: { success: boolean }; error?: ErrorResponse }> {
+    try {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin || adminCheck.role !== 'super_admin') {
+        return {
+          error: {
+            error: 'Unauthorized - Super admin access required',
+            errorCode: 'UNAUTHORIZED'
+          }
+        };
+      }
+
+      const { adminId, clientUserId } = request;
+
+      // Verify the admin exists and is a sub-admin
+      const { data: targetAdmin, error: adminError } = await supabase
+        .from('admin_profiles')
+        .select('id, admin_role')
+        .eq('id', adminId)
+        .maybeSingle();
+
+      if (adminError || !targetAdmin) {
+        return {
+          error: {
+            error: 'Target admin not found',
+            errorCode: 'NOT_FOUND'
+          }
+        };
+      }
+
+      if (targetAdmin.admin_role !== 'sub_admin') {
+        return {
+          error: {
+            error: 'Can only assign clients to sub-admins',
+            errorCode: 'INVALID_ROLE'
+          }
+        };
+      }
+
+      // Verify the client exists
+      const { data: client, error: clientError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', clientUserId)
+        .maybeSingle();
+
+      if (clientError || !client) {
+        return {
+          error: {
+            error: 'Client not found',
+            errorCode: 'NOT_FOUND'
+          }
+        };
+      }
+
+      // Create the assignment
+      const { error: insertError } = await supabase
+        .from('admin_client_assignments')
+        .insert({
+          admin_id: adminId,
+          client_user_id: clientUserId,
+          assigned_by: adminCheck.adminId
+        });
+
+      if (insertError) {
+        if (insertError.code === '23505') { // Unique violation
+          return {
+            error: {
+              error: 'Client is already assigned to this admin',
+              errorCode: 'ALREADY_ASSIGNED'
+            }
+          };
+        }
+        throw insertError;
+      }
+
+      return { data: { success: true } };
+    } catch (error: any) {
+      console.error("Error in assignClient:", error);
+      return {
+        error: {
+          error: 'Failed to assign client',
+          errorCode: 'ASSIGNMENT_ERROR',
+          details: error.message || String(error)
+        }
+      };
+    }
+  },
+
+  // Unassign a client from a sub-admin
+  async unassignClient(assignmentId: string): Promise<{ data?: { success: boolean }; error?: ErrorResponse }> {
+    try {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin || adminCheck.role !== 'super_admin') {
+        return {
+          error: {
+            error: 'Unauthorized - Super admin access required',
+            errorCode: 'UNAUTHORIZED'
+          }
+        };
+      }
+
+      const { error } = await supabase
+        .from('admin_client_assignments')
+        .delete()
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+
+      return { data: { success: true } };
+    } catch (error: any) {
+      console.error("Error in unassignClient:", error);
+      return {
+        error: {
+          error: 'Failed to unassign client',
+          errorCode: 'UNASSIGNMENT_ERROR',
+          details: error.message || String(error)
+        }
+      };
+    }
+  },
+
+  // Get unassigned clients (clients not assigned to any sub-admin)
+  async getUnassignedClients(): Promise<{ data?: UserProfile[]; error?: ErrorResponse }> {
+    try {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin || adminCheck.role !== 'super_admin') {
+        return {
+          error: {
+            error: 'Unauthorized - Super admin access required',
+            errorCode: 'UNAUTHORIZED'
+          }
+        };
+      }
+
+      // First, get all assigned client IDs
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('admin_client_assignments')
+        .select('client_user_id');
+
+      if (assignmentsError) {
+        console.error("Error fetching assignments:", assignmentsError);
+        throw assignmentsError;
+      }
+
+      const assignedClientIds = assignments?.map(a => a.client_user_id) || [];
+
+      // Get all user profiles
+      const { data: allUsers, error } = await supabase
+        .from('user_profiles')
+        .select('id, email, company_name, created_at, updated_at')
+        .order('email', { ascending: true });
+
+      if (error) throw error;
+
+      // Filter out assigned clients in JavaScript
+      const unassignedClients = allUsers?.filter(user => 
+        !assignedClientIds.includes(user.id)
+      ) || [];
+
+      const response: UserProfile[] = unassignedClients.map(client => ({
+        id: client.id,
+        email: client.email,
+        company_name: client.company_name || '',
+        created_at: client.created_at,
+        updated_at: client.updated_at,
+        article_count: 0 // We don't need counts for unassigned clients
+      }));
+
+      return { data: response };
+    } catch (error: any) {
+      console.error("Error in getUnassignedClients:", error);
+      return {
+        error: {
+          error: 'Failed to fetch unassigned clients',
+          errorCode: 'FETCH_ERROR',
+          details: error.message || String(error)
+        }
+      };
+    }
+  }
+};
+
+// Admin Audit Logs API
+export const adminAuditApi = {
+  // Get audit logs with filtering (enhanced with role-based access)
+  async getAuditLogs(params: AuditLogParams = {}): Promise<{ data?: AdminAuditLogsResponse; error?: ErrorResponse }> {
+    try {
+      const adminCheck = await checkAdminPermission();
+      if (!adminCheck.isAdmin) {
+        return {
+          error: {
+            error: 'Unauthorized - Admin access required',
+            errorCode: 'UNAUTHORIZED'
+          }
+        };
+      }
+
+      // TODO: Implement actual audit log functionality
+      // For now, return empty logs but with proper role checking
       const response: AdminAuditLogsResponse = {
         logs: []
       };
@@ -679,9 +1026,9 @@ export const adminAuditApi = {
   }
 };
 
-// Bulk operations
+// Enhanced Bulk operations with role-based access
 export const adminBulkApi = {
-  // Bulk status change for multiple articles
+  // Bulk status change for multiple articles (enhanced with role-based access)
   async bulkStatusChange(
     articleIds: string[],
     status: ArticleUpdateRequest['editing_status'],
@@ -711,7 +1058,7 @@ export const adminBulkApi = {
     return { successes, failures };
   },
 
-  // Bulk ownership transfer for multiple articles
+  // Bulk ownership transfer for multiple articles (enhanced with role-based access)
   async bulkTransferOwnership(
     articleIds: string[],
     newUserId: string,
@@ -742,7 +1089,8 @@ export const adminBulkApi = {
   }
 };
 
-// Check admin status
-export async function checkAdminStatus(): Promise<boolean> {
-  return checkAdminPermission();
+// Enhanced admin status check
+export async function checkAdminStatus(): Promise<{ isAdmin: boolean; role?: 'super_admin' | 'sub_admin' }> {
+  const result = await checkAdminPermission();
+  return { isAdmin: result.isAdmin, role: result.role };
 }

@@ -38,6 +38,7 @@ export interface ArticleDetail {
   article_content: string;
   created_at: string;
   updated_at: string;
+  link?: string | null;
 }
 
 export interface UserProfile {
