@@ -4,6 +4,7 @@ import { Users, Mail, Calendar, Shield } from 'lucide-react';
 import { useProfileContext } from '../../contexts/ProfileContext';
 import { CompanyProfile } from '../../types';
 import { ProfileApi } from '../../lib/profileApi';
+import { canUserCreateProfiles } from '../../utils/userPermissions';
 
 interface ProfileSwitcherProps {
   onCreateProfile?: () => void;
@@ -28,7 +29,40 @@ export function ProfileSwitcher({
   const [isSwitching, setIsSwitching] = useState(false);
   const [companyUsers, setCompanyUsers] = useState<(CompanyProfile & { email?: string })[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [canManageUsers, setCanManageUsers] = useState(false);
+  const [permissionsChecked, setPermissionsChecked] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check user permissions
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        console.log('[ProfileSwitcher] Starting permission check...');
+        console.log('[ProfileSwitcher] Current profile:', currentProfile);
+        
+        // More direct approach: check if user has admin or manager role
+        const hasManagementRole = currentProfile?.profile_role === 'admin' || currentProfile?.profile_role === 'manager';
+        
+        console.log('[ProfileSwitcher] Permission check result:', {
+          hasManagementRole,
+          currentProfileRole: currentProfile?.profile_role,
+          currentProfileIsDefault: currentProfile?.is_default,
+          currentProfileId: currentProfile?.id
+        });
+        
+        setCanManageUsers(hasManagementRole);
+        setPermissionsChecked(true);
+      } catch (error) {
+        console.error('[ProfileSwitcher] Error checking permissions:', error);
+        setCanManageUsers(false);
+        setPermissionsChecked(true);
+      }
+    };
+
+    if (currentProfile) {
+      checkPermissions();
+    }
+  }, [currentProfile]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -40,8 +74,8 @@ export function ProfileSwitcher({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      // Auto-load company users when dropdown opens
-      if (companyUsers.length === 0 && !isLoadingUsers) {
+      // Auto-load company users when dropdown opens (only for users with permission)
+      if (canManageUsers && companyUsers.length === 0 && !isLoadingUsers) {
         loadCompanyUsers();
       }
     }
@@ -49,7 +83,7 @@ export function ProfileSwitcher({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen, companyUsers.length, isLoadingUsers]);
+  }, [isOpen, companyUsers.length, isLoadingUsers, canManageUsers]);
 
   // Handle profile switch
   const handleProfileSwitch = async (profileId: string) => {
@@ -224,10 +258,13 @@ export function ProfileSwitcher({
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                  Company Users
+                  {canManageUsers ? 'Company Users' : 'Current Profile'}
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  {companyUsers.length > 0 ? `${companyUsers.length} team member${companyUsers.length !== 1 ? 's' : ''}` : 'Loading team members...'}
+                  {canManageUsers 
+                    ? (companyUsers.length > 0 ? `${companyUsers.length} team member${companyUsers.length !== 1 ? 's' : ''}` : 'Loading team members...')
+                    : 'Your account information'
+                  }
                 </p>
               </div>
               <div 
@@ -240,66 +277,139 @@ export function ProfileSwitcher({
           </div>
 
           <div className="overflow-y-auto max-h-[60vh]">
-            {/* Company Users List */}
-            <div className="px-6 py-4">
-              {isLoadingUsers ? (
-                <div className="flex justify-center items-center py-8">
-                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="ml-3 text-gray-400">Loading users...</span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {companyUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="p-3 bg-gray-800/50 rounded-lg border border-gray-600/30 hover:border-blue-500/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm font-bold">
-                            {user.profile_name?.charAt(0)?.toUpperCase() || 'U'}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-white text-sm">{user.profile_name}</h4>
-                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                            <Mail className="h-3 w-3" />
-                            {user.email || 'Email not available'}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                            <Calendar className="h-3 w-3" />
-                            Joined {new Date(user.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span className={`
-                            px-2 py-1 text-xs font-medium rounded border
-                            ${user.profile_role === 'admin' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
-                              user.profile_role === 'manager' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                              user.profile_role === 'editor' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
-                              'bg-gray-500/20 text-gray-300 border-gray-500/30'
-                            }
-                          `}>
-                            {user.profile_role}
-                          </span>
-                          {user.is_default && (
-                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded border border-yellow-500/30">
-                              Default
-                            </span>
-                          )}
-                        </div>
-                      </div>
+            {canManageUsers ? (
+              <>
+                {/* Company Users List - Only for main accounts */}
+                <div className="px-6 py-4">
+                  {isLoadingUsers ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="ml-3 text-gray-400">Loading users...</span>
                     </div>
-                  ))}
-                  {companyUsers.length === 0 && !isLoadingUsers && (
-                    <div className="text-center py-8 text-gray-400">
-                      <Users className="h-12 w-12 mx-auto mb-3 text-gray-600" />
-                      <p className="text-sm">No company users found</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {companyUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className="p-3 bg-gray-800/50 rounded-lg border border-gray-600/30 hover:border-blue-500/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-bold">
+                                {user.profile_name?.charAt(0)?.toUpperCase() || 'U'}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-white text-sm">{user.profile_name}</h4>
+                              <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                                <Mail className="h-3 w-3" />
+                                {user.email || 'Email not available'}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                                <Calendar className="h-3 w-3" />
+                                Joined {new Date(user.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className={`
+                                px-2 py-1 text-xs font-medium rounded border
+                                ${user.profile_role === 'admin' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                                  user.profile_role === 'manager' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                                  user.profile_role === 'editor' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                                  'bg-gray-500/20 text-gray-300 border-gray-500/30'
+                                }
+                              `}>
+                                {user.profile_role}
+                              </span>
+                              {user.is_default && (
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded border border-yellow-500/30">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {companyUsers.length === 0 && !isLoadingUsers && (
+                        <div className="text-center py-8 text-gray-400">
+                          <Users className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                          <p className="text-sm">No company users found</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+
+                {/* Add New Profile Button - Only for main accounts */}
+                {showCreateButton && onCreateProfile && (
+                  <div className="px-6 py-4 border-t border-gray-700/50">
+                    <button
+                      onClick={() => {
+                        onCreateProfile();
+                        setIsOpen(false);
+                      }}
+                      className="w-full flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/30 hover:border-yellow-500/50 rounded-lg transition-all duration-200 group"
+                    >
+                      <div className="p-2 bg-yellow-500/20 group-hover:bg-yellow-500/30 rounded-lg transition-colors">
+                        <PlusIcon className="h-5 w-5 text-yellow-400" />
+                      </div>
+                      <div className="text-left">
+                        <h4 className="font-semibold text-white text-sm">Add New User</h4>
+                        <p className="text-xs text-gray-400">Create a new team member</p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Current Profile Info - For regular team members */
+              <div className="px-6 py-4">
+                <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-600/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-lg font-bold">
+                        {currentProfile.profile_name?.charAt(0)?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-white text-lg">{currentProfile.profile_name}</h4>
+                      <div className="flex items-center gap-2 text-sm text-gray-400 mt-1">
+                        <Shield className="h-4 w-4" />
+                        {currentProfile.profile_role} access
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                        <Calendar className="h-4 w-4" />
+                        Member since {new Date(currentProfile.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`
+                        px-3 py-1 text-sm font-medium rounded border
+                        ${currentProfile.profile_role === 'admin' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                          currentProfile.profile_role === 'manager' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                          currentProfile.profile_role === 'editor' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                          'bg-gray-500/20 text-gray-300 border-gray-500/30'
+                        }
+                      `}>
+                        {currentProfile.profile_role}
+                      </span>
+                      {currentProfile.is_default && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded border border-yellow-500/30">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-sm text-center">
+                    <UserIcon className="h-4 w-4 inline mr-2" />
+                    You are logged in as a team member
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
