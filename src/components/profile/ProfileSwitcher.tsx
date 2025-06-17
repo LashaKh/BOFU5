@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, UserIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { Users, Mail, Calendar, Shield } from 'lucide-react';
 import { useProfileContext } from '../../contexts/ProfileContext';
 import { CompanyProfile } from '../../types';
+import { ProfileApi } from '../../lib/profileApi';
 
 interface ProfileSwitcherProps {
   onCreateProfile?: () => void;
@@ -24,6 +26,8 @@ export function ProfileSwitcher({
   
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [companyUsers, setCompanyUsers] = useState<(CompanyProfile & { email?: string })[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -36,12 +40,16 @@ export function ProfileSwitcher({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      // Auto-load company users when dropdown opens
+      if (companyUsers.length === 0 && !isLoadingUsers) {
+        loadCompanyUsers();
+      }
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, companyUsers.length, isLoadingUsers]);
 
   // Handle profile switch
   const handleProfileSwitch = async (profileId: string) => {
@@ -57,6 +65,24 @@ export function ProfileSwitcher({
       console.error('Error switching profile:', err);
     } finally {
       setIsSwitching(false);
+    }
+  };
+
+  // Load company users
+  const loadCompanyUsers = async () => {
+    if (companyUsers.length > 0) return; // Already loaded
+    
+    try {
+      setIsLoadingUsers(true);
+      const result = await ProfileApi.getCompanyUsers();
+      
+      if (result.success && result.data) {
+        setCompanyUsers(result.data);
+      }
+    } catch (err) {
+      console.error('[ProfileSwitcher] Error loading company users:', err);
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
 
@@ -191,17 +217,17 @@ export function ProfileSwitcher({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-3 w-80 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 z-50 max-h-96 overflow-hidden">
+        <div className="absolute top-full right-0 mt-3 w-96 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 z-50 max-h-[80vh] overflow-hidden">
           {/* Header with Gradient */}
           <div className="px-6 py-4 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-b border-gray-700/50">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                  Switch Profile
+                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                  Company Users
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  {allProfiles.length} profile{allProfiles.length !== 1 ? 's' : ''} available
+                  {companyUsers.length > 0 ? `${companyUsers.length} team member${companyUsers.length !== 1 ? 's' : ''}` : 'Loading team members...'}
                 </p>
               </div>
               <div 
@@ -213,93 +239,68 @@ export function ProfileSwitcher({
             </div>
           </div>
 
-          {/* Profile List with Enhanced Styling */}
-          <div className="py-3 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-            {allProfiles.map((profile, index) => (
-              <button
-                key={profile.id}
-                onClick={() => handleProfileSwitch(profile.id)}
-                disabled={isSwitching}
-                className={`
-                  w-full px-6 py-4 flex items-center space-x-4 transition-all duration-200 text-left group
-                  ${profile.id === currentProfile?.id 
-                    ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-r-4 border-yellow-500 shadow-lg' 
-                    : 'hover:bg-gray-800/50 hover:shadow-md'
-                  }
-                  ${isSwitching ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-1'}
-                `}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="relative">
-                  {getProfileDisplay(profile)}
-                  {profile.id === currentProfile?.id && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+          <div className="overflow-y-auto max-h-[60vh]">
+            {/* Company Users List */}
+            <div className="px-6 py-4">
+              {isLoadingUsers ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="ml-3 text-gray-400">Loading users...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {companyUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="p-3 bg-gray-800/50 rounded-lg border border-gray-600/30 hover:border-blue-500/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-sm font-bold">
+                            {user.profile_name?.charAt(0)?.toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-white text-sm">{user.profile_name}</h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                            <Mail className="h-3 w-3" />
+                            {user.email || 'Email not available'}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                            <Calendar className="h-3 w-3" />
+                            Joined {new Date(user.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`
+                            px-2 py-1 text-xs font-medium rounded border
+                            ${user.profile_role === 'admin' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                              user.profile_role === 'manager' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                              user.profile_role === 'editor' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                              'bg-gray-500/20 text-gray-300 border-gray-500/30'
+                            }
+                          `}>
+                            {user.profile_role}
+                          </span>
+                          {user.is_default && (
+                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded border border-yellow-500/30">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {companyUsers.length === 0 && !isLoadingUsers && (
+                    <div className="text-center py-8 text-gray-400">
+                      <Users className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                      <p className="text-sm">No company users found</p>
                     </div>
                   )}
                 </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className="text-base font-semibold text-white truncate group-hover:text-yellow-300 transition-colors">
-                      {profile.profile_name}
-                    </span>
-                    {profile.is_default && (
-                      <div className="flex items-center gap-1 bg-blue-500/20 px-2 py-1 rounded-full border border-blue-500/30">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                        <span className="text-xs text-blue-300 font-medium">Default</span>
-                      </div>
-                    )}
-                    {profile.id === currentProfile?.id && (
-                      <div className="flex items-center gap-1 bg-green-500/20 px-2 py-1 rounded-full border border-green-500/30">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-green-300 font-medium">Active</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <span className={`
-                      text-xs px-3 py-1 rounded-full font-semibold border
-                      ${profile.profile_role === 'admin' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
-                        profile.profile_role === 'manager' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                        profile.profile_role === 'editor' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
-                        'bg-gray-500/20 text-gray-300 border-gray-500/30'
-                      }
-                    `}>
-                      {profile.profile_role.toUpperCase()}
-                    </span>
-                    
-                    <span className="text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded border border-gray-700/50">
-                      {profile.company_id?.slice(0, 8)}...
-                    </span>
-                  </div>
-                </div>
-              </button>
-            ))}
+              )}
+            </div>
           </div>
-
-          {/* Create New Profile Button */}
-          {showCreateButton && onCreateProfile && (
-            <>
-              <div className="border-t border-gray-700/50 bg-gradient-to-r from-gray-800 to-gray-700"></div>
-              <div className="p-4 bg-gray-800">
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    onCreateProfile();
-                  }}
-                  className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 group"
-                >
-                  <div className="p-1 bg-white/20 rounded-full group-hover:bg-white/30 transition-colors">
-                    <PlusIcon className="w-4 h-4" />
-                  </div>
-                  <span>Create New Profile</span>
-                  <div className="w-2 h-2 bg-white/50 rounded-full group-hover:bg-white/70 transition-colors"></div>
-                </button>
-              </div>
-            </>
-          )}
         </div>
       )}
 

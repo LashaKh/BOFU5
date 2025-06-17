@@ -37,6 +37,63 @@ export class ProfileApi {
     }
   }
 
+  // Get all users in the same company as the current user
+  static async getCompanyUsers(): Promise<ProfileApiResponse<(CompanyProfile & { email?: string })[]>> {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        return { success: false, error: 'User not authenticated' };
+      }
+
+      // First, get the current user's company_id
+      const { data: currentProfile, error: profileError } = await supabase
+        .from('company_profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (profileError || !currentProfile?.company_id) {
+        console.error('[ProfileApi] Error getting current user company:', profileError);
+        return { success: false, error: 'Could not determine user company' };
+      }
+
+      const company_id = currentProfile.company_id;
+
+      // Get all users in the same company with their emails
+      const { data, error } = await supabase.rpc('get_company_users_with_emails', {
+        target_company_id: company_id
+      });
+
+      if (error) {
+        console.error('[ProfileApi] Error fetching company users with emails:', error);
+        // Fallback to basic query without emails
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('company_profiles')
+          .select('*')
+          .eq('company_id', company_id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true });
+
+        if (fallbackError) {
+          console.error('[ProfileApi] Fallback query also failed:', fallbackError);
+          return { success: false, error: fallbackError.message };
+        }
+
+        console.log(`[ProfileApi] Fallback: Found ${fallbackData?.length || 0} users in company: ${company_id} (without emails)`);
+        return { success: true, data: fallbackData || [] };
+      }
+
+      console.log(`[ProfileApi] Found ${data?.length || 0} users in company: ${company_id} (with emails)`);
+      return { success: true, data: data || [] };
+    } catch (err) {
+      console.error('[ProfileApi] Exception in getCompanyUsers:', err);
+      return { success: false, error: 'Failed to fetch company users' };
+    }
+  }
+
   // Get current active profile for the user
   static async getCurrentProfile(): Promise<ProfileApiResponse<CompanyProfile>> {
     try {
