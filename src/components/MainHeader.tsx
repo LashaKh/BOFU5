@@ -1,11 +1,12 @@
 import React, { Fragment } from 'react';
 import { motion } from 'framer-motion';
-import { LogIn, Book, Briefcase, Search } from 'lucide-react';
+import { LogIn, Book, Briefcase, Search, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import { UserCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
+import { ProfileManager } from '../components/profile/ProfileManager';
 
 // Logo SVG component
 const Logo = () => (
@@ -178,82 +179,112 @@ export function MainHeader({
               )}
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
             {user ? (
-              <Menu as="div" className="relative">
-                <Menu.Button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all">
-                  <UserCircleIcon className="h-6 w-6" />
-                  <span className="max-w-[150px] truncate">
-                    {getDisplayName(user)}
-                  </span>
-                </Menu.Button>
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-200"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-150"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right rounded-lg bg-neutral-900 z-[60] opacity-100">
-                    <div className="py-1">
-                      <Menu.Item>
-                        {({ active }: { active: boolean }) => (
-                          <button
-                            onClick={() => handleNavigation('/dashboard')}
-                            className={`${
-                              active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
-                            } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
-                          >
-                            <UserCircleIcon className="h-4 w-4 opacity-70" />
-                            Dashboard
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }: { active: boolean }) => (
-                          <button
-                            onClick={() => handleNavigation('/history')}
-                            className={`${
-                              active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
-                            } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
-                          >
-                            <ClockIcon className="h-4 w-4 opacity-70" />
-                            History
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }: { active: boolean }) => (
-                          <button
-                            onClick={() => handleNavigation('/products')}
-                            className={`${
-                              active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
-                            } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
-                          >
-                            <Briefcase className="h-4 w-4 opacity-70" />
-                            Products
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }: { active: boolean }) => (
-                          <button
-                            onClick={handleSignOut}
-                            className={`${
-                              active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
-                            } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
-                          >
-                            <LogIn className="h-4 w-4 opacity-70" />
-                            Sign Out
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </Menu.Items>
-                </Transition>
-              </Menu>
+              <>
+                {/* Profile Manager - Shows current profile and allows switching */}
+                <ProfileManager 
+                  compact={true}
+                  showCreateButton={true}
+                  className="hidden md:block"
+                />
+                
+                {/* User Menu */}
+                <Menu as="div" className="relative">
+                  <Menu.Button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all">
+                    <UserCircleIcon className="h-6 w-6" />
+                    <span className="max-w-[150px] truncate">
+                      {getDisplayName(user)}
+                    </span>
+                  </Menu.Button>
+                  <Transition
+                    as={Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="transform opacity-0 scale-95"
+                    enterTo="transform opacity-100 scale-100"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="transform opacity-100 scale-100"
+                    leaveTo="transform opacity-0 scale-95"
+                  >
+                    <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right rounded-lg bg-neutral-900 z-[60] opacity-100">
+                      <div className="py-1">
+                        {/* Profile Management (Mobile) */}
+                        <div className="block md:hidden px-4 py-3 border-b border-secondary-700">
+                          <ProfileManager 
+                            compact={false}
+                            showCreateButton={true}
+                          />
+                        </div>
+                        <Menu.Item>
+                          {({ active }: { active: boolean }) => (
+                            <button
+                              onClick={() => handleNavigation('/dashboard')}
+                              className={`${
+                                active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
+                              } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
+                            >
+                              <UserCircleIcon className="h-4 w-4 opacity-70" />
+                              Dashboard
+                            </button>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }: { active: boolean }) => (
+                            <button
+                              onClick={() => handleNavigation('/history')}
+                              className={`${
+                                active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
+                              } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
+                            >
+                              <ClockIcon className="h-4 w-4 opacity-70" />
+                              History
+                            </button>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }: { active: boolean }) => (
+                            <button
+                              onClick={() => handleNavigation('/products')}
+                              className={`${
+                                active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
+                              } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
+                            >
+                              <Briefcase className="h-4 w-4 opacity-70" />
+                              Products
+                            </button>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }: { active: boolean }) => (
+                            <button
+                              onClick={() => handleNavigation('/user-settings')}
+                              className={`${
+                                active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
+                              } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
+                            >
+                              <Settings className="h-4 w-4 opacity-70" />
+                              Settings
+                            </button>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }: { active: boolean }) => (
+                            <button
+                              onClick={handleSignOut}
+                              className={`${
+                                active ? 'bg-secondary-600/30 text-primary-300' : 'text-gray-300'
+                              } group flex w-full items-center gap-2 px-4 py-3 text-sm transition-colors`}
+                            >
+                              <LogIn className="h-4 w-4 opacity-70" />
+                              Sign Out
+                            </button>
+                          )}
+                        </Menu.Item>
+                      </div>
+                    </Menu.Items>
+                  </Transition>
+                </Menu>
+              </>
             ) : (
               <motion.button
                 onClick={() => onShowAuthModal && onShowAuthModal()}

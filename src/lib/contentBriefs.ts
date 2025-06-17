@@ -54,7 +54,6 @@ export async function getBriefById(briefId: string) {
       research_result_id
     `)
     .eq('id', briefId)
-    .eq('user_id', user.id)
     .single();
 
   if (error) {

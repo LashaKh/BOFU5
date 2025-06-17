@@ -8,6 +8,7 @@ import { parseProductData } from '../types/product';
 import { ProductCard } from '../components/product/ProductCard';
 import { DocumentUploader, ProcessedDocument } from '../components/DocumentUploader'; 
 import AssociatedDocumentCard from '../components/product/AssociatedDocumentCard';
+import DocumentPreviewModal from '../components/product/DocumentPreviewModal';
 import { scrapeBlogContent, ScrapedBlog } from '../utils/blogScraper';
 import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'; 
 import { MainHeader } from '../components/MainHeader'; 
@@ -130,6 +131,10 @@ const DedicatedProductPage: React.FC = () => {
   const [editDescription, setEditDescription] = useState<string>('');
   const [isSavingHeader, setIsSavingHeader] = useState<boolean>(false);
 
+  // Document preview modal state
+  const [previewDocument, setPreviewDocument] = useState<ProductDocument | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
@@ -197,16 +202,48 @@ const DedicatedProductPage: React.FC = () => {
 
       if (productData.generated_analysis_data) {
         try {
+          console.log('fetchProductDetailsAndDocs: Raw generated_analysis_data from database:', productData.generated_analysis_data);
+          console.log('fetchProductDetailsAndDocs: Type of generated_analysis_data:', typeof productData.generated_analysis_data);
+          
           const savedAnalysis = typeof productData.generated_analysis_data === 'string'
             ? JSON.parse(productData.generated_analysis_data)
             : productData.generated_analysis_data;
-          if (savedAnalysis && typeof savedAnalysis === 'object' && savedAnalysis.companyName) {
-             setParsedAnalysisData(savedAnalysis as ProductAnalysis);
-             toast.success('Previously generated analysis loaded.');
+          
+          console.log('fetchProductDetailsAndDocs: Parsed analysis data:', savedAnalysis);
+          console.log('fetchProductDetailsAndDocs: Analysis data type after parsing:', typeof savedAnalysis);
+          
+          // Check if we have valid analysis data - don't require companyName for competitors to load
+          if (savedAnalysis && typeof savedAnalysis === 'object') {
+            console.log('fetchProductDetailsAndDocs: Analysis data is valid object');
+            console.log('fetchProductDetailsAndDocs: Analysis data keys:', Object.keys(savedAnalysis));
+            
+            // Check specifically for competitors data
+            if (savedAnalysis.competitors) {
+              console.log('fetchProductDetailsAndDocs: Found competitors in analysis data:', savedAnalysis.competitors);
+              console.log('fetchProductDetailsAndDocs: Competitors data type:', typeof savedAnalysis.competitors);
+              console.log('fetchProductDetailsAndDocs: Competitors data keys:', Object.keys(savedAnalysis.competitors || {}));
+            } else {
+              console.log('fetchProductDetailsAndDocs: NO competitors found in analysis data');
+            }
+            
+            // Always set the parsed data if it's a valid object
+            setParsedAnalysisData(savedAnalysis as ProductAnalysis);
+            
+            // Check if there's a companyName for the success message
+            if (savedAnalysis.companyName) {
+              toast.success('Previously generated analysis loaded.');
+            } else {
+              console.log('fetchProductDetailsAndDocs: Analysis loaded but no companyName found');
+            }
+          } else {
+            console.log('fetchProductDetailsAndDocs: Analysis data is not a valid object:', savedAnalysis);
           }
-        } catch (parseError) {
-          console.error("Error parsing saved analysis data:", parseError);
+        } catch (error) {
+          console.error('fetchProductDetailsAndDocs: Error parsing generated_analysis_data:', error);
+          console.error('fetchProductDetailsAndDocs: Raw data that failed to parse:', productData.generated_analysis_data);
         }
+      } else {
+        console.log('fetchProductDetailsAndDocs: No generated_analysis_data found in product data');
       }
     } catch (err: any) {
       console.error('Error fetching product details or documents:', err);
@@ -270,37 +307,103 @@ const DedicatedProductPage: React.FC = () => {
       return;
     }
 
-    const savingToastId = toast.loading('Saving documents to Supabase...', { id: 'saving-documents' });
-
-    const newDocumentData = processedDocs.map(doc => ({
-      product_id: productId!,
-      user_id: user.id, 
-      file_name: doc.name,
-      document_type: determineSupabaseDocumentType(doc.type, doc.isGoogleDoc, doc.originalFile?.type),
-      extracted_text: doc.content,
-      raw_url: doc.rawUrl, 
-      file_url: doc.file_url,
-      status: mapProcessedDocStatusToSupabaseStatus(doc.status) as SupabaseProductDocumentStatus, 
-      is_google_doc: doc.isGoogleDoc,
-      used_ai_extraction: doc.usedAI,
-      error_message: doc.status === 'error' ? doc.error : undefined,
-    }));
+    const savingToastId = toast.loading('Saving documents and uploading files...', { id: 'saving-documents' });
 
     try {
+      // First, upload files to Supabase Storage and prepare document data
+      const newDocumentData = await Promise.all(
+        processedDocs.map(async (doc) => {
+          let storage_path = null;
+          let file_url = null;
+
+          // Upload original file to Supabase Storage if available
+          if (doc.originalFile) {
+            try {
+              console.log(`📁 Uploading file to Supabase Storage: ${doc.name}`);
+              toast.loading(`Uploading ${doc.name} to storage...`, { id: `upload-${doc.name}` });
+
+              // Create a unique filename with timestamp to avoid conflicts
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const fileExtension = doc.originalFile.name.split('.').pop() || 'bin';
+              const uniqueFilename = `${timestamp}-${doc.originalFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+              const filePath = `${user.id}/${productId}/${uniqueFilename}`;
+
+              console.log(`📤 Uploading to path: ${filePath}`);
+
+              // Upload to Supabase Storage
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('productdocuments')
+                .upload(filePath, doc.originalFile, {
+                  cacheControl: '3600',
+                  upsert: false // Don't overwrite existing files
+                });
+
+              if (uploadError) {
+                console.error(`❌ Error uploading file ${doc.name}:`, uploadError);
+                toast.error(`Failed to upload ${doc.name}: ${uploadError.message}`, { id: `upload-${doc.name}` });
+              } else if (uploadData) {
+                console.log(`✅ File uploaded successfully: ${uploadData.path}`);
+                storage_path = uploadData.path;
+
+                // Get the public URL for the uploaded file
+                const { data: urlData } = supabase.storage
+                  .from('productdocuments')
+                  .getPublicUrl(uploadData.path);
+
+                if (urlData?.publicUrl) {
+                  file_url = urlData.publicUrl;
+                  console.log(`🔗 Public URL generated: ${file_url}`);
+                  toast.success(`${doc.name} uploaded successfully!`, { id: `upload-${doc.name}`, duration: 2000 });
+                } else {
+                  console.warn(`⚠️ Could not generate public URL for ${doc.name}`);
+                  toast.error(`${doc.name} uploaded but URL generation failed`, { id: `upload-${doc.name}` });
+                }
+              }
+            } catch (storageError) {
+              console.error(`❌ Storage upload failed for ${doc.name}:`, storageError);
+              toast.error(`Storage upload failed for ${doc.name}`, { id: `upload-${doc.name}` });
+            }
+          } else {
+            console.log(`ℹ️ No original file for ${doc.name}, skipping storage upload`);
+          }
+
+          return {
+            product_id: productId!,
+            user_id: user.id, 
+            file_name: doc.name,
+            document_type: determineSupabaseDocumentType(doc.type, doc.isGoogleDoc, doc.originalFile?.type),
+            extracted_text: doc.content,
+            raw_url: doc.rawUrl, 
+            file_url: file_url,
+            storage_path: storage_path,
+            status: mapProcessedDocStatusToSupabaseStatus(doc.status) as SupabaseProductDocumentStatus, 
+            is_google_doc: doc.isGoogleDoc,
+            used_ai_extraction: doc.usedAI,
+            error_message: doc.status === 'error' ? doc.error : undefined,
+          };
+        })
+      );
+
+      // Save document records to database
       if (newDocumentData.length > 0) {
+        console.log(`💾 Saving ${newDocumentData.length} documents to database...`);
+        
         const { data: insertedSupabaseDocs, error: dbError } = await supabase
           .from('product_documents')
-          .insert(newDocumentData) // Cast here
+          .insert(newDocumentData)
           .select();
 
         if (dbError) {
           console.error('Error inserting documents to Supabase:', dbError);
           toast.error(`Failed to save documents to Supabase: ${dbError.message}`, { id: savingToastId });
         } else if (insertedSupabaseDocs) {
-          toast.success('Documents saved to Supabase successfully!', { id: savingToastId, duration: 3000 });
+          console.log(`✅ ${insertedSupabaseDocs.length} documents saved to database successfully!`);
+          toast.success('Documents saved with file storage successfully!', { id: savingToastId, duration: 3000 });
           
           // --- BEGIN OPENAI UPLOAD ---
           if (product && product.openai_vector_store_id) {
+            console.log(`🤖 Starting OpenAI uploads for ${processedDocs.length} documents...`);
+            
             for (const processedDoc of processedDocs) {
               const matchingSupabaseDoc = insertedSupabaseDocs.find(sd => sd.file_name === processedDoc.name && sd.extracted_text === processedDoc.content);
 
@@ -313,6 +416,7 @@ const DedicatedProductPage: React.FC = () => {
                 }
 
                 if (fileToUpload) {
+                  console.log(`🚀 Uploading ${processedDoc.name} to OpenAI...`);
                   const openaiFileId = await callUploadProductDocumentEdgeFunction(
                     fileToUpload,
                     product.openai_vector_store_id,
@@ -323,7 +427,7 @@ const DedicatedProductPage: React.FC = () => {
                   if (openaiFileId && matchingSupabaseDoc) {
                     const { error: updateError } = await supabase
                       .from('product_documents')
-                      .update({ openai_vsf_id: openaiFileId, status: 'completed' as SupabaseProductDocumentStatus }) // Also mark as completed
+                      .update({ openai_vsf_id: openaiFileId, status: 'completed' as SupabaseProductDocumentStatus })
                       .eq('id', matchingSupabaseDoc.id);
 
                     if (updateError) {
@@ -657,15 +761,8 @@ const DedicatedProductPage: React.FC = () => {
   };
 
   const handleViewDocument = (document: ProductDocument) => {
-    if (document.extracted_text) {
-      alert(`Extracted Text (first 500 chars):
-
-${document.extracted_text.substring(0, 500)}`);
-    } else if (document.source_url) {
-      window.open(document.source_url, '_blank');
-    } else {
-      toast.error('No content or link available.');
-    }
+    setPreviewDocument(document);
+    setIsPreviewModalOpen(true);
   };
 
   const handleProcessBlogUrl = async () => {
@@ -887,107 +984,114 @@ ${document.extracted_text.substring(0, 500)}`);
     // Safe logging that handles undefined values properly
     const safeLogValue = newItems !== undefined ? JSON.parse(JSON.stringify(newItems)) : 'undefined';
     console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Initiating update. ProductIndex: ${productIndex}, SectionType: '${sectionType}'. Received newItems:`, safeLogValue);
+    
+    // Special handling for competitors section
+    if (sectionType === 'competitors' && newItems && typeof newItems === 'object' && !Array.isArray(newItems)) {
+      console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Processing competitors update:`, newItems);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Competitors data type:`, typeof newItems);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Competitors data keys:`, Object.keys(newItems));
+      
+      // Check each competitor array - use type assertion after checking
+      const competitorsData = newItems as Record<string, any>;
+      if (competitorsData.direct_competitors) {
+        console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Direct competitors:`, competitorsData.direct_competitors);
+        console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Direct competitors is array:`, Array.isArray(competitorsData.direct_competitors));
+        console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Direct competitors length:`, competitorsData.direct_competitors?.length);
+      }
+      if (competitorsData.niche_competitors) {
+        console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Niche competitors:`, competitorsData.niche_competitors);
+      }
+      if (competitorsData.broader_competitors) {
+        console.log(`[DedicatedPage.handleProductSectionUpdate.COMPETITORS] Broader competitors:`, competitorsData.broader_competitors);
+      }
+    }
+
     if (!product?.id) {
+      console.error(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error: Product or product.id is not available.`);
       toast.error('Product ID is missing. Cannot update section.');
-      console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error: Product or product.id is not available.');
       return;
     }
-    setIsSavingSection(true);
 
     try {
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Fetching fresh product data from Supabase for product ID:', product.id);
-      const { data: freshProductFullRecord, error: fetchError } = await supabase
+      // Fetch fresh product data first
+      const { data: currentProduct, error: fetchError } = await supabase
         .from('products')
-        .select('*')
+        .select('generated_analysis_data')
         .eq('id', product.id)
         .single();
 
       if (fetchError) {
-        console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error fetching product:', fetchError);
-        toast.error(`Failed to fetch product details: ${fetchError.message}`);
+        console.error(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error fetching current product:`, fetchError);
         throw fetchError;
       }
 
-      if (!freshProductFullRecord) {
-        const notFoundMsg = '[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Product not found in database.';
-        console.error(notFoundMsg);
-        toast.error(notFoundMsg);
-        throw new Error('Product not found');
-      }
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Successfully fetched fresh product data:', freshProductFullRecord);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Current product from DB:`, currentProduct);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Current generated_analysis_data:`, currentProduct.generated_analysis_data);
 
-      let baseAnalysisData: ProductAnalysis;
-      if (typeof freshProductFullRecord.generated_analysis_data === 'string') {
-        try {
-          baseAnalysisData = JSON.parse(freshProductFullRecord.generated_analysis_data);
-          console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Parsed string generated_analysis_data into object:', baseAnalysisData);
-        } catch (parseError) {
-          console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Failed to parse string generated_analysis_data, using defaultProduct:', parseError);
-          baseAnalysisData = { ...defaultProduct }; // Fallback to defaultProduct if parsing fails
+      // Parse the current analysis data
+      const baseAnalysisData: ProductAnalysis = (() => {
+        if (!currentProduct.generated_analysis_data) {
+          console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] No existing analysis data, creating new base object`);
+          return {} as ProductAnalysis;
         }
-      } else if (freshProductFullRecord.generated_analysis_data && typeof freshProductFullRecord.generated_analysis_data === 'object') {
-        baseAnalysisData = freshProductFullRecord.generated_analysis_data as ProductAnalysis;
-        console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Using object generated_analysis_data:', baseAnalysisData);
-      } else {
-        console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] generated_analysis_data is null or undefined, using defaultProduct.');
-        baseAnalysisData = { ...defaultProduct }; // Fallback to defaultProduct if null/undefined
-      }
 
+        try {
+          const parsed = typeof currentProduct.generated_analysis_data === 'string'
+            ? JSON.parse(currentProduct.generated_analysis_data)
+            : currentProduct.generated_analysis_data;
+          console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Parsed existing analysis data:`, parsed);
+          return parsed;
+        } catch (e) {
+          console.error(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error parsing existing analysis data:`, e);
+          return {} as ProductAnalysis;
+        }
+      })();
+
+      // Create the updated analysis data
       const updatedAnalysisData: ProductAnalysis = {
         ...baseAnalysisData,
         [sectionType]: newItems,
       };
-      // Ensure all array fields that might be null/undefined from bad data are defaulted to empty arrays
-      // This is a safeguard, ideally baseAnalysisData from parsing/defaulting should handle this.
-      (Object.keys(defaultProduct) as Array<keyof ProductAnalysis>).forEach(key => {
-        if (Array.isArray(defaultProduct[key]) && !Array.isArray(updatedAnalysisData[key])) {
-          (updatedAnalysisData as any)[key] = [];
-        }
-      });
 
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Constructed updatedAnalysisData:', updatedAnalysisData);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Final updated analysis data to save:`, updatedAnalysisData);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Updated analysis data as JSON string:`, JSON.stringify(updatedAnalysisData));
 
+      // Save to Supabase
       const { error: updateError } = await supabase
         .from('products')
-        .update({ generated_analysis_data: updatedAnalysisData })
+        .update({ generated_analysis_data: JSON.stringify(updatedAnalysisData) })
         .eq('id', product.id);
 
       if (updateError) {
-        console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update error:', updateError);
-        toast.error(`Failed to save updates for section ${String(sectionType)}: ${updateError.message}`);
+        console.error(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update error:`, updateError);
         throw updateError;
       }
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update successful.');
+
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Supabase update successful.`);
 
       // Update local state
-      // Create a new product object for state update to ensure React detects the change.
-      // Use the freshly fetched full record as the base, then implant the updated analysis data,
-      // and crucially, preserve the existing associatedDocuments.
-      const newProductDataForState: PageProductData = {
-        ...(freshProductFullRecord as Product), // Spread fields from the 'products' table record
-        generated_analysis_data: updatedAnalysisData, // Add the updated analysis data
-        associatedDocuments: product?.associatedDocuments || [], // Preserve existing documents
-      };
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] newProductDataForState before setting product state:', JSON.parse(JSON.stringify(newProductDataForState)));
-      setProduct(newProductDataForState);
+      setParsedAnalysisData(updatedAnalysisData);
+      console.log(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Local state updated.`);
 
-      toast.success(`Section '${String(sectionType)}' updated successfully!`);
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Section update process completed successfully.');
-    } catch (error: any) {
-      console.error('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error in catch block:', error);
-      toast.error(`An unexpected error occurred: ${error.message}`);
-    } finally {
-      setIsSavingSection(false);
-      console.log('[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] setIsSavingSection(false) in finally block.');
+    } catch (error) {
+      console.error(`[DedicatedPage.handleProductSectionUpdate.NEW_LOGIC] Error during update:`, error);
+      toast.error(`Failed to update ${sectionType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   useEffect(() => {
+    console.log("[DedicatedProductPage] Product data useEffect triggered with product:", product);
+    console.log("[DedicatedProductPage] Product generated_analysis_data:", product?.generated_analysis_data);
+    
     if (product?.generated_analysis_data) {
       try {
         const data = typeof product.generated_analysis_data === 'string' 
           ? JSON.parse(product.generated_analysis_data) 
           : product.generated_analysis_data;
+        
+        console.log("[DedicatedProductPage] Parsed analysis data:", data);
+        console.log("[DedicatedProductPage] Parsed analysis data competitors:", data.competitors);
+        
         setParsedAnalysisData(data as ProductAnalysis); // Directly set parsed data
         setAnalysisParsingError(null); // Clear any parsing error
       } catch (e) {
@@ -997,9 +1101,11 @@ ${document.extracted_text.substring(0, 500)}`);
         setAnalysisResults(product.generated_analysis_data); // Keep raw potentially problematic data for inspection if needed
       }
     } else if (product && !product.generated_analysis_data) { // Product loaded, but no analysis data
+      console.log("[DedicatedProductPage] Product loaded but no generated_analysis_data");
       setParsedAnalysisData(null); // No data to parse
       setAnalysisParsingError(null);
     } else if (!product) { // Product not loaded yet
+      console.log("[DedicatedProductPage] Product not loaded yet");
       setParsedAnalysisData(null); 
       setAnalysisParsingError(null);
     }
@@ -1422,6 +1528,14 @@ ${document.extracted_text.substring(0, 500)}`);
         </button>
       )}
       {isChatOpen && <ChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
+      <DocumentPreviewModal 
+        document={previewDocument} 
+        isOpen={isPreviewModalOpen} 
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setPreviewDocument(null);
+        }} 
+      />
     </>
   );
 };

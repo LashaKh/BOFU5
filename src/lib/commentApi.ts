@@ -10,6 +10,8 @@ export interface ArticleComment {
   content_type: 'text' | 'image' | 'suggestion';
   selection_start?: number;
   selection_end?: number;
+  selected_text?: string; // Store the original selected text for accurate reference
+  image_url?: string; // For image comments
   status: 'active' | 'resolved' | 'archived';
   created_at: string;
   updated_at: string;
@@ -41,7 +43,9 @@ export interface CreateCommentData {
   content_type?: 'text' | 'image' | 'suggestion';
   selection_start?: number;
   selection_end?: number;
+  selected_text?: string; // Store the original selected text for accurate reference
   parent_comment_id?: string;
+  image_url?: string; // For image comments
   // Admin-specific fields
   admin_comment_type?: 'admin_note' | 'approval_comment' | 'priority_comment' | 'review_comment' | 'system_notification';
   priority?: 'low' | 'normal' | 'high' | 'urgent' | 'critical';
@@ -115,6 +119,7 @@ export async function createComment(data: CreateCommentData): Promise<ArticleCom
       id: comment.id,
       selection_start: comment.selection_start,
       selection_end: comment.selection_end,
+      selected_text: comment.selected_text ? comment.selected_text.substring(0, 50) + '...' : null,
       hasSelection: comment.selection_start !== null && comment.selection_end !== null,
       admin_metadata: comment.admin_metadata
     });
@@ -729,7 +734,11 @@ async function transformComment(comment: any): Promise<ArticleComment> {
 
   // Debug log to see what data we have
   console.log('Transform comment data:', {
+    id: comment.id,
     user_id: comment.user_id,
+    content_type: comment.content_type,
+    image_url: comment.image_url,
+    hasImageUrl: !!comment.image_url,
     hasUserProfile: !!comment.user_profiles,
     hasAdminProfile: !!comment.admin_profiles,
     isAdmin,
@@ -750,7 +759,9 @@ async function transformComment(comment: any): Promise<ArticleComment> {
     parent_comment_id: comment.parent_comment_id,
     selection_start: comment.selection_start,
     selection_end: comment.selection_end,
+    selected_text: comment.selected_text,
     content_type: comment.content_type || 'text',
+    image_url: comment.image_url,
     status: comment.status || 'active',
     // Include admin fields
     admin_comment_type: comment.admin_comment_type,
@@ -997,4 +1008,680 @@ export async function deleteAllCommentsForArticle(articleId: string): Promise<{
       error: `Unexpected error: ${error}`
     };
   }
-} 
+}
+
+/**
+ * Upload an image file to comment images storage
+ */
+export async function uploadCommentImage(file: File, commentId?: string): Promise<string> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Generate a unique filename
+    const timestamp = Date.now();
+    const fileName = `${timestamp}-${file.name}`;
+    
+    // Create the file path: {user_id}/{comment_id or temp}/{fileName}
+    const folderName = commentId || 'temp';
+    const filePath = `${user.id}/${folderName}/${fileName}`;
+
+    console.log('📤 Uploading comment image:', {
+      fileName,
+      filePath,
+      fileSize: file.size,
+      fileType: file.type
+    });
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('comment-images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('❌ Storage upload error:', error);
+      throw error;
+    }
+
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('comment-images')
+      .getPublicUrl(filePath);
+
+    console.log('✅ Comment image uploaded successfully:', {
+      path: data.path,
+      publicUrl
+    });
+
+    return publicUrl;
+  } catch (error) {
+    console.error('❌ Error uploading comment image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a comment with an image
+ */
+export async function createCommentWithImage(
+  file: File,
+  data: Omit<CreateCommentData, 'content_type' | 'image_url'>
+): Promise<ArticleComment> {
+  try {
+    // First upload the image
+    const imageUrl = await uploadCommentImage(file);
+    
+    // Create the comment with image URL
+    const commentData: CreateCommentData = {
+      ...data,
+      content: data.content || `Image: ${file.name}`,
+      content_type: 'image',
+      image_url: imageUrl
+    };
+
+    const comment = await createComment(commentData);
+
+    // Update the image path to include the actual comment ID
+    if (comment.id) {
+      try {
+        await moveImageToCommentFolder(imageUrl, comment.id);
+      } catch (moveError) {
+        console.warn('⚠️ Could not move image to comment folder:', moveError);
+        // Don't fail the comment creation if we can't move the file
+      }
+    }
+
+    return comment;
+  } catch (error) {
+    console.error('❌ Error creating comment with image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Move an uploaded image from temp folder to the comment folder
+ */
+async function moveImageToCommentFolder(imageUrl: string, commentId: string): Promise<void> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Extract the file path from the URL
+    const urlParts = imageUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+    
+    const tempPath = `${user.id}/temp/${fileName}`;
+    const finalPath = `${user.id}/${commentId}/${fileName}`;
+
+    // Copy the file to the new location
+    const { error: copyError } = await supabase.storage
+      .from('comment-images')
+      .copy(tempPath, finalPath);
+
+    if (copyError) {
+      console.error('❌ Error copying image to comment folder:', copyError);
+      return; // Don't throw, just log the error
+    }
+
+    // Delete the temp file
+    const { error: deleteError } = await supabase.storage
+      .from('comment-images')
+      .remove([tempPath]);
+
+    if (deleteError) {
+      console.warn('⚠️ Could not delete temp image file:', deleteError);
+    }
+
+    console.log('✅ Image moved to comment folder:', { tempPath, finalPath });
+  } catch (error) {
+    console.error('❌ Error moving image to comment folder:', error);
+    // Don't throw - this is a cleanup operation
+  }
+}
+
+/**
+ * Delete comment image from storage
+ */
+export async function deleteCommentImage(imageUrl: string): Promise<void> {
+  try {
+    // Extract the file path from the URL
+    const url = new URL(imageUrl);
+    const pathParts = url.pathname.split('/');
+    const filePath = pathParts.slice(-3).join('/'); // Get user_id/comment_id/filename
+
+    const { error } = await supabase.storage
+      .from('comment-images')
+      .remove([filePath]);
+
+    if (error) {
+      console.error('❌ Error deleting comment image:', error);
+      throw error;
+    }
+
+    console.log('✅ Comment image deleted:', filePath);
+  } catch (error) {
+    console.error('❌ Error deleting comment image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get signed URL for comment image (fallback for private images)
+ */
+export async function getCommentImageSignedUrl(imagePath: string): Promise<string> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('comment-images')
+      .createSignedUrl(imagePath, 60 * 60); // 1 hour expiry
+
+    if (error) {
+      console.error('❌ Error creating signed URL:', error);
+      throw error;
+    }
+
+    return data.signedUrl;
+  } catch (error) {
+    console.error('❌ Error getting signed URL for comment image:', error);
+    throw error;
+  }
+}
+
+// ==================== MENTION SYSTEM API ====================
+
+/**
+ * Interface for mentionable user data
+ */
+export interface MentionableUser {
+  user_id: string;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  is_admin: boolean;
+  mention_text: string;
+}
+
+/**
+ * Interface for comment mention data
+ */
+export interface CommentMention {
+  id: string;
+  comment_id: string;
+  mentioned_user_id: string;
+  mentioned_by_user_id: string;
+  mention_text: string;
+  notification_sent: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Get mentionable users for autocomplete
+ */
+export async function getMentionableUsers(
+  articleId?: string,
+  searchTerm: string = ''
+): Promise<MentionableUser[]> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🔍 Getting mentionable users:', { articleId, searchTerm });
+
+    const { data, error } = await supabase.rpc('get_mentionable_users', {
+      article_id_param: articleId || null,
+      search_term: searchTerm
+    });
+
+    if (error) {
+      console.error('❌ Error getting mentionable users:', error);
+      throw error;
+    }
+
+    console.log('✅ Retrieved mentionable users:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('❌ Error getting mentionable users:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get mentions for a specific comment
+ */
+export async function getCommentMentions(commentId: string): Promise<CommentMention[]> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🔍 Getting mentions for comment:', commentId);
+
+    const { data, error } = await supabase
+      .from('comment_mentions')
+      .select('*')
+      .eq('comment_id', commentId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error getting comment mentions:', error);
+      throw error;
+    }
+
+    console.log('✅ Retrieved comment mentions:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('❌ Error getting comment mentions:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get mentions where the current user was mentioned
+ */
+export async function getUserMentions(): Promise<CommentMention[]> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🔍 Getting user mentions for:', user.id);
+
+    const { data, error } = await supabase
+      .from('comment_mentions')
+      .select(`
+        *,
+        comment:article_comments(
+          id,
+          content,
+          article_id,
+          created_at,
+          user:profiles(email, full_name)
+        )
+      `)
+      .eq('mentioned_user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error getting user mentions:', error);
+      throw error;
+    }
+
+    console.log('✅ Retrieved user mentions:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('❌ Error getting user mentions:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark mention notification as sent
+ */
+export async function markMentionNotificationSent(mentionId: string): Promise<void> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('📧 Marking mention notification as sent:', mentionId);
+
+    const { error } = await supabase
+      .from('comment_mentions')
+      .update({ notification_sent: true, updated_at: new Date().toISOString() })
+      .eq('id', mentionId);
+
+    if (error) {
+      console.error('❌ Error marking mention notification as sent:', error);
+      throw error;
+    }
+
+    console.log('✅ Mention notification marked as sent');
+  } catch (error) {
+    console.error('❌ Error marking mention notification as sent:', error);
+    throw error;
+  }
+}
+
+/**
+ * Extract mentions from text content
+ */
+export function extractMentionsFromText(text: string): string[] {
+  const mentionRegex = /@\w+/g;
+  const mentions = text.match(mentionRegex) || [];
+  return [...new Set(mentions)]; // Remove duplicates
+}
+
+/**
+ * Validate if a mention text corresponds to a real user
+ */
+export async function validateMentions(
+  mentions: string[],
+  articleId?: string
+): Promise<{ validMentions: MentionableUser[], invalidMentions: string[] }> {
+  try {
+    if (mentions.length === 0) {
+      return { validMentions: [], invalidMentions: [] };
+    }
+
+    const validMentions: MentionableUser[] = [];
+    const invalidMentions: string[] = [];
+
+    // Get all mentionable users
+    const mentionableUsers = await getMentionableUsers(articleId, '');
+
+    for (const mention of mentions) {
+      const matchingUser = mentionableUsers.find(user => user.mention_text === mention);
+      if (matchingUser) {
+        validMentions.push(matchingUser);
+      } else {
+        invalidMentions.push(mention);
+      }
+    }
+
+    return { validMentions, invalidMentions };
+  } catch (error) {
+    console.error('❌ Error validating mentions:', error);
+    throw error;
+  }
+}
+
+/**
+ * Process mentions in comment content and highlight them
+ */
+export function highlightMentions(
+  content: string,
+  mentionableUsers: MentionableUser[] = []
+): { highlightedContent: string, foundMentions: string[] } {
+  const mentions = extractMentionsFromText(content);
+  let highlightedContent = content;
+  const foundMentions: string[] = [];
+
+  mentions.forEach(mention => {
+    const user = mentionableUsers.find(u => u.mention_text === mention);
+    if (user) {
+      foundMentions.push(mention);
+      const highlightClass = user.is_admin 
+        ? 'mention-admin' 
+        : 'mention-user';
+      
+      const regex = new RegExp(`\\B${mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+      highlightedContent = highlightedContent.replace(
+        regex,
+        `<span class="${highlightClass}" data-mention="${mention}" data-user-id="${user.user_id}">${mention}</span>`
+      );
+    }
+  });
+
+  return { highlightedContent, foundMentions };
+}
+
+// Notification Management for Mentions
+export interface MentionNotification {
+  id: string;
+  comment_id: string;
+  mentioned_user_id: string;
+  mentioned_by_user_id: string;
+  mention_text: string;
+  notification_sent: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  comment?: ArticleComment;
+  mentioned_by_user?: {
+    id: string;
+    email: string;
+    name?: string;
+  };
+}
+
+// Create notifications for mentioned users
+export const createMentionNotifications = async (
+  commentId: string, 
+  mentions: string[]
+): Promise<MentionNotification[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const notifications: MentionNotification[] = [];
+
+    for (const mentionText of mentions) {
+      // Extract username from mention (remove @ if present)
+      const username = mentionText.replace('@', '');
+      
+      // Find the mentioned user
+      const { data: mentionedUsers } = await supabase
+        .from('profiles')
+        .select('id, email, name')
+        .or(`email.ilike.%${username}%,name.ilike.%${username}%`)
+        .limit(1);
+
+      if (mentionedUsers && mentionedUsers.length > 0) {
+        const mentionedUser = mentionedUsers[0];
+        
+        // Create mention record
+        const { data: mention, error } = await supabase
+          .from('comment_mentions')
+          .insert({
+            comment_id: commentId,
+            mentioned_user_id: mentionedUser.id,
+            mentioned_by_user_id: user.id,
+            mention_text: mentionText,
+            notification_sent: false
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('Error creating mention:', error);
+          continue;
+        }
+
+        if (mention) {
+          notifications.push({
+            ...mention,
+            mentioned_by_user: {
+              id: user.id,
+              email: user.email || '',
+              name: user.user_metadata?.name
+            }
+          });
+        }
+      }
+    }
+
+    return notifications;
+  } catch (error) {
+    console.error('Error creating mention notifications:', error);
+    return [];
+  }
+};
+
+// Get mention notifications for a user
+export const getMentionNotifications = async (
+  userId?: string
+): Promise<MentionNotification[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const targetUserId = userId || user?.id;
+    
+    if (!targetUserId) throw new Error('User ID required');
+
+    const { data, error } = await supabase
+      .from('comment_mentions')
+      .select(`
+        *,
+        comment:article_comments!inner(
+          id,
+          content,
+          content_type,
+          image_url,
+          created_at,
+          article_id,
+          user:profiles!article_comments_user_id_fkey(
+            id,
+            email,
+            name
+          )
+        ),
+        mentioned_by_user:profiles!comment_mentions_mentioned_by_user_id_fkey(
+          id,
+          email,
+          name
+        )
+      `)
+      .eq('mentioned_user_id', targetUserId)
+      .eq('notification_sent', false)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching mention notifications:', error);
+    return [];
+  }
+};
+
+// Mark mention notifications as sent/read
+export const markMentionNotificationsAsSent = async (
+  notificationIds: string[]
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('comment_mentions')
+      .update({ 
+        notification_sent: true,
+        updated_at: new Date().toISOString()
+      })
+      .in('id', notificationIds);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error marking notifications as sent:', error);
+    return false;
+  }
+};
+
+// Enhanced comment creation with mention processing
+export const createCommentWithMentions = async (
+  articleId: string,
+  content: string,
+  contentType: 'text' | 'image' | 'suggestion' = 'text',
+  imageFile?: File,
+  selectionStart?: number,
+  selectionEnd?: number,
+  parentId?: string
+): Promise<ArticleComment | null> => {
+  try {
+    let imageUrl: string | undefined;
+    
+    // Handle image upload if provided
+    if (imageFile) {
+      imageUrl = await uploadCommentImage(imageFile);
+      if (!imageUrl) {
+        throw new Error('Failed to upload image');
+      }
+    }
+
+    // Create the comment data object
+    const commentData: CreateCommentData = {
+      article_id: articleId,
+      content,
+      content_type: contentType,
+      image_url: imageUrl,
+      selection_start: selectionStart,
+      selection_end: selectionEnd,
+      parent_comment_id: parentId
+    };
+
+    // Create the comment
+    const comment = await createComment(commentData);
+
+    if (!comment) {
+      throw new Error('Failed to create comment');
+    }
+
+    // Extract mentions from content
+    const mentions = extractMentionsFromText(content);
+    
+    // Create mention notifications if mentions found
+    if (mentions.length > 0) {
+      await createMentionNotifications(comment.id, mentions);
+    }
+
+    return comment;
+  } catch (error) {
+    console.error('Error creating comment with mentions:', error);
+    return null;
+  }
+};
+
+// Get mention statistics for analytics
+export const getMentionStats = async (
+  articleId?: string,
+  dateRange?: { start: Date; end: Date }
+): Promise<{
+  totalMentions: number;
+  uniqueUsers: number;
+  mentionsByDate: { date: string; count: number }[];
+}> => {
+  try {
+    let query = supabase
+      .from('comment_mentions')
+      .select(`
+        id,
+        created_at,
+        mentioned_user_id,
+        comment:article_comments!inner(article_id)
+      `);
+
+    if (articleId) {
+      query = query.eq('comment.article_id', articleId);
+    }
+
+    if (dateRange) {
+      query = query
+        .gte('created_at', dateRange.start.toISOString())
+        .lte('created_at', dateRange.end.toISOString());
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const mentions = data || [];
+    const uniqueUsers = new Set(mentions.map(m => m.mentioned_user_id)).size;
+    
+    // Group by date
+    const mentionsByDate = mentions.reduce((acc, mention) => {
+      const date = new Date(mention.created_at).toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalMentions: mentions.length,
+      uniqueUsers,
+      mentionsByDate: Object.entries(mentionsByDate).map(([date, count]) => ({
+        date,
+        count
+      }))
+    };
+  } catch (error) {
+    console.error('Error fetching mention stats:', error);
+    return {
+      totalMentions: 0,
+      uniqueUsers: 0,
+      mentionsByDate: []
+    };
+  }
+}; 

@@ -110,7 +110,6 @@ export default function UserContentBriefs() {
       const { data, error, count } = await supabase
         .from('content_briefs')
         .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;

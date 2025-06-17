@@ -109,7 +109,7 @@ function transformLegacyProduct(legacyProduct: LegacyProductCardProps['product']
     isApproved: legacyProduct.approved || false,
     google_doc: legacyProduct.google_doc,
     competitorAnalysisUrl: legacyProduct.competitorAnalysisUrl,
-  } as import('../../types/product/types').ProductAnalysis;
+  } as unknown as ProductAnalysis;
 }
 
 // Enhanced ProductCard component for new features
@@ -240,12 +240,19 @@ export function ProductCard(props: any) {
     return <div className="text-red-500">No product data provided</div>;
   }
 
+  // Add debugging to see what ProductCard receives
+  console.log("[ProductCard] Received product:", props.product);
+  console.log("[ProductCard] Received product.competitors:", props.product.competitors);
+
   // Transform the product to ensure it has the right structure
   const enhancedProduct = React.useMemo(() => {
     const product = props.product;
     
+    console.log("[ProductCard] Transform input product:", product);
+    console.log("[ProductCard] Transform input competitors:", product.competitors);
+    
     // Ensure the product has all required fields for ProductAnalysis
-    return {
+    const transformed = {
       companyName: product.companyName || 'Unknown Company',
       productDetails: {
         name: product.productDetails?.name || product.productDetails?.productName || 'Unknown Product',
@@ -259,11 +266,28 @@ export function ProductCard(props: any) {
         industry: '',
         keyOperations: '',
       },
-      targetPersona: product.targetPersona || {
+      targetPersona: product.targetPersona ? {
+        primaryAudience: product.targetPersona.primaryAudience || '',
+        demographics: Array.isArray(product.targetPersona.demographics) 
+          ? product.targetPersona.demographics 
+          : product.targetPersona.demographics 
+            ? [product.targetPersona.demographics] 
+            : [],
+        industrySegments: Array.isArray(product.targetPersona.industrySegments) 
+          ? product.targetPersona.industrySegments 
+          : product.targetPersona.industrySegments 
+            ? [product.targetPersona.industrySegments] 
+            : [],
+        psychographics: Array.isArray(product.targetPersona.psychographics) 
+          ? product.targetPersona.psychographics 
+          : product.targetPersona.psychographics 
+            ? [product.targetPersona.psychographics] 
+            : [],
+      } : {
         primaryAudience: '',
-        demographics: '',
-        industrySegments: '',
-        psychographics: '',
+        demographics: [],
+        industrySegments: [],
+        psychographics: [],
       },
       pricing: product.pricing || '',
       currentSolutions: product.currentSolutions || {
@@ -271,10 +295,16 @@ export function ProductCard(props: any) {
         existingMethods: [],
       },
       capabilities: product.capabilities || [],
+      competitors: product.competitors || undefined,
       isApproved: product.isApproved || false,
       google_doc: product.google_doc,
       competitorAnalysisUrl: product.competitorAnalysisUrl,
-    } as ProductAnalysis;
+    } as unknown as ProductAnalysis;
+    
+    console.log("[ProductCard] Transformed product:", transformed);
+    console.log("[ProductCard] Transformed competitors:", transformed.competitors);
+    
+    return transformed;
   }, [props.product]);
 
   // Extract context and other props

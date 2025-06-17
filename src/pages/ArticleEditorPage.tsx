@@ -207,7 +207,7 @@ export const ArticleEditorPage: React.FC<ArticleEditorPageProps> = () => {
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-white border-b border-gray-200 sticky top-0 z-50"
+        className="bg-white border-b border-gray-200 fixed top-0 z-50 w-full"
       >
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -356,7 +356,7 @@ export const ArticleEditorPage: React.FC<ArticleEditorPageProps> = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="h-full"
+        className="h-full pt-24"
       >
         <ArticleEditor
           articleId={articleId}

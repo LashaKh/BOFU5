@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductAnalysis } from '../../types/product/types';
 import { ProductCardCapabilities } from './ProductCardCapabilities';
@@ -319,6 +319,12 @@ export function ProductCardContent({
     
     setEditableProduct(product);
   }, [product]);
+
+  // Debug logging for competitor data flow
+  useEffect(() => {
+    console.log("[ProductCardContent] editableProduct updated:", editableProduct);
+    console.log("[ProductCardContent] editableProduct.competitors:", editableProduct.competitors);
+  }, [editableProduct]);
 
   // Auto-save functionality
   const handleAutoSave = useCallback(async (updatedProduct: ProductAnalysis): Promise<boolean> => {

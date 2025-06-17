@@ -45,7 +45,6 @@ const GeneratedArticlesPage: React.FC = () => {
         const { data, error: dbError } = await supabase
           .from('content_briefs')
           .select('id, possible_article_titles, product_name, link, updated_at') // Added product_name to select
-          .eq('user_id', user.id)
           .not('link', 'is', null)
           .order('updated_at', { ascending: false });
 

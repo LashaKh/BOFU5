@@ -66,7 +66,6 @@ export default function UserDashboard() {
       const queryPromise = supabase
         .from('content_briefs')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       const { data: briefs, error: briefsError } = await Promise.race([
@@ -113,8 +112,7 @@ export default function UserDashboard() {
       const { error } = await supabase
         .from('content_briefs')
         .delete()
-        .eq('id', briefId)
-        .eq('user_id', user.id);
+        .eq('id', briefId);
 
       if (error) throw error;
 

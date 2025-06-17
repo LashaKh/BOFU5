@@ -65,7 +65,6 @@ export default function ApprovedContent() {
       const { data, error, count } = await supabase
         .from('content_briefs')
         .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
       

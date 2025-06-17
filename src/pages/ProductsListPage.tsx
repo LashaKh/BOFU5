@@ -34,7 +34,6 @@ const ProductsListPage: React.FC = () => {
       const { data, error: fetchError } = await supabase
         .from('products')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
@@ -73,8 +72,7 @@ const ProductsListPage: React.FC = () => {
       const { error: deleteError } = await supabase
         .from('products')
         .delete()
-        .eq('id', productId)
-        .eq('user_id', user.id); // Ensure user can only delete their own products
+        .eq('id', productId);
 
       if (deleteError) throw deleteError;
 

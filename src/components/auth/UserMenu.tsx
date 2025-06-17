@@ -50,6 +50,11 @@ export function UserMenu({ user, onShowAuthModal }: UserMenuProps) {
     }
   };
 
+  const handleSettingsClick = () => {
+    setIsOpen(false);
+    navigate('/user-settings');
+  };
+
   return (
     <div className="relative">
       <button
@@ -91,10 +96,7 @@ export function UserMenu({ user, onShowAuthModal }: UserMenuProps) {
             >
               <div className="p-2 space-y-1">
                 <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    // Add settings handler
-                  }}
+                  onClick={handleSettingsClick}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <Settings size={16} />

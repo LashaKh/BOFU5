@@ -27,8 +27,10 @@ import UserContentBriefs from './pages/UserContentBriefs';
 import EditContentBrief from './pages/EditContentBrief';
 import ApprovedContent from './pages/ApprovedContent';
 import GeneratedArticlesPage from './pages/GeneratedArticlesPage'; // Import for new page
+import UserSettingsPage from './pages/UserSettingsPage'; // Import for user settings page
 import { ResetPassword } from './components/auth/ResetPassword';
 import { ToastProvider } from './contexts/ToastContext';
+import { ProfileContextProvider } from './contexts/ProfileContext'; // Import ProfileContext
 import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
 import DedicatedProductPage from './pages/DedicatedProductPage'; // Added import
 import LandingPage from './pages/LandingPage'; // Import the new LandingPage
@@ -39,6 +41,7 @@ import { AuditLogViewerTest } from './components/admin/AuditLogViewerTest'; // I
 import ArticleEditorPage from './pages/ArticleEditorPage'; // Import the new dedicated article editor page
 import { AdminContextProvider } from './contexts/AdminContext'; // Import the new AdminContext
 import { AdminRoute } from './components/admin/AdminRoute'; // Import the new AdminRoute component
+import { ProfileTest } from './components/profile/ProfileTest'; // Import the ProfileTest component
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -801,287 +804,306 @@ console.log('Admin granted:', data, error);
   };
 
   return (
-    <AdminContextProvider user={user}>
-      <ToastProvider>
-        <ErrorBoundary>
-          <div className="App">
-          <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#333',
-              color: '#fff',
-            },
-            success: {
-              iconTheme: {
-                primary: '#FFE600',
-                secondary: '#000',
+    <ProfileContextProvider user={user}>
+      <AdminContextProvider user={user}>
+        <ToastProvider>
+          <ErrorBoundary>
+            <div className="App">
+            <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#333',
+                color: '#fff',
               },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ff4b4b',
-                secondary: '#fff',
+              success: {
+                iconTheme: {
+                  primary: '#FFE600',
+                  secondary: '#000',
+                },
               },
-            },
-          }}
-        />
-        
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />} />
-            
-            <Route path="/research" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+              error: {
+                iconTheme: {
+                  primary: '#ff4b4b',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
+          
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />} />
+              
+              <Route path="/research" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
+                  </div>
+                ) : user ? (
+                  renderMainContent(true)
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/history" element={user ? (
+                <div className="min-h-screen text-white" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}>
+                  <MainHeader 
+                    user={user} 
+                    onShowAuthModal={() => setShowAuthModal(true)} 
+                    showHistory={true}
+                    setShowHistory={(show) => {
+                      if (!show) {
+                        navigate('/', { replace: true });
+                        resetForm();
+                      }
+                    }}
+                    onSignOut={handleSignOut}
+                  />
+                  
+                  <div className="container mx-auto px-4 py-8">
+                    <h1 className="text-2xl font-bold text-primary-400 mb-6">Your Research History</h1>
+                    
+                    <ResearchHistory 
+                      results={historyResults}
+                      onSelect={handleHistorySelect}
+                      onDelete={handleHistoryDelete}
+                      isLoading={isHistoryLoading}
+                      onStartNew={() => {
+                        resetForm();
+                        navigate('/', { replace: true });
+                      }}
+                    />
                   </div>
                 </div>
-              ) : user ? (
-                renderMainContent(true)
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/history" element={user ? (
-              <div className="min-h-screen text-white" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}>
-                <MainHeader 
-                  user={user} 
-                  onShowAuthModal={() => setShowAuthModal(true)} 
-                  showHistory={true}
-                  setShowHistory={(show) => {
-                    if (!show) {
-                      navigate('/', { replace: true });
-                      resetForm();
-                    }
-                  }}
-                  onSignOut={handleSignOut}
-                />
-                
-                <div className="container mx-auto px-4 py-8">
-                  <h1 className="text-2xl font-bold text-primary-400 mb-6">Your Research History</h1>
-                  
-                  <ResearchHistory 
-                    results={historyResults}
-                    onSelect={handleHistorySelect}
-                    onDelete={handleHistoryDelete}
-                    isLoading={isHistoryLoading}
+              ) : <Navigate to="/" replace />} />
+              <Route path="/product/:id" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
+                  </div>
+                ) : user ? (
+                  <ProductResultsPage 
+                    products={researchResults}
                     onStartNew={() => {
                       resetForm();
-                      navigate('/', { replace: true });
+                      navigate('/research', { replace: true });
+                    }}
+                    existingId={currentHistoryId}
+                    onHistorySave={loadResearchHistory}
+                    onSaveComplete={(newId) => {
+                      setCurrentHistoryId(newId);
+                      loadResearchHistory();
                     }}
                   />
-                </div>
-              </div>
-            ) : <Navigate to="/" replace />} />
-            <Route path="/product/:id" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/products" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <ProductResultsPage 
-                  products={researchResults}
-                  onStartNew={() => {
-                    resetForm();
-                    navigate('/research', { replace: true });
-                  }}
-                  existingId={currentHistoryId}
-                  onHistorySave={loadResearchHistory}
-                  onSaveComplete={(newId) => {
-                    setCurrentHistoryId(newId);
-                    loadResearchHistory();
-                  }}
-                />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/products" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <ProductsListPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/products/:id" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <ProductsListPage />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/products/:id" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <DedicatedProductPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              
+              <Route path="/dashboard" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <DedicatedProductPage />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            
-            <Route path="/dashboard" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <UserDashboard />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/dashboard/content-briefs" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <UserDashboard />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/dashboard/content-briefs" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <UserContentBriefs />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/dashboard/content-briefs/edit/:id" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <UserContentBriefs />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/dashboard/content-briefs/edit/:id" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <EditContentBrief />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/dashboard/approved-content" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <EditContentBrief />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/dashboard/approved-content" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+                ) : user ? (
+                  <ApprovedContent />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/dashboard/generated-articles" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <ApprovedContent />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/dashboard/generated-articles" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
-                  </div>
-                </div>
-              ) : user ? (
-                <GeneratedArticlesPage />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
+                ) : user ? (
+                  <GeneratedArticlesPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
 
-            <Route path="/admin" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Checking authentication...</p>
+              <Route path="/admin" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Checking authentication...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <AdminRoute user={user} onLogout={handleSignOut} />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
-            <Route path="/admin/articles/:articleId" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Checking authentication...</p>
+                ) : user ? (
+                  <AdminRoute user={user} onLogout={handleSignOut} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/admin/articles/:articleId" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Checking authentication...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <AdminRoute user={user} onLogout={handleSignOut} />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
+                ) : user ? (
+                  <AdminRoute user={user} onLogout={handleSignOut} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
 
-            <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* Test Routes - To be removed before production */}
-            <Route path="/user-selector-test" element={<UserSelectorTest />} />
-            <Route path="/admin-article-list-test" element={<AdminArticleListTest />} />
-            <Route path="/article-editor-admin-test" element={<ArticleEditorAdminTest />} />
-            <Route path="/audit-log-viewer-test" element={<AuditLogViewerTest />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              
+              {/* Test Routes - To be removed before production */}
+              <Route path="/user-selector-test" element={<UserSelectorTest />} />
+              <Route path="/admin-article-list-test" element={<AdminArticleListTest />} />
+              <Route path="/article-editor-admin-test" element={<ArticleEditorAdminTest />} />
+              <Route path="/audit-log-viewer-test" element={<AuditLogViewerTest />} />
 
-            <Route path="/article-editor/:id" element={
-              isAuthLoading ? (
-                <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                    <p className="text-white">Loading...</p>
+              <Route path="/article-editor/:id" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
                   </div>
-                </div>
-              ) : user ? (
-                <ArticleEditorPage />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } />
+                ) : user ? (
+                  <ArticleEditorPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AnimatePresence>
-        
-        {/* Processing Modal */}
-        <ProcessingModal isOpen={isProcessing} />
-        
-        {/* Global Authentication Modal - visible regardless of route */}
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
-          onShowAdminLogin={() => setShowAdminAuthModal(true)}
-        />
-        
-        {/* Admin Auth Modal */}
-        <AdminAuthModal
-          isOpen={showAdminAuthModal}
-          onClose={() => setShowAdminAuthModal(false)}
-          onAdminAuthenticated={() => {
-            notify('success', 'Admin login successful');
-            navigate('/admin', { replace: true });
-          }}
-        />
-      </div>
-      </ErrorBoundary>
-      </ToastProvider>
-    </AdminContextProvider>
+              <Route path="/profile-test" element={<ProfileTest />} />
+
+              <Route path="/user-settings" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
+                  </div>
+                ) : user ? (
+                  <UserSettingsPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AnimatePresence>
+          
+          {/* Processing Modal */}
+          <ProcessingModal isOpen={isProcessing} />
+          
+          {/* Global Authentication Modal - visible regardless of route */}
+          <AuthModal 
+            isOpen={showAuthModal} 
+            onClose={() => setShowAuthModal(false)} 
+            onShowAdminLogin={() => setShowAdminAuthModal(true)}
+          />
+          
+          {/* Admin Auth Modal */}
+          <AdminAuthModal
+            isOpen={showAdminAuthModal}
+            onClose={() => setShowAdminAuthModal(false)}
+            onAdminAuthenticated={() => {
+              notify('success', 'Admin login successful');
+              navigate('/admin', { replace: true });
+            }}
+          />
+        </div>
+        </ErrorBoundary>
+        </ToastProvider>
+      </AdminContextProvider>
+    </ProfileContextProvider>
   );
 }
 

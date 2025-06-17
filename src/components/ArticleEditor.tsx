@@ -41,8 +41,6 @@ import {
   Check, 
   Loader2, 
   Monitor, 
-  Moon, 
-  Sun, 
   Maximize2, 
   Minimize2, 
   Focus as FocusIcon, 
@@ -66,6 +64,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
   Settings,
   PaintBucket,
 } from 'lucide-react';
@@ -79,9 +78,21 @@ import { getArticleComments } from '../lib/commentApi';
 import { debounce } from 'lodash';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 import { Node } from 'prosemirror-model';
+import { supabase } from '../lib/supabase';
+import { joinArticlePresence, leaveArticlePresence } from '../lib/presenceApi';
 
 // Import enhanced CSS styles
 import '../styles/article-editor-enhanced.css';
+
+// Define UserProfile interface
+interface UserProfile {
+  id: string;
+  email: string;
+  company_name?: string;
+  role?: string;
+  avatar_url?: string;
+  status?: 'viewing' | 'editing' | 'idle';
+}
 
 // Enhanced theme hook for better state management
 const useTheme = () => {
@@ -93,19 +104,6 @@ const useTheme = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  const toggleTheme = useCallback(() => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('article-editor-theme', newTheme);
-    
-    // Apply theme class to document
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
   // Apply theme on mount
   useEffect(() => {
     if (theme === 'dark') {
@@ -115,44 +113,192 @@ const useTheme = () => {
     }
   }, [theme]);
 
-  return { theme, toggleTheme };
+  return { theme };
 };
 
-// Enhanced User Presence Component
+// Enhanced User Presence Component with Real-time Collaboration
 const UserPresence = ({ articleId }: { articleId: string }) => {
   const [activeUsers, setActiveUsers] = useState<UserProfile[]>([]);
-  
-  // Mock active users for demonstration
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const mockUsers: UserProfile[] = [
-      { id: '1', email: 'user@example.com', company_name: 'Company A' },
-      { id: '2', email: 'collaborator@example.com', company_name: 'Company B' }
-    ];
-    setActiveUsers(mockUsers);
+    let mounted = true;
+    let presenceChannel: any = null;
+
+    const initializePresence = async () => {
+      try {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.log('No authenticated user for presence tracking');
+          setLoading(false);
+          return;
+        }
+
+        // Update user presence to mark as viewing
+        const { error: presenceError } = await supabase.rpc('update_user_presence', {
+          p_article_id: articleId,
+          p_status: 'viewing'
+        });
+
+        if (presenceError) {
+          console.error('Error updating presence:', presenceError);
+        }
+
+        // Fetch initial active users
+        await fetchActiveUsers();
+
+        // Set up real-time channel for presence updates
+        presenceChannel = supabase.channel(`article_presence_${articleId}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'article_presence',
+            filter: `article_id=eq.${articleId}`
+          }, () => {
+            // Refetch active users when presence changes
+            fetchActiveUsers();
+          })
+          .subscribe();
+
+      } catch (error) {
+        console.error('Error initializing presence:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const fetchActiveUsers = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_active_article_users', {
+          p_article_id: articleId
+        });
+
+        if (error) {
+          console.error('Error fetching active users:', error);
+          return;
+        }
+
+        if (mounted) {
+          const users = data?.map((user: any) => ({
+            id: user.user_id,
+            email: user.user_email || 'Unknown',
+            company_name: user.user_company,
+            role: user.user_role,
+            status: user.status
+          })) || [];
+          
+          setActiveUsers(users);
+        }
+      } catch (error) {
+        console.error('Error fetching active users:', error);
+      }
+    };
+
+    initializePresence();
+
+    // Update status to editing when user interacts
+    const handleStatusChange = async (status: 'viewing' | 'editing' | 'idle') => {
+      try {
+        await supabase.rpc('update_user_presence', {
+          p_article_id: articleId,
+          p_status: status
+        });
+      } catch (error) {
+        console.error('Error updating status:', error);
+      }
+    };
+
+    // Debounced status change to prevent rapid updates during comment interactions
+    let statusChangeTimeout: NodeJS.Timeout | null = null;
+    
+    const debouncedStatusChange = (status: 'viewing' | 'editing' | 'idle') => {
+      if (statusChangeTimeout) {
+        clearTimeout(statusChangeTimeout);
+      }
+      statusChangeTimeout = setTimeout(() => {
+        handleStatusChange(status);
+      }, 300); // 300ms debounce to prevent rapid status changes
+    };
+
+    // Listen for editor focus/blur events
+    const handleFocus = () => debouncedStatusChange('editing');
+    const handleBlur = () => debouncedStatusChange('viewing');
+
+    const editorElement = document.querySelector('.ProseMirror');
+    if (editorElement) {
+      editorElement.addEventListener('focus', handleFocus);
+      editorElement.addEventListener('blur', handleBlur);
+    }
+
+    // Cleanup function
+    return () => {
+      mounted = false;
+      
+      if (presenceChannel) {
+        supabase.removeChannel(presenceChannel);
+      }
+
+      if (editorElement) {
+        editorElement.removeEventListener('focus', handleFocus);
+        editorElement.removeEventListener('blur', handleBlur);
+      }
+
+      // Leave article when component unmounts
+      supabase.rpc('leave_article', { p_article_id: articleId });
+    };
   }, [articleId]);
 
-  if (activeUsers.length === 0) return null;
+  const getInitials = (email: string) => {
+    if (!email) return '?';
+    const parts = email.split('@')[0].split('.');
+    if (parts.length >= 2) {
+      return parts[0][0].toUpperCase() + parts[1][0].toUpperCase();
+    }
+    return email[0].toUpperCase();
+  };
+
+  const getStatusColor = (status?: string, role?: string) => {
+    if (role === 'admin') return 'from-red-400 to-red-600';
+    if (role === 'manager') return 'from-blue-400 to-blue-600';
+    if (status === 'editing') return 'from-green-400 to-green-600';
+    return 'from-blue-400 to-purple-500';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center space-x-1">
+        <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center space-x-2">
-      <div className="flex -space-x-2">
-        {activeUsers.slice(0, 3).map((user, index) => (
-          <motion.div
-            key={user.id}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
-            className="relative"
+    <div className="flex items-center space-x-1">
+      {activeUsers.slice(0, 5).map((user) => (
+        <div key={user.id} className="relative group">
+          <div 
+            className={`w-8 h-8 bg-gradient-to-br ${getStatusColor(user.status, user.role)} rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white dark:border-gray-800 shadow-sm transition-transform hover:scale-110`}
+            title={`${user.email}${user.company_name ? ` (${user.company_name})` : ''} - ${user.status || 'viewing'}${user.role ? ` [${user.role}]` : ''}`}
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white dark:border-gray-800 shadow-sm">
-              {user.email.charAt(0).toUpperCase()}
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white dark:border-gray-800"></div>
-          </motion.div>
-        ))}
-      </div>
-      {activeUsers.length > 3 && (
-        <span className="text-xs text-gray-500 ml-2">+{activeUsers.length - 3} more</span>
+            {getInitials(user.email)}
+          </div>
+          {user.status === 'editing' && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white dark:border-gray-800"></div>
+          )}
+        </div>
+      ))}
+      
+      {activeUsers.length > 5 && (
+        <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white dark:border-gray-800 shadow-sm">
+          +{activeUsers.length - 5}
+        </div>
+      )}
+      
+      {activeUsers.length === 0 && (
+        <div className="text-sm text-gray-500">No active collaborators</div>
       )}
     </div>
   );
@@ -485,6 +631,9 @@ interface UserProfile {
   id: string;
   email: string;
   company_name?: string;
+  role?: string;
+  avatar_url?: string;
+  status?: 'viewing' | 'editing' | 'idle';
 }
 
 // Enhanced helper functions
@@ -768,7 +917,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   onAdminNote
 }) => {
   // Enhanced theme management
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   
   // UI State with better organization
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -965,12 +1114,15 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   }, []);
 
   // Memoize the decorations function to prevent excessive re-renders
-  // Only depend on highlightedCommentId, use ref for comments
+  // Use a stable function that gets the current highlightedCommentId from ref
+  const highlightedCommentIdRef = useRef(highlightedCommentId);
+  
   const editorDecorations = useCallback((state: any) => {
-    if (!highlightedCommentId) return null;
+    const currentHighlightedId = highlightedCommentIdRef.current;
+    if (!currentHighlightedId) return null;
 
     const decorations: Decoration[] = [];
-    const commentToHighlight = commentsRef.current.find(c => c.id === highlightedCommentId);
+    const commentToHighlight = commentsRef.current.find(c => c.id === currentHighlightedId);
 
     if (commentToHighlight && typeof commentToHighlight.selection_start === 'number' && typeof commentToHighlight.selection_end === 'number') {
       decorations.push(
@@ -981,7 +1133,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     }
 
     return DecorationSet.create(state.doc, decorations);
-  }, [highlightedCommentId]); // Remove comments dependency, use ref instead
+  }, []); // Empty dependencies - this function is now stable
 
   const editor = useEditor({
     extensions: getEditorExtensions,
@@ -1044,7 +1196,16 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     onBlur: () => {
       console.log('🎯 Editor lost focus');
     },
-  }, [getEditorExtensions, editorDecorations, theme]); // Add theme to dependencies
+  }, [getEditorExtensions, theme, content]); // Removed editorDecorations from dependencies
+  
+  // Update ref when highlightedCommentId changes and force decoration update
+  useEffect(() => {
+    highlightedCommentIdRef.current = highlightedCommentId;
+    // Force decoration update without recreating editor
+    if (editor && !editor.isDestroyed) {
+      editor.view.updateState(editor.view.state);
+    }
+  }, [highlightedCommentId, editor]);
 
   // Auto-save functionality with stable debounced function
   const debouncedAutoSave = useMemo(
@@ -1345,7 +1506,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     return executeCommand(() => editor?.chain().focus().toggleHighlight({ color }).run(), `setHighlight(${color})`);
   }, [editor, executeCommand]);
 
-  const toggleHeading = useCallback((level: 1 | 2 | 3) => {
+  const toggleHeading = useCallback((level: 1 | 2 | 3 | 4) => {
     return executeCommand(() => editor?.chain().focus().toggleHeading({ level }).run(), `toggleHeading(${level})`);
   }, [editor, executeCommand]);
 
@@ -1379,7 +1540,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
         ${focusMode === 'zen' ? 'hidden' : 'block'}
         bg-white/95 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4
         ${theme === 'dark' ? 'bg-gray-900/95 border-gray-700/50 dark' : ''}
-        sticky top-0 z-40 shadow-sm
+        fixed top-20 z-40 w-full shadow-sm
       `}
     >
       {/* Top toolbar row */}
@@ -1428,34 +1589,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
 
         {/* Right: View and settings controls */}
         <div className="flex items-center gap-3">
-          {/* View mode toggle */}
-          <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-xl p-1">
-            <ToolbarButton
-              icon={Type}
-              label="Editor"
-              isActive={viewMode === 'editor'}
-              onClick={() => setViewMode('editor')}
-              variant={viewMode === 'editor' ? 'primary' : 'ghost'}
-              size="sm"
-            />
-            <ToolbarButton
-              icon={Eye}
-              label="Preview"
-              isActive={viewMode === 'preview'}
-              onClick={() => setViewMode('preview')}
-              variant={viewMode === 'preview' ? 'primary' : 'ghost'}
-              size="sm"
-            />
-            <ToolbarButton
-              icon={Columns}
-              label="Split View"
-              isActive={viewMode === 'split'}
-              onClick={() => setViewMode('split')}
-              variant={viewMode === 'split' ? 'primary' : 'ghost'}
-              size="sm"
-            />
-          </div>
-          
           {/* Focus and theme controls */}
           <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-xl p-1 gap-1">
             <ToolbarButton
@@ -1468,24 +1601,9 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               badge={comments.length > 0 ? comments.length : undefined}
             />
             <ToolbarButton
-              icon={FocusIcon}
-              label="Focus Mode"
-              isActive={focusMode === 'focused'}
-              onClick={() => setFocusMode(focusMode === 'focused' ? 'normal' : 'focused')}
-              variant="ghost"
-              size="sm"
-            />
-            <ToolbarButton
               icon={focusMode === 'zen' ? Minimize2 : Maximize2}
               label={focusMode === 'zen' ? 'Exit Zen Mode' : 'Zen Mode'}
               onClick={() => setFocusMode(focusMode === 'zen' ? 'normal' : 'zen')}
-              variant="ghost"
-              size="sm"
-            />
-            <ToolbarButton
-              icon={theme === 'dark' ? Sun : Moon}
-              label="Toggle Theme"
-              onClick={toggleTheme}
               variant="ghost"
               size="sm"
             />
@@ -1565,6 +1683,14 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               label="Heading 3"
               isActive={editor?.isActive('heading', { level: 3 })}
               onClick={() => toggleHeading(3)}
+              variant="ghost"
+              size="sm"
+            />
+            <ToolbarButton
+              icon={Heading4}
+              label="Heading 4"
+              isActive={editor?.isActive('heading', { level: 4 })}
+              onClick={() => toggleHeading(4)}
               variant="ghost"
               size="sm"
             />
@@ -1758,28 +1884,80 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
         ${isFullscreen ? 'fixed inset-0 z-50' : 'relative'}
         ${className}
         ${theme === 'dark' ? 'bg-gray-900 dark' : 'bg-gray-50'}
-        ${focusMode === 'zen' ? 'zen-mode' : ''}
         w-full flex flex-col
+        ${focusMode === 'zen' ? 'h-screen' : ''}
       `}
+      style={{
+        ...(focusMode === 'zen' && {
+          overflow: 'auto',
+        })
+      }}
     >
+      {/* Custom styles for heading hierarchy */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .article-editor-content h1 {
+            font-size: 2.5rem !important;
+            font-weight: 700 !important;
+            line-height: 1.2 !important;
+            margin-top: 2rem !important;
+            margin-bottom: 1rem !important;
+            color: ${theme === 'dark' ? '#f9fafb' : '#111827'} !important;
+          }
+          .article-editor-content h2 {
+            font-size: 2rem !important;
+            font-weight: 600 !important;
+            line-height: 1.3 !important;
+            margin-top: 1.75rem !important;
+            margin-bottom: 0.875rem !important;
+            color: ${theme === 'dark' ? '#f3f4f6' : '#1f2937'} !important;
+          }
+          .article-editor-content h3 {
+            font-size: 1.5rem !important;
+            font-weight: 600 !important;
+            line-height: 1.4 !important;
+            margin-top: 1.5rem !important;
+            margin-bottom: 0.75rem !important;
+            color: ${theme === 'dark' ? '#e5e7eb' : '#374151'} !important;
+          }
+          .article-editor-content h4 {
+            font-size: 1.25rem !important;
+            font-weight: 600 !important;
+            line-height: 1.5 !important;
+            margin-top: 1.25rem !important;
+            margin-bottom: 0.625rem !important;
+            color: ${theme === 'dark' ? '#d1d5db' : '#4b5563'} !important;
+          }
+          .article-editor-content p {
+            font-size: 1.125rem !important;
+            line-height: 1.7 !important;
+            margin-bottom: 1rem !important;
+            color: ${theme === 'dark' ? '#d1d5db' : '#374151'} !important;
+          }
+        `
+      }} />
+
       {/* Main toolbar - Fixed at top */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
         {renderMainToolbar()}
       </div>
 
       {/* Main content area with proper layout - Make wider overall */}
-      <div className="flex-1 flex overflow-hidden" style={{ maxWidth: '100vw' }}>
+      <div className="flex-1 flex overflow-hidden pt-28" style={{ maxWidth: '100vw' }}>
         {/* Editor area - takes most space */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ minWidth: '60%' }}>
+        <div className={`flex-1 flex flex-col min-w-0 ${focusMode === 'zen' ? 'overflow-y-auto' : 'overflow-hidden'}`} style={{ minWidth: '60%' }}>
           {/* Editor container - properly contained with overflow handling */}
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 ${focusMode === 'zen' ? 'overflow-visible' : 'overflow-y-auto'}`}>
             <div 
               ref={editorRef}
+              data-editor="true"
               className={`
                 px-8 pt-8 min-h-full
                 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}
-                ${focusMode === 'zen' ? 'zen-mode' : ''}
-                ${focusMode === 'focused' ? 'max-w-5xl mx-auto' : 'w-full'}
+                ${focusMode === 'zen' ? 'prose-2xl max-w-5xl mx-auto' : 'prose-xl max-w-none'}
+                ${isMobile ? 'prose-lg' : ''}
+                w-full leading-relaxed
+                article-editor-content
               `}
               onClick={handleEditorContainerClick}
               data-gramm="false"
@@ -1787,6 +1965,10 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               data-enable-grammarly="false"
               style={{
                 scrollBehavior: 'auto', // Prevent smooth scrolling that might interfere
+                ...(focusMode === 'zen' && {
+                  minHeight: '100vh',
+                  paddingBottom: '50vh', // Extra space for zen mode scrolling
+                })
               }}
             >
               <EditorContent 
@@ -1855,6 +2037,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
         {showComments && articleId && (
           <div className="flex-shrink-0 border-l border-gray-200 bg-gray-50" style={{ width: '420px', maxWidth: '420px' }}>
             <CommentingSystem
+              key={`comments-${articleId}`}
               articleId={articleId}
               editorRef={editorRef}
               comments={comments}

@@ -60,7 +60,6 @@ export async function loadArticleContent(articleId: string): Promise<ArticleLoad
         updated_at
       `)
       .eq('id', articleId)
-      .eq('user_id', user.id)  // Ensure user can only access their own articles
       .single();
 
     if (error) {
@@ -141,7 +140,6 @@ export async function saveArticleContent(
       .from('content_briefs')
       .select('article_version, editing_status')
       .eq('id', articleId)
-      .eq('user_id', user.id)
       .single();
 
     if (fetchError) {
@@ -166,7 +164,6 @@ export async function saveArticleContent(
         updated_at: new Date().toISOString()
       })
       .eq('id', articleId)
-      .eq('user_id', user.id)
       .select(`
         id,
         product_name,
@@ -260,7 +257,6 @@ export async function getArticleStatus(articleId: string): Promise<{
       .from('content_briefs')
       .select('editing_status, last_edited_at, last_edited_by, article_version')
       .eq('id', articleId)
-      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -679,7 +675,6 @@ export async function deleteArticle(articleId: string): Promise<{ success: boole
       .from('content_briefs')
       .select('id, product_name, user_id, article_content, link')
       .eq('id', articleId)
-      .eq('user_id', user.id)
       .single();
 
     if (fetchError) {
@@ -773,8 +768,7 @@ export async function deleteArticle(articleId: string): Promise<{ success: boole
         current_version: null,
         updated_at: new Date().toISOString()
       })
-      .eq('id', articleId)
-      .eq('user_id', user.id);
+      .eq('id', articleId);
 
     if (updateError) {
       console.error('Error clearing article content:', updateError);

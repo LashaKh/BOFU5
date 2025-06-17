@@ -26,8 +26,7 @@ const UserDashboardSidebar = () => {
       // Get total briefs count
       const { count: totalBriefs, error: briefsError } = await supabase
         .from('content_briefs')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .select('id', { count: 'exact', head: true });
       if (briefsError) console.error('Error fetching briefs count:', briefsError);
       else setBriefsCount(totalBriefs || 0);
 
@@ -35,7 +34,6 @@ const UserDashboardSidebar = () => {
       const { count: approvedBriefs, error: approvedError } = await supabase
         .from('content_briefs')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
         .eq('status', 'approved');
       if (approvedError) console.error('Error fetching approved count:', approvedError);
       else setApprovedCount(approvedBriefs || 0);
@@ -44,7 +42,6 @@ const UserDashboardSidebar = () => {
       const { count: articlesCountVal, error: articlesCountError } = await supabase
         .from('content_briefs')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
         .not('link', 'is', null);
 
       if (articlesCountError) {

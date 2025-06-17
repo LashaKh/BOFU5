@@ -8,7 +8,8 @@ import {
   resolveCommentWithReason,
   bulkUpdateCommentStatus,
   getCommentsWithMetrics,
-  createComment
+  createComment,
+  createCommentWithMentions
 } from '../../lib/commentApi';
 import { CommentMarker } from './CommentMarker';
 import { CommentPopover } from './CommentPopover';
@@ -42,18 +43,50 @@ interface TextSelection {
   range?: Range; // Make range optional since it's not serializable
 }
 
-export const CommentingSystem: React.FC<CommentingSystemProps> = ({
+// Enhanced global interaction state management
+const GLOBAL_INTERACTION_KEY = 'commentSystemInteraction';
+
+const setGlobalInteractionState = (isInteracting: boolean) => {
+  try {
+    sessionStorage.setItem(GLOBAL_INTERACTION_KEY, String(isInteracting));
+    console.log('🔧 Global interaction state set:', isInteracting);
+  } catch (error) {
+    console.warn('Could not save interaction state:', error);
+  }
+};
+
+const getGlobalInteractionState = (): boolean => {
+  try {
+    const stored = sessionStorage.getItem(GLOBAL_INTERACTION_KEY);
+    return stored === 'true';
+  } catch {
+    return false;
+  }
+};
+
+// Memoized CommentingSystem with enhanced comparison and debugging
+const CommentingSystemComponent = React.memo(({
   articleId,
   editorRef,
   comments,
   onCommentsChange,
   highlightedCommentId,
   onHighlightComment,
-  showResolutionPanel = false,
   adminMode = false,
-  adminUser = null
-}) => {
-  console.log('🎯 CommentingSystem initialized:', { articleId, hasEditorRef: !!editorRef.current, showResolutionPanel, adminMode });
+  showResolutionPanel = false,
+  adminUser = null,
+}: CommentingSystemProps) => {
+  // Use a more specific console log that includes render timestamp
+  const renderTimestamp = Date.now();
+  console.log('🎯 CommentingSystem rendered:', { 
+    articleId, 
+    hasEditorRef: !!editorRef?.current, 
+    showResolutionPanel, 
+    adminMode,
+    commentsCount: comments.length,
+    renderTimestamp,
+    highlightedCommentId
+  });
 
   const [selectedText, setSelectedText] = useState<TextSelection | null>(null);
   const [selectedComment, setSelectedComment] = useState<ArticleComment | null>(null);
@@ -63,9 +96,37 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [showResolutionManagement, setShowResolutionManagement] = useState(false);
+  const [contentDriftDetected, setContentDriftDetected] = useState(false);
+  const [layoutStable, setLayoutStable] = useState(false);
 
   const isCreatingCommentRef = useRef(false);
   const pendingSelectionRef = useRef<TextSelection | null>(null);
+
+  // Enhanced interaction tracking with multiple approaches
+  const isInteractingWithCommentUIRef = useRef(false);
+  const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const setInteractionFlag = useCallback((isInteracting: boolean, duration = 800) => {
+    console.log('🔧 Setting interaction flag:', isInteracting, 'for', duration, 'ms');
+    
+    // Clear any existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    
+    // Set both local and global state
+    isInteractingWithCommentUIRef.current = isInteracting;
+    setGlobalInteractionState(isInteracting);
+    
+    if (isInteracting) {
+      // Auto-clear after specified duration
+      interactionTimeoutRef.current = setTimeout(() => {
+        console.log('🔧 Auto-clearing interaction flag after', duration, 'ms');
+        isInteractingWithCommentUIRef.current = false;
+        setGlobalInteractionState(false);
+      }, duration);
+    }
+  }, []);
 
   // Global state management functions
   const getGlobalPopoverState = () => {
@@ -117,6 +178,9 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       const fetchedComments = await getArticleComments(articleId);
       console.log('📥 Loaded comments:', fetchedComments.length, 'comments');
       onCommentsChange(fetchedComments);
+      
+      // Reset content drift detection when loading fresh comments
+      setContentDriftDetected(false);
     } catch (error) {
       console.error('❌ Error loading comments:', error);
     } finally {
@@ -144,29 +208,57 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
     };
   }, [articleId, loadComments]);
 
-  // Set up text selection monitoring with proper cleanup
+  // Detect when layout has stabilized after sidebar loading
+  useEffect(() => {
+    // Wait for the component to render and layout to stabilize
+    const stabilizeLayout = () => {
+      // Use multiple checks to ensure layout is really stable
+      setTimeout(() => {
+        console.log('🎯 Layout stabilization check 1...');
+        if (editorRef.current) {
+          // Force a reflow to ensure layout is complete
+          const editorWidth = editorRef.current.offsetWidth;
+          console.log('📐 Editor width after stabilization:', editorWidth);
+          
+          // Wait a bit more to be absolutely sure
+          setTimeout(() => {
+            console.log('🎯 Layout stabilization check 2...');
+            setLayoutStable(true);
+            console.log('✅ Layout marked as stable - markers can now render');
+          }, 300);
+        }
+      }, 100);
+    };
+
+    // Initial stabilization
+    stabilizeLayout();
+
+    // Also re-stabilize when comments change (sidebar content changes)
+    const debounceTimer = setTimeout(stabilizeLayout, 200);
+
+    return () => {
+      clearTimeout(debounceTimer);
+    };
+  }, [comments.length, isExpanded, editorRef]);
+
+  // Set up text selection monitoring with enhanced interaction checking
   useEffect(() => {
     if (!editorRef.current) return;
 
     console.log('🔍 Setting up selection change listener');
     const handleSelectionChange = () => {
-      // Check global state as well to be extra safe
-      const globalState = getGlobalPopoverState();
+      // Enhanced interaction checking - check both local and global state
+      const localInteracting = isCreatingCommentRef.current || showPopover;
+      const globalInteracting = getGlobalInteractionState();
+      const globalPopoverState = getGlobalPopoverState();
       
-      // Prevent clearing selection during comment creation or when popover is open
-      if (isCreatingCommentRef.current || showPopover || globalState.showPopover) {
-        console.log('🚫 Skipping selection change - popover should stay open', {
-          isCreating: isCreatingCommentRef.current,
-          localShowPopover: showPopover,
-          globalShowPopover: globalState.showPopover
+      if (localInteracting || globalInteracting || globalPopoverState.showPopover || isInteractingWithCommentUIRef.current) {
+        console.log('🚫 Skipping selection change - interaction detected', {
+          localInteracting,
+          globalInteracting,
+          globalPopover: globalPopoverState.showPopover,
+          uiInteraction: isInteractingWithCommentUIRef.current
         });
-        return;
-      }
-
-      // Prevent showing comment button when interacting with comment UI
-      if (isInteractingWithCommentUIRef.current) {
-        console.log('🚫 Skipping selection change - interacting with comment UI');
-        setSelectedText(null);
         return;
       }
 
@@ -201,22 +293,48 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       });
 
       if (selectedTextContent.length >= 3) {
-        const start = editorTextContent.indexOf(selectedTextContent);
-        const end = start + selectedTextContent.length;
+        // FIXED: Use actual range position instead of indexOf() which finds first occurrence
+        // Calculate start position using the Range API for precise positioning
+        const startNode = range.startContainer;
+        const startOffset = range.startOffset;
         
-        // Validate the calculated range
-        if (start !== -1 && start >= 0 && end <= editorTextContent.length) {
+        // Get the actual text offset within the editor
+        const actualStart = getTextOffset(editorRef.current, startNode, startOffset);
+        const actualEnd = actualStart + selectedTextContent.length;
+        
+        // ENHANCED VALIDATION: Verify that our calculated offsets match the selected text
+        const editorText = editorTextContent;
+        const textAtCalculatedPosition = editorText.substring(actualStart, actualEnd);
+        
+        console.log('🔍 Selection validation:', {
+          selectedText: selectedTextContent.substring(0, 50) + '...',
+          calculatedStart: actualStart,
+          calculatedEnd: actualEnd,
+          textAtPosition: textAtCalculatedPosition.substring(0, 50) + '...',
+          positionMatches: selectedTextContent === textAtCalculatedPosition,
+          selectionLength: selectedTextContent.length,
+          calculatedLength: textAtCalculatedPosition.length,
+          editorTotalLength: editorText.length
+        });
+        
+        // Only proceed if our calculation matches the actual selection
+        if (actualStart >= 0 && actualEnd <= editorTextContent.length && selectedTextContent === textAtCalculatedPosition) {
           const newSelection: TextSelection = {
-            start,
-            end,
+            start: actualStart,
+            end: actualEnd,
             text: selectedTextContent,
             range: range.cloneRange()
           };
           
-          console.log('✅ Valid selection found:', newSelection);
+          console.log('✅ Valid and verified selection found:', newSelection);
           setSelectedText(newSelection);
         } else {
-          console.log('❌ Invalid selection range:', { start, end, editorLength: editorTextContent.length });
+          console.error('❌ Selection validation FAILED:', { 
+            start: actualStart, 
+            end: actualEnd, 
+            editorLength: editorTextContent.length,
+            textMismatch: selectedTextContent !== textAtCalculatedPosition
+          });
           setSelectedText(null);
         }
       } else {
@@ -234,7 +352,22 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
   }, [editorRef, showPopover]);
 
   const handleCreateComment = (selection: TextSelection) => {
-    console.log('💬 Creating comment for selection:', selection);
+    console.log('💬 Creating comment for selection:', {
+      text: selection.text.substring(0, 50) + '...',
+      start: selection.start,
+      end: selection.end,
+      length: selection.text.length
+    });
+    
+    // **CRITICAL DEBUG: Verify the selection data integrity**
+    const editorContent = editorRef.current?.textContent || '';
+    const actualTextAtCoordinates = editorContent.substring(selection.start, selection.end);
+    console.log('🔍 Verifying selection integrity:', {
+      selectedText: selection.text.substring(0, 50) + '...',
+      actualTextAtCoords: actualTextAtCoordinates.substring(0, 50) + '...',
+      coordinatesMatch: selection.text === actualTextAtCoordinates,
+      editorLength: editorContent.length
+    });
     
     isCreatingCommentRef.current = true;
     pendingSelectionRef.current = selection;
@@ -248,14 +381,12 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
     setShowPopover(true);
   };
 
-  // Add ref to track if user is interacting with comment UI
-  const isInteractingWithCommentUIRef = useRef(false);
-
-  const handleCommentClick = (comment: ArticleComment) => {
+  // Enhanced comment click handler with immediate interaction flag setting
+  const handleCommentClick = useCallback((comment: ArticleComment) => {
     console.log('🖱️ Comment clicked:', comment.id);
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    // Set interaction flag IMMEDIATELY to prevent any selection changes
+    setInteractionFlag(true, 1000);
     
     // Toggle selection: if clicking the same comment, deselect it
     if (highlightedCommentId === comment.id) {
@@ -265,48 +396,10 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       console.log('🔄 Selecting comment:', comment.id);
       onHighlightComment(comment.id);
       
-      // Scroll to the comment text in the editor if it has selection coordinates
-      if (comment.selection_start !== undefined && comment.selection_end !== undefined && editorRef.current) {
-        try {
-          const textNode = getTextNodeAtOffset(editorRef.current, comment.selection_start);
-          if (textNode) {
-            const range = document.createRange();
-            range.setStart(textNode.node, textNode.offset);
-            
-            const endTextNode = getTextNodeAtOffset(editorRef.current, comment.selection_end);
-            if (endTextNode) {
-              range.setEnd(endTextNode.node, endTextNode.offset);
-  
-              // Scroll the range into view by calculating position
-              const selection = window.getSelection();
-              if (selection) {
-                selection.removeAllRanges();
-                selection.addRange(range);
-                
-                // Scroll into view using window.scrollTo
-                setTimeout(() => {
-                  const rect = range.getBoundingClientRect();
-                  if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                    window.scrollTo({
-                      top: window.scrollY + rect.top - window.innerHeight / 2,
-                      behavior: 'smooth'
-                    });
-                  }
-                }, 100);
-              }
-            }
-          }
-        } catch (error) {
-          console.warn('Could not scroll to comment text:', error);
-        }
-      }
+      // Note: Removed automatic scrolling to prevent unwanted page jumps
+      // The comment will be highlighted but won't automatically scroll to the referenced text
     }
-    
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isInteractingWithCommentUIRef.current = false;
-    }, 500);
-  };
+  }, [highlightedCommentId, onHighlightComment, setInteractionFlag]);
 
   const handleClosePopover = () => {
     console.log('❌ Closing popover');
@@ -324,42 +417,83 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
     
     try {
       if (selectedText && !selectedComment) {
-        // Creating a new comment
-        console.log('🆕 Creating new comment');
-        
-        const commentData = {
-          article_id: articleId,
-          content: content.trim(),
+        // Creating a new comment with mention support
+        console.log('🆕 Creating new comment with coordinates:', {
+          articleId,
+          content: content.trim().substring(0, 50) + '...',
           selection_start: selectedText.start,
           selection_end: selectedText.end,
-          content_type: 'text' as const,
-          status: 'active' as const
-        };
-
-        console.log('📤 Sending comment data:', commentData);
-        const result = await createComment(commentData);
+          selected_text: selectedText.text.substring(0, 50) + '...'
+        });
+        
+        // Use the regular createComment API with selected_text
+        const result = await createComment({
+          article_id: articleId,
+          content: content.trim(),
+          content_type: 'text',
+          selection_start: selectedText.start,
+          selection_end: selectedText.end,
+          selected_text: selectedText.text // Store the original selected text
+        });
+        
+        // **CRITICAL DEBUG: Verify what was actually saved**
+        console.log('💾 Comment creation result:', {
+          success: !!result,
+          savedCoordinates: {
+            start: result.selection_start,
+            end: result.selection_end
+          },
+          savedSelectedText: result.selected_text?.substring(0, 50) + '...',
+          originalSelection: {
+            text: selectedText.text.substring(0, 50) + '...',
+            start: selectedText.start,
+            end: selectedText.end
+          },
+          currentEditorLength: editorRef.current?.textContent?.length || 0
+        });
+        
+        // **FINAL VERIFICATION: Check the text at saved coordinates**
+        if (editorRef.current) {
+          const editorContent = editorRef.current.textContent || '';
+          const textAtSavedCoords = editorContent.substring(selectedText.start, selectedText.end);
+          console.log('✅ Final verification - text at saved coordinates:', {
+            savedText: textAtSavedCoords.substring(0, 50) + '...',
+            originalSelectedText: selectedText.text.substring(0, 50) + '...',
+            storedSelectedText: result.selected_text?.substring(0, 50) + '...',
+            coordsMatch: textAtSavedCoords === selectedText.text,
+            storedTextMatch: result.selected_text === selectedText.text
+          });
+        }
         
         if (result) {
-          console.log('✅ Comment created successfully:', result);
+          console.log('✅ Comment created successfully with stored coordinates and selected text:', {
+            id: result.id,
+            stored_start: result.selection_start,
+            stored_end: result.selection_end,
+            stored_selected_text: result.selected_text?.substring(0, 50) + '...',
+            original_start: selectedText.start,
+            original_end: selectedText.end,
+            coordinates_match: result.selection_start === selectedText.start && result.selection_end === selectedText.end,
+            selected_text_match: result.selected_text === selectedText.text
+          });
           await loadComments(); // Refresh comments
           handleClosePopover();
         } else {
           console.error('❌ Failed to create comment');
         }
       } else if (selectedComment) {
-        // Creating a reply to an existing comment
+        // Creating a reply to an existing comment with mention support
         console.log('💬 Creating reply to comment:', selectedComment.id);
         
-        const replyData = {
-          article_id: articleId,
-          content: content.trim(),
-          content_type: 'text' as const,
-          status: 'active' as const,
-          parent_comment_id: selectedComment.id // This makes it a reply
-        };
-
-        console.log('📤 Sending reply data:', replyData);
-        const result = await createComment(replyData);
+        const result = await createCommentWithMentions(
+          articleId,
+          content.trim(),
+          'text',
+          undefined, // no image file
+          undefined, // no selection start
+          undefined, // no selection end
+          selectedComment.id // parent comment for reply
+        );
         
         if (result) {
           console.log('✅ Reply created successfully:', result);
@@ -380,8 +514,7 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
   const handleDeleteComment = async (commentId: string) => {
     console.log('🗑️ Deleting comment:', commentId);
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    setInteractionFlag(true, 1000);
 
     try {
       setLoadingAction(`delete-${commentId}`);
@@ -403,18 +536,13 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       console.error('❌ Error deleting comment:', error);
     } finally {
       setLoadingAction(null);
-      // Reset flag after action completes
-      setTimeout(() => {
-        isInteractingWithCommentUIRef.current = false;
-      }, 500);
     }
   };
 
   const handleStatusChange = async (commentId: string, status: 'active' | 'resolved' | 'archived') => {
     console.log('🔄 Changing comment status:', { commentId, status });
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    setInteractionFlag(true, 1000);
     
     try {
       setLoadingAction(`status-${commentId}`);
@@ -424,18 +552,13 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       console.error('❌ Error updating comment status:', error);
     } finally {
       setLoadingAction(null);
-      // Reset flag after action completes
-      setTimeout(() => {
-        isInteractingWithCommentUIRef.current = false;
-      }, 500);
     }
   };
 
   const handleResolveWithReason = async (commentId: string, reason: string) => {
     console.log('✅ Resolving comment with reason:', { commentId, reason });
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    setInteractionFlag(true, 1000);
     
     try {
       setLoadingAction(`resolve-${commentId}`);
@@ -445,10 +568,6 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
       console.error('❌ Error resolving comment:', error);
     } finally {
       setLoadingAction(null);
-      // Reset flag after action completes
-      setTimeout(() => {
-        isInteractingWithCommentUIRef.current = false;
-      }, 500);
     }
   };
   
@@ -468,8 +587,7 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
   const handleReply = (comment: ArticleComment) => {
     console.log('💬 Replying to comment:', comment.id);
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    setInteractionFlag(true, 1000);
     
     setSelectedComment(comment);
     setSelectedText(null);
@@ -478,18 +596,12 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
     setPopoverPosition({ x: 0, y: 0 }); // Not used anymore but keeping for compatibility
     
     setShowPopover(true);
-    
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isInteractingWithCommentUIRef.current = false;
-    }, 500);
   };
 
   const handleEdit = (comment: ArticleComment) => {
     console.log('✏️ Editing comment:', comment.id);
     
-    // Set flag to prevent comment button from appearing
-    isInteractingWithCommentUIRef.current = true;
+    setInteractionFlag(true, 1000);
     
     setSelectedComment(comment);
     setSelectedText(null);
@@ -498,11 +610,6 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
     setPopoverPosition({ x: 0, y: 0 }); // Not used anymore but keeping for compatibility
     
     setShowPopover(true);
-    
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isInteractingWithCommentUIRef.current = false;
-    }, 500);
   };
 
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved' | 'archived'>('all');
@@ -570,208 +677,358 @@ export const CommentingSystem: React.FC<CommentingSystemProps> = ({
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl"
-      style={{ 
-        width: '420px', 
-        maxWidth: '420px'
-      }}
-    >
-      {/* Comment markers in editor */}
-      {comments.map((comment) => {
+    <>
+      {/* Comment markers in editor - render as portals for proper positioning */}
+      {/* Only render markers after layout has stabilized to prevent timing issues */}
+      {layoutStable && comments.map((comment, index) => {
+        // **DEBUG: Log each comment being processed for marker rendering**
+        console.log(`🎯 Processing comment ${index + 1}/${comments.length} for marker:`, {
+          id: comment.id,
+          content: comment.content.substring(0, 50) + '...',
+          selection_start: comment.selection_start,
+          selection_end: comment.selection_end,
+          selected_text: comment.selected_text ? comment.selected_text.substring(0, 30) + '...' : 'NOT_STORED',
+          status: comment.status,
+          created_at: comment.created_at
+        });
+
         if (typeof comment.selection_start !== 'number' || typeof comment.selection_end !== 'number') {
+          console.warn(`🚨 Comment ${comment.id} has invalid selection coordinates:`, {
+            selection_start: comment.selection_start,
+            selection_end: comment.selection_end
+          });
           return null;
         }
 
-        const position = getMarkerPosition(comment.selection_start, comment.selection_end, editorRef);
-        if (!position) return null;
+        // **COORDINATE VALIDATION: Check if stored coordinates match stored selected_text**
+        if (editorRef.current && comment.selected_text) {
+          const editorContent = editorRef.current.textContent || '';
+          const textAtCoordinates = editorContent.substring(comment.selection_start, comment.selection_end);
+          
+          if (textAtCoordinates !== comment.selected_text) {
+            console.warn(`🚨 COORDINATE MISMATCH for comment ${comment.id}:`, {
+              storedText: comment.selected_text.substring(0, 50) + '...',
+              textAtCoords: textAtCoordinates.substring(0, 50) + '...',
+              coordinates: `${comment.selection_start}-${comment.selection_end}`,
+              match: false
+            });
+            
+            // Skip rendering marker for mismatched comments to avoid confusion
+            return null;
+          } else {
+            console.log(`✅ Coordinate validation passed for comment ${comment.id}`);
+          }
+        }
 
-        return (
-          <CommentMarker
+        const position = getMarkerPosition(comment.selection_start, comment.selection_end, editorRef, setContentDriftDetected);
+        if (!position || !editorRef.current) {
+          console.warn(`🚨 Could not calculate position for comment ${comment.id}`);
+          return null;
+        }
+
+        console.log(`✅ Rendering marker for comment ${comment.id} at position:`, position);
+
+        return ReactDOM.createPortal(
+          <div
             key={comment.id}
-            comment={comment}
-            position={position}
-            onClick={() => handleCommentClick(comment)}
-          />
+            style={{
+              position: 'absolute',
+              top: position.top,
+              left: position.left - 40, // Position marker to the left of selection start
+              zIndex: 15,
+              pointerEvents: 'auto'
+            }}
+          >
+            <CommentMarker
+              comment={comment}
+              position={position}
+              onClick={handleCommentClick}
+            />
+          </div>,
+          editorRef.current
         );
       })}
 
-      {/* Enhanced Selection button */}
-      {selectedText && !showPopover && ReactDOM.createPortal(
-        <motion.div key="comment-selection-button">
-          <CommentSelectionButton
-            selection={selectedText}
-            onCreateComment={handleCreateComment}
-          />
-        </motion.div>,
-        document.body
-      )}
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl"
+        style={{ 
+          width: '420px', 
+          maxWidth: '420px'
+        }}
+      >
+        {/* Layout Stabilization Indicator */}
+        <AnimatePresence>
+          {!layoutStable && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700 px-4 py-2"
+            >
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Positioning comments...
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Comment popover */}
-      {showPopover && ReactDOM.createPortal(
-        <CommentPopover 
-          position={popoverPosition}
-          articleId={articleId}
-          selectedText={selectedText}
-          selectedComment={selectedComment}
-          onClose={handleClosePopover}
-          onSubmit={handleCommentSubmit}
-        />,
-        document.body
-      )}
-
-      {/* Professional Comments Interface */}
-      <div className="h-full flex flex-col">
-        {/* Clean Modern Header */}
-        <div className="flex-shrink-0 px-6 py-6 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
-                  <MessageCircle className="w-6 h-6 text-white" />
+        {/* Content Drift Warning */}
+        <AnimatePresence>
+          {contentDriftDetected && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-orange-50 dark:bg-orange-900/20 border-b border-orange-200 dark:border-orange-700 px-4 py-3"
+            >
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                    Content Changes Detected
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                    Some comments may not be visible because the article content has changed since they were created.
+                  </p>
                 </div>
+                <button
+                  onClick={() => setContentDriftDetected(false)}
+                  className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Enhanced Selection button */}
+        {selectedText && !showPopover && ReactDOM.createPortal(
+          <motion.div key="comment-selection-button">
+            <CommentSelectionButton
+              selection={selectedText}
+              onCreateComment={handleCreateComment}
+            />
+          </motion.div>,
+          document.body
+        )}
+
+        {/* Comment popover */}
+        {showPopover && ReactDOM.createPortal(
+          <CommentPopover 
+            position={popoverPosition}
+            articleId={articleId}
+            selectedText={selectedText}
+            selectedComment={selectedComment}
+            onClose={handleClosePopover}
+            onSubmit={handleCommentSubmit}
+            onCommentCreated={async (comment) => {
+              console.log('✅ Comment created with image/mentions:', comment);
+              await loadComments(); // Refresh comments to show the new comment with image
+              handleClosePopover();
+            }}
+          />,
+          document.body
+        )}
+
+        {/* Professional Comments Interface */}
+        <div className="h-full flex flex-col">
+          {/* Clean Modern Header */}
+          <div className="flex-shrink-0 px-6 py-6 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
+                    <MessageCircle className="w-6 h-6 text-white" />
+                  </div>
+                  {commentMetrics.recent > 0 && (
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
+                    >
+                      <span className="text-xs font-bold text-white">{commentMetrics.recent}</span>
+                    </motion.div>
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Comments
+                  </h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {commentMetrics.total} total • {commentMetrics.active} active
+                  </p>
+                </div>
+              </div>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                {isExpanded ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </motion.button>
+            </div>
+
+            {/* Professional Metrics Cards */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
+                    <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{commentMetrics.active}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{commentMetrics.resolved}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Professional Comments List */}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex-1 overflow-hidden"
+              >
+                <CommentsSidebar
+                  comments={comments}
+                  isLoading={isLoading}
+                  onCommentClick={handleCommentClick}
+                  onStatusChange={handleStatusChange}
+                  onResolveWithReason={handleResolveWithReason}
+                  onDelete={handleDeleteComment}
+                  onReply={handleReply}
+                  onEdit={handleEdit}
+                  showResolutionDetails={showResolutionManagement}
+                  loadingAction={loadingAction}
+                  highlightedCommentId={highlightedCommentId}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Resolution Management Panel */}
+          <AnimatePresence>
+            {showResolutionManagement && adminMode && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="border-t border-gray-100 dark:border-gray-700"
+              >
+                <CommentResolutionPanel
+                  comments={comments}
+                  onStatusChange={handleBulkStatusUpdate}
+                  onRefresh={loadComments}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Professional Footer Actions */}
+          <div className="flex-shrink-0 p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowResolutionManagement(!showResolutionManagement)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>{showResolutionManagement ? 'Hide Panel' : 'Manage'}</span>
+                </motion.button>
+                
                 {commentMetrics.recent > 0 && (
                   <motion.div 
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
+                    className="flex items-center space-x-2 px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium"
                   >
-                    <span className="text-xs font-bold text-white">{commentMetrics.recent}</span>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                    <span>{commentMetrics.recent} new</span>
                   </motion.div>
                 )}
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Comments
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {commentMetrics.total} total • {commentMetrics.active} active
-                </p>
-              </div>
-            </div>
-            
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="p-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              {isExpanded ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </motion.button>
-          </div>
-
-          {/* Professional Metrics Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{commentMetrics.active}</p>
-                </div>
-                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{commentMetrics.resolved}</p>
-                </div>
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Professional Comments List */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex-1 overflow-hidden"
-            >
-              <CommentsSidebar
-                comments={comments}
-                isLoading={isLoading}
-                onCommentClick={handleCommentClick}
-                onStatusChange={handleStatusChange}
-                onResolveWithReason={handleResolveWithReason}
-                onDelete={handleDeleteComment}
-                onReply={handleReply}
-                onEdit={handleEdit}
-                showResolutionDetails={showResolutionManagement}
-                loadingAction={loadingAction}
-                highlightedCommentId={highlightedCommentId}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Resolution Management Panel */}
-        <AnimatePresence>
-          {showResolutionManagement && adminMode && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="border-t border-gray-100 dark:border-gray-700"
-            >
-              <CommentResolutionPanel
-                comments={comments}
-                onStatusChange={handleBulkStatusUpdate}
-                onRefresh={loadComments}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Professional Footer Actions */}
-        <div className="flex-shrink-0 p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowResolutionManagement(!showResolutionManagement)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
-              >
-                <Settings className="w-4 h-4" />
-                <span>{showResolutionManagement ? 'Hide Panel' : 'Manage'}</span>
-              </motion.button>
               
-              {commentMetrics.recent > 0 && (
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="flex items-center space-x-2 px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium"
-                >
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                  <span>{commentMetrics.recent} new</span>
-                </motion.div>
-              )}
-            </div>
-            
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Updated {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Updated {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
-};
+});
+
+// Enhanced comparison function with detailed logging
+CommentingSystemComponent.displayName = 'CommentingSystem';
+
+const CommentingSystemMemoized = React.memo(CommentingSystemComponent, (prevProps, nextProps) => {
+  console.log('🔍 CommentingSystem memo comparison triggered');
+  
+  // Log what changed for debugging
+  const changes: string[] = [];
+  
+  if (prevProps.articleId !== nextProps.articleId) changes.push('articleId');
+  if (prevProps.adminMode !== nextProps.adminMode) changes.push('adminMode');
+  if (prevProps.showResolutionPanel !== nextProps.showResolutionPanel) changes.push('showResolutionPanel');
+  if (prevProps.highlightedCommentId !== nextProps.highlightedCommentId) changes.push('highlightedCommentId');
+  if (prevProps.comments.length !== nextProps.comments.length) changes.push('comments.length');
+  if (!!prevProps.editorRef?.current !== !!nextProps.editorRef?.current) changes.push('editorRef');
+  
+  // Deep comparison of comment IDs to detect actual comment changes
+  const prevCommentIds = prevProps.comments.map(c => c.id).sort().join(',');
+  const nextCommentIds = nextProps.comments.map(c => c.id).sort().join(',');
+  if (prevCommentIds !== nextCommentIds) changes.push('comment IDs');
+  
+  // Function reference comparison - these will always be different but we don't care
+  if (prevProps.onCommentsChange !== nextProps.onCommentsChange) changes.push('onCommentsChange (callback)');
+  if (prevProps.onHighlightComment !== nextProps.onHighlightComment) changes.push('onHighlightComment (callback)');
+  
+  const shouldRerender = changes.some(change => 
+    !change.includes('callback') // Ignore callback changes
+  );
+  
+  console.log('🔍 Memo comparison result:', {
+    changes,
+    shouldRerender,
+    timestamp: Date.now()
+  });
+  
+  return !shouldRerender; // Return true to skip re-render, false to re-render
+});
+
+export { CommentingSystemMemoized as CommentingSystem };
 
 // Helper component for the comment button that appears on text selection
 interface CommentSelectionButtonProps {
@@ -1072,11 +1329,49 @@ const CommentsSidebar: React.FC<CommentsSidebarProps> = ({
 // Helper functions to calculate text offsets
 // These are crucial for mapping selection ranges to the editor's text content
 
-function getTextOffset(container: Element, node: Node, offset: number): number {
-  let range = document.createRange();
-  range.selectNodeContents(container);
-  range.setEnd(node, offset);
-  return range.toString().length;
+function getTextOffset(container: Element, targetNode: Node, targetOffset: number): number {
+  // Walk through all text nodes in the container to calculate the precise offset
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+  
+  let totalOffset = 0;
+  let currentNode = walker.nextNode();
+  
+  while (currentNode) {
+    if (currentNode === targetNode) {
+      // Found our target node, add the offset within this node
+      const finalOffset = totalOffset + targetOffset;
+      
+      console.log('🎯 Text offset calculation - TARGET FOUND:', {
+        targetNodeText: targetNode.textContent?.substring(0, 50) + '...',
+        targetOffset,
+        totalOffsetBeforeNode: totalOffset,
+        finalCalculatedOffset: finalOffset,
+        containerTotalLength: container.textContent?.length || 0
+      });
+      
+      return finalOffset;
+    }
+    
+    // Add this node's text length to our running total
+    const nodeLength = currentNode.textContent?.length || 0;
+    totalOffset += nodeLength;
+    
+    console.log('🔍 Walking text node:', {
+      nodeText: currentNode.textContent?.substring(0, 30) + '...',
+      nodeLength,
+      runningTotal: totalOffset
+    });
+    
+    currentNode = walker.nextNode();
+  }
+  
+  // If we didn't find the target node, return the total offset (edge case)
+  console.warn('⚠️ Target node not found in container, returning total offset:', totalOffset);
+  return totalOffset;
 }
 
 function getTextNodeAtOffset(container: Element, offset: number): { node: Text; offset: number } | null {
@@ -1095,38 +1390,95 @@ function getTextNodeAtOffset(container: Element, offset: number): { node: Text; 
   return null;
 }
 
-const getMarkerPosition = (start: number, end: number, editorRef: React.RefObject<HTMLElement>) => {
+const getMarkerPosition = (start: number, end: number, editorRef: React.RefObject<HTMLElement>, setDriftDetected?: (detected: boolean) => void) => {
   if (!editorRef.current) return null;
 
   try {
-    const editorLength = editorRef.current.textContent?.length || 0;
+    const editorTextContent = editorRef.current.textContent || '';
+    const editorLength = editorTextContent.length;
+    
+    // **DEBUG: Log the positioning attempt**
+    console.log('🎯 Calculating marker position:', { 
+      start, 
+      end, 
+      editorLength,
+      actualText: editorTextContent.substring(start, end),
+      firstChars: editorTextContent.substring(0, 50) + '...',
+      aroundSelection: editorTextContent.substring(Math.max(0, start - 20), start + end - start + 20)
+    });
+    
+    // **CONTENT DRIFT DETECTION: Check if coordinates are completely out of bounds**
+    if (start >= editorLength || end > editorLength) {
+      console.warn(`🚨 CONTENT DRIFT DETECTED: Comment coordinates (${start}-${end}) exceed current editor length (${editorLength}). Article content may have changed since comment was created.`);
+      
+      // Set the drift detection state if callback provided
+      if (setDriftDetected) {
+        setDriftDetected(true);
+      }
+      
+      // **RECOVERY STRATEGY: Try to find the comment text in the current content**
+      // This is a fallback for when content has been significantly modified
+      return null; // For now, hide the marker rather than show it in wrong position
+    }
+    
     // **ULTRA-ROBUST CHECK: Validate the entire range against editor length**
     if (start < 0 || end < start || start >= editorLength || end > editorLength) {
-      console.warn(`📌 Invalid range for marker position: start=${start}, end=${end}. Skipping.`);
+      console.warn(`📌 Invalid range for marker position: start=${start}, end=${end}, editorLength=${editorLength}. Skipping.`);
       return null;
     }
 
     const textNode = getTextNodeAtOffset(editorRef.current, start);
-    if (!textNode) return null;
+    if (!textNode) {
+      console.warn(`📌 Could not find text node at offset ${start}. Skipping.`);
+      return null;
+    }
+
+    console.log('🎯 Found text node:', { 
+      nodeText: textNode.node.textContent?.substring(0, 50) + '...',
+      offset: textNode.offset,
+      nodeLength: textNode.node.textContent?.length
+    });
 
     const range = document.createRange();
     range.setStart(textNode.node, textNode.offset);
     
-    // **DEFENSIVE CODING: Ensure end offset is valid for the node**
-    const endOffset = Math.min(textNode.offset + (end - start), textNode.node.textContent?.length || 0);
-    range.setEnd(textNode.node, endOffset);
+    // **DEFENSIVE END POSITION SETTING**
+    const endTextNode = getTextNodeAtOffset(editorRef.current, Math.min(end, editorLength));
+    if (!endTextNode) {
+      console.warn(`📌 Could not find end text node at offset ${end}. Using start position.`);
+      range.setEnd(textNode.node, textNode.offset);
+    } else {
+      range.setEnd(endTextNode.node, endTextNode.offset);
+    }
+
+    const rangeText = range.toString();
+    console.log('🎯 Range created:', { 
+      rangeText: rangeText.substring(0, 50) + (rangeText.length > 50 ? '...' : ''),
+      rangeLength: rangeText.length,
+      expectedLength: end - start
+    });
 
     const rect = range.getBoundingClientRect();
     const editorRect = editorRef.current.getBoundingClientRect();
 
-    return {
-      top: rect.top - editorRect.top + editorRef.current.scrollTop,
+    // **ADDITIONAL VALIDATION: Ensure the rect is valid**
+    if (rect.width === 0 && rect.height === 0) {
+      console.warn(`📌 Invalid rect dimensions for range ${start}-${end}. Skipping.`);
+      return null;
+    }
+
+    const position = {
+      top: rect.top - editorRect.top,
       left: rect.left - editorRect.left,
       width: rect.width,
-      height: rect.height || 20 // Fallback height
+      height: rect.height
     };
+
+    console.log('✅ Marker position calculated:', position);
+
+    return position;
   } catch (error) {
-    console.error('Error calculating marker position:', error);
+    console.error('❌ Error calculating marker position:', error);
     return null;
   }
 }; 
