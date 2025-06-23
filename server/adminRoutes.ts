@@ -1,4 +1,4 @@
-import express, { Request, Response, Router, NextFunction } from 'express';
+import { Request, Response, Router, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client with service role key for admin access
@@ -53,14 +53,9 @@ interface ArticleDetail {
   updated_at: string;
 }
 
-interface ErrorResponse {
-  error: string;
-  errorCode: string;
-  details?: string;
-}
 
 // Async handler wrapper
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => 
+const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) => 
   (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
@@ -96,9 +91,20 @@ async function verifyAdminAccess(authHeader: string | undefined): Promise<{ isAd
     }
 
     return { isAdmin: true, adminId: user.id };
-  } catch (error) {
+  } catch (_error) {
     return { isAdmin: false, error: 'Authentication verification failed' };
   }
+}
+
+// Define metadata type for better type safety
+interface AdminAccessMetadata {
+  action?: string;
+  filters?: Record<string, unknown>;
+  result_count?: number;
+  changes?: string[];
+  notes?: string;
+  article_title?: string;
+  search?: string | null;
 }
 
 // Log admin access to articles
@@ -106,7 +112,7 @@ async function logAdminAccess(
   adminId: string, 
   articleId: string | null, 
   action: string, 
-  metadata: any = {}
+  metadata: AdminAccessMetadata = {}
 ): Promise<void> {
   try {
     if (!supabase) return;
@@ -237,8 +243,8 @@ router.get('/articles', asyncHandler(async (req: Request, res: Response) => {
     id: article.id,
     title: article.title || 'Untitled Article',
     user_id: article.user_id,
-    user_email: (article.user_profiles as any)?.email || 'Unknown',
-    user_company: (article.user_profiles as any)?.company_name || 'Unknown',
+    user_email: (article.user_profiles as { email?: string })?.email || 'Unknown',
+    user_company: (article.user_profiles as { company_name?: string })?.company_name || 'Unknown',
     product_name: article.product_name,
     editing_status: article.editing_status,
     last_edited_at: article.last_edited_at,
@@ -339,8 +345,8 @@ router.get('/articles/:id', asyncHandler(async (req: Request, res: Response) => 
     id: article.id,
     title: article.title || 'Untitled Article',
     user_id: article.user_id,
-    user_email: (article.user_profiles as any)?.email || 'Unknown',
-    user_company: (article.user_profiles as any)?.company_name || 'Unknown',
+    user_email: (article.user_profiles as { email?: string })?.email || 'Unknown',
+    user_company: (article.user_profiles as { company_name?: string })?.company_name || 'Unknown',
     product_name: article.product_name,
     editing_status: article.editing_status,
     last_edited_at: article.last_edited_at,
@@ -394,9 +400,19 @@ router.put('/articles/:id', asyncHandler(async (req: Request, res: Response) => 
     });
   }
 
+  // Define update data type
+  interface UpdateData {
+    last_edited_by: string;
+    last_edited_at: string;
+    article_content?: string;
+    editing_status?: 'draft' | 'editing' | 'review' | 'final';
+    title?: string;
+    product_name?: string;
+  }
+
   // Build update object
-  const updateData: any = {
-    last_edited_by: authResult.adminId,
+  const updateData: UpdateData = {
+    last_edited_by: authResult.adminId!,
     last_edited_at: new Date().toISOString(),
   };
 
@@ -468,8 +484,8 @@ router.put('/articles/:id', asyncHandler(async (req: Request, res: Response) => 
     id: updatedArticle.id,
     title: updatedArticle.title || 'Untitled Article',
     user_id: updatedArticle.user_id,
-    user_email: (updatedArticle.user_profiles as any)?.email || 'Unknown',
-    user_company: (updatedArticle.user_profiles as any)?.company_name || 'Unknown',
+    user_email: (updatedArticle.user_profiles as { email?: string })?.email || 'Unknown',
+    user_company: (updatedArticle.user_profiles as { company_name?: string })?.company_name || 'Unknown',
     product_name: updatedArticle.product_name,
     editing_status: updatedArticle.editing_status,
     last_edited_at: updatedArticle.last_edited_at,

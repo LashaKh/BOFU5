@@ -294,7 +294,7 @@ export class PdfExportStrategy extends ExportStrategy {
 
   private processPdfContent(content: string): string {
     // Remove comment-related elements and ensure proper dark text formatting
-    let processedContent = content
+    const processedContent = content
       // Remove comment highlights and markers
       .replace(/<span[^>]*class="[^"]*comment[^"]*"[^>]*>.*?<\/span>/gi, '')
       .replace(/<div[^>]*class="[^"]*comment[^"]*"[^>]*>.*?<\/div>/gi, '')

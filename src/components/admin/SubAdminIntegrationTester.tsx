@@ -418,7 +418,7 @@ export function SubAdminIntegrationTester({ isVisible, onClose }: SubAdminIntegr
       ];
 
       // Test actual API call if we have data
-      let apiCallTest = { name: 'API call test', pass: false, error: null as string | null };
+      const apiCallTest = { name: 'API call test', pass: false, error: null as string | null };
       
       try {
         const { data, error } = await adminClientAssignmentApi.getUnassignedClients();

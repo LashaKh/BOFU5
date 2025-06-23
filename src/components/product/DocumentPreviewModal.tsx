@@ -168,7 +168,7 @@ ${document.openai_vsf_id ? `Vector Store File ID: ${document.openai_vsf_id}` : '
     
     try {
       let downloadUrl = '';
-      let fileName = document.file_name;
+      const fileName = document.file_name;
 
       // Check if it's a Supabase storage file
       if (document.storage_path) {

@@ -9,7 +9,7 @@ import { ProductCard } from '../components/product/ProductCard';
 import { DocumentUploader, ProcessedDocument } from '../components/DocumentUploader'; 
 import AssociatedDocumentCard from '../components/product/AssociatedDocumentCard';
 import DocumentPreviewModal from '../components/product/DocumentPreviewModal';
-import { scrapeBlogContent, ScrapedBlog } from '../utils/blogScraper';
+import type { ScrapedBlog } from '../utils/blogScraper';
 import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'; 
 import { MainHeader } from '../components/MainHeader'; 
 import ChatWindow from '../components/ChatWindow'; 
@@ -785,6 +785,7 @@ const DedicatedProductPage: React.FC = () => {
     const processingToastId = toast.loading('Processing blog URL...');
     try {
       setIsProcessingBlogUrl(true);
+      const { scrapeBlogContent } = await import('../utils/blogScraper');
       scrapedData = await scrapeBlogContent(blogUrlInput);
       toast.dismiss(processingToastId); // Dismiss after scraping succeeds
     } catch (err: any) {

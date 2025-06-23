@@ -50,6 +50,7 @@ export interface ProductAnalysis {
     images?: string[];
   }>;
   competitors?: CompetitorsData;
+  keywords?: string[]; // New field for admin-managed keywords
   isApproved?: boolean;
   approvedBy?: string;
 }
@@ -145,6 +146,7 @@ export const defaultProduct: ProductAnalysis = {
     niche_competitors: [],
     broader_competitors: []
   },
+  keywords: [],
   isApproved: false,
   approvedBy: undefined
 };

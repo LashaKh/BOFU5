@@ -1,12 +1,15 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogIn, Book, Briefcase, Search, Settings } from 'lucide-react';
+import { LogIn, Book, Briefcase, Search, Settings, Bell } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import { UserCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { ProfileManager } from '../components/profile/ProfileManager';
+import { NotificationCenter } from './user-dashboard/NotificationCenter';
+import { getMentionNotifications } from '../lib/commentApi';
+import { MentionSystemDebugger } from './debug/MentionSystemDebugger';
 
 // Logo SVG component
 const Logo = () => (
@@ -32,6 +35,9 @@ export function MainHeader({
   onSignOut
 }: MainHeaderProps) {
   const [user, setUser] = React.useState(propUser);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [showMentionDebugger, setShowMentionDebugger] = useState(false);
   const navigate = useNavigate();
 
   // Helper function to get display name
@@ -48,19 +54,55 @@ export function MainHeader({
     return userData?.email || 'User';
   };
 
+  // Load notification count
+  const loadNotificationCount = async () => {
+    if (user) {
+      try {
+        console.log('🔔 Loading notification count for user:', user.email);
+        const notifications = await getMentionNotifications();
+        const unreadCount = notifications.filter(n => !n.notification_sent).length;
+        console.log('🔔 Notification count loaded:', { total: notifications.length, unread: unreadCount });
+        setUnreadNotificationCount(unreadCount);
+      } catch (error) {
+        console.error('❌ Error loading notification count:', error);
+        // Don't show error to user unless it's a critical issue
+        setUnreadNotificationCount(0);
+      }
+    }
+  };
+
   React.useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        loadNotificationCount();
+      }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        loadNotificationCount();
+      } else {
+        setUnreadNotificationCount(0);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load notifications when user changes
+  React.useEffect(() => {
+    if (user) {
+      loadNotificationCount();
+      
+      // Set up periodic refresh every 30 seconds
+      const interval = setInterval(loadNotificationCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const handleSignOut = async () => {
     try {
@@ -189,6 +231,35 @@ export function MainHeader({
                   className="hidden md:block"
                 />
                 
+                {/* Notification Bell */}
+                <motion.button
+                  onClick={() => setShowNotificationCenter(true)}
+                  className="relative p-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  title="Notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadNotificationCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
+                      {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                    </div>
+                  )}
+                </motion.button>
+                
+                {/* Debug Button (Development Only) */}
+                {process.env.NODE_ENV === 'development' && (
+                  <motion.button
+                    onClick={() => setShowMentionDebugger(true)}
+                    className="p-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    title="Debug Mention System"
+                  >
+                    🐛
+                  </motion.button>
+                )}
+                
                 {/* User Menu */}
                 <Menu as="div" className="relative">
                   <Menu.Button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all">
@@ -299,6 +370,24 @@ export function MainHeader({
           </div>
         </div>
       </nav>
+      
+      {/* Notification Center Modal */}
+      <NotificationCenter
+        isVisible={showNotificationCenter}
+        onClose={() => {
+          setShowNotificationCenter(false);
+          // Refresh notification count when closing
+          loadNotificationCount();
+        }}
+      />
+      
+      {/* Mention System Debugger (Development Only) */}
+      {process.env.NODE_ENV === 'development' && (
+        <MentionSystemDebugger
+          isVisible={showMentionDebugger}
+          onClose={() => setShowMentionDebugger(false)}
+        />
+      )}
     </header>
   );
 }

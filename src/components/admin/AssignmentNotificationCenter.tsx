@@ -16,10 +16,17 @@ import {
   Eye,
   Trash2,
   Filter,
-  MoreVertical
+  MoreVertical,
+  AtSign,
+  MessageSquare
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { 
+  getMentionNotifications, 
+  markMentionNotificationsAsSent,
+  MentionNotification 
+} from '../../lib/commentApi';
 
 interface AssignmentNotificationCenterProps {
   isVisible: boolean;
@@ -28,7 +35,7 @@ interface AssignmentNotificationCenterProps {
 
 interface NotificationItem {
   id: string;
-  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation';
+  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation' | 'mention' | 'comment';
   message: string;
   details?: string;
   timestamp: string;
@@ -60,8 +67,9 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [recentActivities, setRecentActivities] = useState<AssignmentActivity[]>([]);
+  const [mentionNotifications, setMentionNotifications] = useState<MentionNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts' | 'mentions'>('all');
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
 
   // Only super-admins can access this component
@@ -69,11 +77,12 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     return null;
   }
 
-  // Load recent assignment activities
+  // Load recent assignment activities and mention notifications
   const loadRecentActivities = async () => {
     try {
       setIsLoading(true);
       
+      // Load assignment activities
       const { data, error } = await supabase
         .from('admin_client_assignments')
         .select(`
@@ -106,8 +115,18 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
 
       setRecentActivities(activities);
       
-      // Generate notifications based on recent activities
-      generateNotificationsFromActivities(activities);
+      // Load mention notifications for admin
+      let mentions: MentionNotification[] = [];
+      try {
+        mentions = await getMentionNotifications();
+        setMentionNotifications(mentions);
+        console.log('📥 Loaded mention notifications for admin:', mentions.length);
+      } catch (mentionError) {
+        console.error('Error loading mention notifications:', mentionError);
+      }
+      
+      // Generate notifications based on recent activities and mentions
+      generateNotificationsFromActivities(activities, mentions);
 
     } catch (error) {
       console.error('Error loading recent activities:', error);
@@ -116,8 +135,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     }
   };
 
-  // Generate notifications from activities
-  const generateNotificationsFromActivities = (activities: AssignmentActivity[]) => {
+  // Generate notifications from activities and mentions
+  const generateNotificationsFromActivities = (activities: AssignmentActivity[], mentions: MentionNotification[] = []) => {
     const generatedNotifications: NotificationItem[] = activities.map((activity, index) => ({
       id: `activity-${activity.id}`,
       type: 'assignment' as const,
@@ -132,6 +151,22 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         adminEmail: activity.admin_email,
         clientEmail: activity.client_email,
         clientCompany: activity.client_company
+      }
+    }));
+
+    // Convert mention notifications to notification items
+    const mentionNotificationItems: NotificationItem[] = mentions.map((mention) => ({
+      id: `mention-${mention.id}`,
+      type: 'mention' as const,
+      message: 'You were mentioned in a comment',
+      details: `${mention.comment?.user?.email || 'Someone'} mentioned you: "${mention.comment?.content?.substring(0, 100)}..."`,
+      timestamp: mention.created_at,
+      isRead: mention.notification_sent,
+      priority: 'high' as const,
+      metadata: {
+        commentId: mention.comment_id,
+        mentionText: mention.mention_text,
+        commentContent: mention.comment?.content
       }
     }));
 
@@ -159,7 +194,11 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       }
     ];
 
-    setNotifications([...systemNotifications, ...generatedNotifications.slice(0, 20)]);
+    // Combine all notifications and sort by timestamp
+    const allNotifications = [...systemNotifications, ...mentionNotificationItems, ...generatedNotifications.slice(0, 20)]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    setNotifications(allNotifications);
   };
 
   // Filter notifications
@@ -171,13 +210,25 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return ['assignment', 'unassignment', 'transfer', 'bulk_operation'].includes(notification.type);
       case 'accounts':
         return ['account_created', 'account_deleted'].includes(notification.type);
+      case 'mentions':
+        return ['mention', 'comment'].includes(notification.type);
       default:
         return true;
     }
   });
 
   // Mark notification as read
-  const markAsRead = (notificationId: string) => {
+  const markAsRead = async (notificationId: string) => {
+    // Handle mention notifications separately
+    if (notificationId.startsWith('mention-')) {
+      const mentionId = notificationId.replace('mention-', '');
+      try {
+        await markMentionNotificationsAsSent([mentionId]);
+      } catch (error) {
+        console.error('Error marking mention as read:', error);
+      }
+    }
+    
     setNotifications(prev => 
       prev.map(notification => 
         notification.id === notificationId 
@@ -188,7 +239,20 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
   };
 
   // Mark all as read
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    // Mark mention notifications as read
+    const mentionIds = notifications
+      .filter(n => n.id.startsWith('mention-') && !n.isRead)
+      .map(n => n.id.replace('mention-', ''));
+    
+    if (mentionIds.length > 0) {
+      try {
+        await markMentionNotificationsAsSent(mentionIds);
+      } catch (error) {
+        console.error('Error marking mentions as read:', error);
+      }
+    }
+    
     setNotifications(prev => 
       prev.map(notification => ({ ...notification, isRead: true }))
     );
@@ -229,6 +293,10 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return Trash2;
       case 'bulk_operation':
         return Users;
+      case 'mention':
+        return AtSign;
+      case 'comment':
+        return MessageSquare;
       default:
         return Bell;
     }
@@ -326,7 +394,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
                   { key: 'all', label: 'All', count: notifications.length },
                   { key: 'unread', label: 'Unread', count: unreadCount },
                   { key: 'assignments', label: 'Assignments', count: notifications.filter(n => ['assignment', 'unassignment', 'transfer', 'bulk_operation'].includes(n.type)).length },
-                  { key: 'accounts', label: 'Accounts', count: notifications.filter(n => ['account_created', 'account_deleted'].includes(n.type)).length }
+                  { key: 'accounts', label: 'Accounts', count: notifications.filter(n => ['account_created', 'account_deleted'].includes(n.type)).length },
+                  { key: 'mentions', label: 'Mentions', count: notifications.filter(n => ['mention', 'comment'].includes(n.type)).length }
                 ].map((tab) => (
                   <button
                     key={tab.key}

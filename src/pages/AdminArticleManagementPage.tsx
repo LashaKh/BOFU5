@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Settings,
@@ -34,11 +34,11 @@ import {
   logArticleExport
 } from '../lib/auditLogger';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { useAdminContext } from '../contexts/AdminContext';
 
 // Define props for the page
 interface AdminArticleManagementPageProps {
-  user: User | null; // Authenticated Supabase user
+  user?: User | null; // Authenticated Supabase user (optional since we'll use AdminContext)
 }
 
 // Interface for article editing modal state
@@ -67,8 +67,8 @@ const mockArticles: ArticleListItem[] = Array.from({ length: 15 }, (_, i) => ({
 }));
 
 function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
-  const [adminProfile, setAdminProfile] = useState<UserProfile | null>(null);
-  const [isLoadingAdminProfile, setIsLoadingAdminProfile] = useState(true);
+  // Use AdminContext for admin authentication
+  const { isAdmin, adminRole, adminId, adminEmail, isLoading: isLoadingAdminProfile } = useAdminContext();
   const [selectedArticles, setSelectedArticles] = useState<ArticleListItem[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null); // For potential future user filtering
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
@@ -84,51 +84,6 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
     contentError: null
   });
 
-  useEffect(() => {
-    const fetchAdminProfile = async () => {
-      if (user && user.id) {
-        setIsLoadingAdminProfile(true);
-        try {
-          const { data, error } = await supabase
-            .from('admin_profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (error) {
-            // Handle case where profile not found by .single() as an error
-            if (error.code === 'PGRST116') { // PGRST116: " relazione con zero righe " (zero rows)
-              toast.error('Admin profile not found for your user ID.');
-              setAdminProfile(null);
-            } else {
-              throw error; // Re-throw other errors
-            }
-          } else if (data) {
-            setAdminProfile(data as UserProfile);
-          } else {
-            // This case should ideally not be hit if .single() errors on not found, 
-            // but as a fallback:
-            toast.error('Admin profile not found (no data).');
-            setAdminProfile(null);
-          }
-        } catch (error: any) {
-          console.error('Error fetching admin profile:', error);
-          toast.error(`Failed to fetch admin profile: ${error.message || 'Unknown error'}`);
-          setAdminProfile(null);
-        } finally {
-          setIsLoadingAdminProfile(false); // Ensure loading is stopped
-        }
-      } else {
-        // If no user or user.id, we can't fetch a profile.
-        // This might happen on initial load if user prop isn't ready.
-        // We should stop loading and the component will show the !adminProfile message.
-        setIsLoadingAdminProfile(false);
-        setAdminProfile(null); // Ensure adminProfile is null if no user
-      }
-    };
-
-    fetchAdminProfile();
-  }, [user]);
 
   const handleArticleSelectionChange = async (article: ArticleListItem) => {
     const isSelected = selectedArticles.some(a => a.id === article.id);
@@ -524,15 +479,14 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
     );
   }
 
-  if (!adminProfile) {
+  if (!isAdmin) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-gray-900 p-8">
         <AlertTriangle className="h-16 w-16 text-red-500 mb-6" />
-        <h2 className="text-2xl font-semibold text-white mb-4">Admin Profile Error</h2>
+        <h2 className="text-2xl font-semibold text-white mb-4">Access Denied</h2>
         <p className="text-gray-300 text-center mb-6 max-w-md">
-          We couldn't load your admin profile. This is required to manage articles. 
-          Please ensure your account is correctly configured in the admin_profiles table 
-          or contact technical support.
+          You don't have admin access to manage articles. 
+          Please contact your administrator to request access.
         </p>
         {/* Optionally, add a button to retry or logout */}
       </div>
@@ -579,11 +533,11 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
       </div>
 
       {/* Full-Screen Article Editor Modal */}
-      {articleEditing.isOpen && articleEditing.article && adminProfile && (() => {
+      {articleEditing.isOpen && articleEditing.article && isAdmin && (() => {
         console.log('🔥 Rendering article editor modal:', {
           isOpen: articleEditing.isOpen,
           hasArticle: !!articleEditing.article,
-          hasAdminProfile: !!adminProfile,
+          isAdmin: isAdmin,
           articleId: articleEditing.article?.id
         });
         return (
@@ -728,17 +682,25 @@ function AdminArticleManagementPage({ user }: AdminArticleManagementPageProps) {
                         console.log('🔥 About to render ArticleEditor with props:', {
                           articleId: articleEditing.article.id,
                           adminMode: true,
-                          hasAdminUser: !!adminProfile,
+                          hasAdminUser: isAdmin,
                           hasOriginalAuthor: !!articleEditing.originalAuthor,
                           hasArticleContent: !!articleEditing.articleContent,
                           initialContentLength: articleEditing.articleContent.content?.length || 0
                         });
+                        // Create admin user profile from AdminContext
+                        const adminUserProfile: UserProfile = {
+                          id: adminId || '',
+                          email: adminEmail || '',
+                          company_name: 'Admin',
+                          role: adminRole || 'admin'
+                        };
+
                         return (
                           <ArticleEditor
                             articleId={articleEditing.article.id}
                             initialContent={articleEditing.articleContent.content || ''}
                             adminMode={true}
-                            adminUser={adminProfile}
+                            adminUser={adminUserProfile}
                             originalAuthor={articleEditing.originalAuthor}
                             onStatusChange={handleArticleStatusChange}
                             onOwnershipTransfer={handleArticleOwnershipTransfer}

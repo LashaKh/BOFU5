@@ -26,6 +26,9 @@ dist-ssr
 # Environment variables
 .env
 
+# MCP configuration with sensitive API keys
+.mcp.json
+
 # Added by Claude Task Master
 dev-debug.log
 # Dependency directories

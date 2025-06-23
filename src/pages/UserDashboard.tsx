@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserDashboardLayout } from '../components/user-dashboard/UserDashboardLayout';
+import { DataboxEmbed } from '../components/common/DataboxEmbed';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
@@ -230,6 +231,15 @@ export default function UserDashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Analytics Dashboard */}
+        <div className="mb-8">
+          <DataboxEmbed 
+            dashboardName="Analytics Dashboard"
+            className="w-full"
+            fallbackMessage="Analytics dashboard will be configured by your administrator"
+          />
         </div>
 
         {/* Content Briefs List */}

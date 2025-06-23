@@ -37,7 +37,7 @@ function safeJSONParse(str: string): any {
 function isCompleted(response: any): boolean {
   try {
     // If response is a string, try to parse it
-    let data = typeof response === 'string' ? safeJSONParse(response) : response;
+    const data = typeof response === 'string' ? safeJSONParse(response) : response;
 
     // Direct status check
     if (data?.status === 'completed') {
@@ -110,7 +110,7 @@ function cleanJSONString(str: string): string {
 function extractResult(response: any): any {
   try {
     // If response is a string, try to parse it
-    let data = typeof response === 'string' ? safeJSONParse(response) : response;
+    const data = typeof response === 'string' ? safeJSONParse(response) : response;
 
     // If data has a result field that's a string (like JSON string), try to parse it
     if (data?.result && typeof data.result === 'string') {

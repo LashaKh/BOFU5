@@ -246,14 +246,19 @@ export function ProductCardContent({
   enableEditing = false,
   index,
 }: ProductCardContentProps) {
-  // Authentication context
   const { user } = useAuth();
-  
-  // State for the editable product data
   const [editableProduct, setEditableProduct] = useState<ProductAnalysis>(product);
-  
-  // Ref to track when we're updating competitors to prevent resets
+  const [autoSaveCount, setAutoSaveCount] = useState(0);
   const isUpdatingCompetitors = useRef(false);
+
+  console.log('🎯 ProductCardContent: Received product data:', {
+    companyName: product.companyName,
+    productName: product.productDetails?.name,
+    keywords: product.keywords,
+    context,
+    enableEditing,
+    hasOnUpdateSection: !!onUpdateSection
+  });
 
   // Add state for capabilities collapse (collapsed by default)
   const [isCapabilitiesExpanded, setIsCapabilitiesExpanded] = useState(false);
@@ -333,23 +338,65 @@ export function ProductCardContent({
         // We need to determine what changed and call onUpdateSection for each change
         const changes: Array<{ section: keyof ProductAnalysis, value: any }> = [];
         
-        // Compare all sections and collect changes
+        // Compare all sections and collect changes - Use proper deep comparison for arrays
         Object.keys(updatedProduct).forEach(key => {
           const sectionKey = key as keyof ProductAnalysis;
           const originalValue = product[sectionKey];
           const newValue = updatedProduct[sectionKey];
           
-          // Safe comparison that handles undefined values
-          const originalStr = originalValue !== undefined ? JSON.stringify(originalValue) : 'undefined';
-          const newStr = newValue !== undefined ? JSON.stringify(newValue) : 'undefined';
-          
-          if (originalStr !== newStr) {
+          // Handle array comparison properly to prevent corruption
+          if (Array.isArray(newValue) && Array.isArray(originalValue)) {
+            // For arrays, compare length and content directly
+            if (newValue.length !== originalValue.length || 
+                !newValue.every((item, index) => item === originalValue[index])) {
+              console.log(`🔍 Array change detected for ${sectionKey}:`, { 
+                original: originalValue, 
+                new: newValue,
+                isValidArray: Array.isArray(newValue)
+              });
+              changes.push({ section: sectionKey, value: newValue });
+            }
+          } else if (Array.isArray(newValue) && !Array.isArray(originalValue)) {
+            // New array where there wasn't one before
+            console.log(`🔍 New array detected for ${sectionKey}:`, { 
+              original: originalValue, 
+              new: newValue,
+              isValidArray: Array.isArray(newValue)
+            });
             changes.push({ section: sectionKey, value: newValue });
+          } else if (!Array.isArray(newValue) && Array.isArray(originalValue)) {
+            // Array was removed/changed to non-array
+            console.log(`🔍 Array removed for ${sectionKey}:`, { 
+              original: originalValue, 
+              new: newValue 
+            });
+            changes.push({ section: sectionKey, value: newValue });
+          } else {
+            // For non-arrays, use JSON comparison but with safety checks
+            try {
+              const originalStr = originalValue !== undefined ? JSON.stringify(originalValue) : 'undefined';
+              const newStr = newValue !== undefined ? JSON.stringify(newValue) : 'undefined';
+              
+              if (originalStr !== newStr) {
+                changes.push({ section: sectionKey, value: newValue });
+              }
+            } catch (error) {
+              console.warn(`Failed to JSON stringify values for ${sectionKey}:`, error);
+              // Fallback to strict equality
+              if (originalValue !== newValue) {
+                changes.push({ section: sectionKey, value: newValue });
+              }
+            }
           }
         });
 
-        // Apply changes sequentially
+        // Apply changes sequentially with additional logging
         for (const change of changes) {
+          console.log(`🚀 Applying change for ${change.section}:`, {
+            value: change.value,
+            isArray: Array.isArray(change.value),
+            type: typeof change.value
+          });
           await onUpdateSection(index ?? 0, change.section, change.value);
         }
       } else if (onSave) {
@@ -375,10 +422,15 @@ export function ProductCardContent({
 
   // Update field handlers
   const updateField = useCallback((field: keyof ProductAnalysis, value: any) => {
-    setEditableProduct(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    console.log('🔄 ProductCardContent: updateField called:', { field, value });
+    setEditableProduct(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      console.log('🔄 ProductCardContent: editableProduct updated:', { field, newValue: value });
+      return updated;
+    });
   }, []);
 
   const updateNestedField = useCallback((section: keyof ProductAnalysis, field: string, value: any) => {
@@ -1035,6 +1087,99 @@ export function ProductCardContent({
             }
           }}
         />
+      )}
+
+      {/* Keywords Section - Admin Only */}
+      {context === 'admin' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="space-y-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-xl font-semibold text-gray-900">Keywords & Tags</h4>
+              <p className="text-sm text-gray-500">Identify and manage keywords for content brief generation</p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
+            <div className="space-y-4">
+              {/* Keywords Display and Management */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Content Keywords
+                    <span className="text-xs text-gray-500 font-normal">
+                      ({(editableProduct.keywords || []).length} keyword{(editableProduct.keywords || []).length !== 1 ? 's' : ''})
+                    </span>
+                  </span>
+                </label>
+
+                <EditableField
+                  label=""
+                  value={editableProduct.keywords || []}
+                  onSave={(value) => updateField('keywords', value)}
+                  type="array"
+                  arrayItemPlaceholder="Add keyword (e.g., automation, productivity, SaaS, analytics)..."
+                  disabled={!enableEditing}
+                  className="rounded-lg"
+                />
+              </div>
+
+              {/* Keywords Preview */}
+              {editableProduct.keywords && editableProduct.keywords.length > 0 && (
+                <div className="mt-4 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                  <h5 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Keyword Tags
+                  </h5>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {editableProduct.keywords.map((keyword, index) => (
+                      <motion.span
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2, delay: index * 0.05 }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-medium rounded-full shadow-sm hover:shadow-md transition-all duration-200"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        {keyword}
+                      </motion.span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Instructions */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-xs text-blue-700">
+                    <p className="font-medium mb-1">Admin Keywords:</p>
+                    <p>These keywords will be included when sending data to AirOps for content brief generation. Keywords help improve content relevance and SEO targeting.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {/* Advanced sections - only show when expanded and needed */}

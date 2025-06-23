@@ -8,8 +8,7 @@ import { ContentBrief } from '../types/contentBrief';
 import { toast } from 'react-hot-toast';
 import { BriefContent } from '../components/content-brief/BriefContent';
 import { ContentBriefEditorSimple } from '../components/content-brief/ContentBriefEditorSimple';
-import { DesktopApprovalButton, MobileApprovalButton } from '../components/common/ResponsiveApprovalButton';
-import { useBriefAutoSave } from '../hooks/useBriefAutoSave';
+import { SimpleApprovalButton } from '../components/content/SimpleApprovalButton';
 import { 
   ensureLinksAsText, 
   ensureLinksAsArray,
@@ -22,7 +21,7 @@ import {
 } from '../utils/contentProcessor';
 import { motion } from 'framer-motion';
 import { Edit3, ArrowLeft, Package, FileText, AlertCircle } from 'lucide-react';
-import { ResponsiveApprovalButton } from '../components/common/ResponsiveApprovalButton';
+import { useBriefAutoSave } from '../hooks/useBriefAutoSave';
 
 export default function EditContentBrief() {
   const { id } = useParams<{ id: string }>();
@@ -364,8 +363,7 @@ export default function EditContentBrief() {
                       </div>
                       
                       <div className="flex items-center space-x-3">
-                        <ResponsiveApprovalButton 
-                          brief={brief}
+                        <SimpleApprovalButton 
                           briefId={id || ''}
                           onSuccess={handleApprovalSuccess}
                         />

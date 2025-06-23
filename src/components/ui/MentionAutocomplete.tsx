@@ -123,15 +123,19 @@ export const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
 
   // Fetch mentionable users based on search term
   const fetchUsers = useCallback(async (term: string) => {
-    console.log('🔍 Fetching mentionable users:', { term, articleId });
+    console.log('🔍 MentionAutocomplete fetchUsers called:', { term, articleId });
     setLoading(true);
     try {
       const mentionableUsers = await getMentionableUsers(articleId, term);
-      console.log('✅ Fetched mentionable users:', mentionableUsers);
+      console.log('✅ MentionAutocomplete received users:', {
+        count: mentionableUsers.length,
+        users: mentionableUsers.map(u => ({ email: u.email, mention: u.mention_text }))
+      });
       setUsers(mentionableUsers);
       setSelectedIndex(0);
     } catch (error) {
-      console.error('❌ Error fetching mentionable users:', error);
+      console.error('❌ MentionAutocomplete error fetching users:', error);
+      // Show user-friendly error in the dropdown instead of empty state
       setUsers([]);
     } finally {
       setLoading(false);
