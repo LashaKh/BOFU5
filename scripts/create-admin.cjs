@@ -18,9 +18,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Admin account details - change these before running the script
-const adminEmail = 'admin@example.com'; // Change this to your admin email
-const adminPassword = 'strong-password-here'; // Change this to a secure password
-const adminName = 'Admin User'; // Change this to your admin name
+const adminEmail = 'test.admin@bofu.com'; // Change this to your admin email
+const adminPassword = 'TestAdmin123!'; // Change this to a secure password
+const adminName = 'Test Admin'; // Change this to your admin name
 
 async function createAdminAccount() {
   try {

@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
@@ -89,7 +89,7 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
 });
 
 // Error handling middleware
-app.use((error: any, req: Request, res: Response, next: any) => {
+app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled error:', error);
   res.status(500).json({
     error: 'Internal server error',

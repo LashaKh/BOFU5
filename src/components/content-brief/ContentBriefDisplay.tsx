@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   AlertCircle, 
@@ -32,12 +32,16 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
   onInternalLinksChange,
   onSuggestedTitlesChange,
   readOnly = false,
-  possibleTitles = [],
-  additionalLinks = [],
+  possibleTitles,
+  additionalLinks,
   researchResultId
 }) => {
   const [sections, setSections] = useState<ContentBriefData>({});
   const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // Stabilize array references to prevent infinite re-renders
+  const stablePossibleTitles = useMemo(() => possibleTitles || [], [possibleTitles]);
+  const stableAdditionalLinks = useMemo(() => additionalLinks || [], [additionalLinks]);
   
   // State for collapsible sections - all collapsed by default
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -67,13 +71,13 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
     console.log('ContentBriefDisplay: Parsing content...', {
       contentLength: content?.length || 0,
       contentPreview: content ? content.substring(0, 100) + '...' : 'No content',
-      possibleTitlesLength: possibleTitles?.length || 0,
-      additionalLinksLength: additionalLinks?.length || 0
+      possibleTitlesLength: stablePossibleTitles?.length || 0,
+      additionalLinksLength: stableAdditionalLinks?.length || 0
     });
 
     if (content) {
       try {
-        const parsed = parseContent(content, possibleTitles, additionalLinks);
+        const parsed = parseContent(content, stablePossibleTitles, stableAdditionalLinks);
         console.log('ContentBriefDisplay: Parsed content result:', {
           parsedKeys: Object.keys(parsed),
           painPointsLength: parsed.pain_points?.length || 0,
@@ -95,21 +99,21 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
       setSections({});
       setHasInitialized(true);
     }
-  }, [content, possibleTitles, additionalLinks]);
+  }, [content, stablePossibleTitles, stableAdditionalLinks]);
 
   // Handle history/navigation changes
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       // Re-parse content on navigation
       if (content) {
-        const parsed = parseContent(content, possibleTitles, additionalLinks);
+        const parsed = parseContent(content, stablePossibleTitles, stableAdditionalLinks);
         setSections(parsed);
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [content, possibleTitles, additionalLinks]);
+  }, [content, stablePossibleTitles, stableAdditionalLinks]);
 
   // Generate updated content and trigger callbacks
   const generateContentFromSections = useCallback((newSections: ContentBriefData) => {

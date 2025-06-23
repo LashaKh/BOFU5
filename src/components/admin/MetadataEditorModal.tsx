@@ -149,15 +149,54 @@ export function MetadataEditorModal({
     { value: 'high', label: 'High', color: 'text-red-400' }
   ];
 
-  const categories = [
-    'Product Review',
-    'Tutorial',
-    'Comparison',
-    'News',
+  const contentTypes = [
+    'Blog Post',
     'Case Study',
+    'White Paper',
+    'eBook',
+    'Tutorial',
     'How-to Guide',
-    'Industry Analysis',
-    'Best Practices'
+    'Comparison Guide',
+    'FAQ',
+    'Feature Announcement',
+    'Integration Guide',
+    'Best Practices',
+    'Troubleshooting Guide',
+    'API Documentation',
+    'Getting Started Guide',
+    'Security Guide',
+    'Performance Guide',
+    'Industry Report',
+    'News Article',
+    'Press Release',
+    'Email Template',
+    'Landing Page Copy',
+    'Social Media Post',
+    'Video Script',
+    'Webinar Description',
+    'Podcast Description',
+    'Newsletter',
+    'Survey',
+    'Research Report',
+    'Data Sheet',
+    'Technical Specification',
+    'User Manual',
+    'Release Notes',
+    'Changelog',
+    'ROI Calculator',
+    'Checklist',
+    'Template',
+    'Worksheet',
+    'Infographic Script',
+    'Quote Template',
+    'Proposal Template',
+    'Contract Template',
+    'SLA Template',
+    'Privacy Policy',
+    'Terms of Service',
+    'GDPR Compliance Guide',
+    'Accessibility Statement',
+    'Community Guidelines'
   ];
 
   if (!isOpen) return null;
@@ -275,7 +314,7 @@ export function MetadataEditorModal({
                     className="w-full px-3 py-2 bg-secondary-700 border border-secondary-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white"
                   >
                     <option value="">Select category...</option>
-                    {categories.map((category) => (
+                    {contentTypes.map((category) => (
                       <option key={category} value={category}>
                         {category}
                       </option>

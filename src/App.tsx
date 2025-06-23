@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { DocumentUploader, ProcessedDocument } from './components/DocumentUploader';
 import { BlogLinkInput } from './components/BlogLinkInput';
@@ -16,7 +17,6 @@ import { makeWebhookRequest } from './utils/webhookUtils';
 import { parseProductData } from './types/product';
 import { ProductAnalysis } from './types/product/types';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
-import { AdminDashboard } from './components/admin/AdminDashboard';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { AuthModal } from './components/auth/AuthModal';
@@ -26,22 +26,32 @@ import UserDashboard from './pages/UserDashboard';
 import UserContentBriefs from './pages/UserContentBriefs';
 import EditContentBrief from './pages/EditContentBrief';
 import ApprovedContent from './pages/ApprovedContent';
-import GeneratedArticlesPage from './pages/GeneratedArticlesPage'; // Import for new page
-import UserSettingsPage from './pages/UserSettingsPage'; // Import for user settings page
 import { ResetPassword } from './components/auth/ResetPassword';
 import { ToastProvider } from './contexts/ToastContext';
-import { ProfileContextProvider } from './contexts/ProfileContext'; // Import ProfileContext
-import ProductsListPage from './pages/ProductsListPage'; // Import the actual page
-import DedicatedProductPage from './pages/DedicatedProductPage'; // Added import
-import LandingPage from './pages/LandingPage'; // Import the new LandingPage
-import { UserSelectorTest } from './components/admin/UserSelectorTest'; // Import the test component
-import { AdminArticleListTest } from './components/admin/AdminArticleListTest'; // Import the article list test
-import { ArticleEditorAdminTest } from './components/admin/ArticleEditorAdminTest'; // Import the article editor admin test
-import { AuditLogViewerTest } from './components/admin/AuditLogViewerTest'; // Import the audit log viewer test
-import ArticleEditorPage from './pages/ArticleEditorPage'; // Import the new dedicated article editor page
-import { AdminContextProvider } from './contexts/AdminContext'; // Import the new AdminContext
-import { AdminRoute } from './components/admin/AdminRoute'; // Import the new AdminRoute component
-import { ProfileTest } from './components/profile/ProfileTest'; // Import the ProfileTest component
+import { ProfileContextProvider } from './contexts/ProfileContext';
+import ProductsListPage from './pages/ProductsListPage';
+import DedicatedProductPage from './pages/DedicatedProductPage';
+import LandingPage from './pages/LandingPage';
+import ArticleEditorPage from './pages/ArticleEditorPage';
+import { AdminContextProvider } from './contexts/AdminContext';
+import { AdminRoute } from './components/admin/AdminRoute';
+
+// Lazy load admin and heavy components
+const GeneratedArticlesPage = lazy(() => import('./pages/GeneratedArticlesPage'));
+const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'));
+const AdminArticleEditorPage = lazy(() => import('./pages/AdminArticleEditorPage'));
+const UserSelectorTest = lazy(() => import('./components/admin/UserSelectorTest').then(m => ({ default: m.UserSelectorTest })));
+const AdminArticleListTest = lazy(() => import('./components/admin/AdminArticleListTest').then(m => ({ default: m.AdminArticleListTest })));
+const ArticleEditorAdminTest = lazy(() => import('./components/admin/ArticleEditorAdminTest').then(m => ({ default: m.ArticleEditorAdminTest })));
+const AuditLogViewerTest = lazy(() => import('./components/admin/AuditLogViewerTest').then(m => ({ default: m.AuditLogViewerTest })));
+const ProfileTest = lazy(() => import('./components/profile/ProfileTest').then(m => ({ default: m.ProfileTest })));
+
+// Loading component
+const PageLoading = () => (
+  <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+    <div className="text-white text-xl">Loading...</div>
+  </div>
+);
 
 function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -49,7 +59,7 @@ function App() {
   const [productLines, setProductLines] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -107,9 +117,9 @@ function App() {
     } catch (error) {
       console.error('Error signing out:', error);
       console.error('[DEBUG] Sign out error details:', {
-        name: (error as any)?.name,
-        message: (error as any)?.message,
-        stack: (error as any)?.stack
+        name: (error as Error)?.name,
+        message: (error as Error)?.message,
+        stack: (error as Error)?.stack
       });
       notify('error', 'Failed to sign out');
     } finally {
@@ -121,84 +131,10 @@ function App() {
     }
   };
 
-  // Function to check if user is admin (using database instead of metadata)
-  const checkAdminStatus = async (userId: string): Promise<boolean> => {
-    try {
-      console.log(`[DEBUG] Checking admin status for user ID: ${userId}`);
-      
-      const { data: adminProfile, error } = await supabase
-        .from('admin_profiles')
-        .select('id, email, role, permissions')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("[DEBUG] Error checking admin status:", error);
-        console.error("[DEBUG] Error details:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        // If table doesn't exist, suggest creating it
-        if (error.code === '42P01') {
-          console.log("[DEBUG] admin_profiles table does not exist. User needs to be added to admin_profiles table.");
-          console.log("[DEBUG] Run this in browser console:");
-          console.log(`
-const { data, error } = await supabase
-  .from('admin_profiles')
-  .insert({ 
-    id: '${userId}',
-    email: '${await getUserEmail(userId)}',
-    role: 'admin',
-    permissions: ['read', 'write', 'delete', 'manage_users']
-  });
-console.log('Result:', data, error);
-          `);
-        }
-        return false;
-      }
-      
-      const isAdmin = !!adminProfile;
-      console.log(`[DEBUG] Admin check result: ${isAdmin ? 'IS ADMIN' : 'NOT ADMIN'}`);
-      if (isAdmin) {
-        console.log(`[DEBUG] Admin profile:`, adminProfile);
-      } else {
-        console.log(`[DEBUG] User ${userId} not found in admin_profiles table`);
-        console.log(`[DEBUG] To grant admin access, run this in console:`);
-        console.log(`
-// Add user to admin_profiles
-const { data, error } = await supabase
-  .from('admin_profiles')
-  .insert({ 
-    id: '${userId}',
-    role: 'admin',
-    permissions: ['read', 'write', 'delete', 'manage_users']
-  });
-console.log('Admin granted:', data, error);
-        `);
-      }
-      
-      return isAdmin;
-    } catch (e) {
-      console.error("[DEBUG] Exception in checkAdminStatus:", e);
-      return false;
-    }
-  };
   
-  // Helper function to get user email
-  const getUserEmail = async (userId: string): Promise<string> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user?.email || 'unknown@email.com';
-    } catch {
-      return 'unknown@email.com';
-    }
-  };
 
   // Function to automatically setup admin access if tables are empty
-  const autoSetupAdmin = async (userId: string, userEmail: string): Promise<boolean> => {
+  const autoSetupAdmin = useCallback(async (userId: string, userEmail: string): Promise<boolean> => {
     try {
       console.log("[DEBUG] Auto-setting up admin access...");
       
@@ -266,7 +202,7 @@ console.log('Admin granted:', data, error);
       console.error("[DEBUG] Auto setup error:", error);
       return false;
     }
-  };
+  }, []);
 
   // Function to populate user_profiles from content_briefs if user_profiles is empty
   const populateUserProfiles = async (): Promise<void> => {
@@ -283,10 +219,10 @@ console.log('Admin granted:', data, error);
         .from('user_profiles')
         .select('id', { count: 'exact', head: true });
       
-      const result = await Promise.race([
+      await Promise.race([
         queryPromise,
         timeoutPromise
-      ]) as any;
+      ]);
       
       // If we get here without timeout, we can safely skip population
       console.log("[DEBUG] user_profiles table accessible, skipping population");
@@ -318,12 +254,12 @@ console.log('Admin granted:', data, error);
           console.log('[INITIAL] Setting admin authentication for lashay@bofu.ai (bypassing database checks)');
           setIsAuthLoading(false);
           
-          // Always redirect admin users to admin dashboard
-          if (location.pathname !== '/admin') {
+          // Allow admin users to access admin-related routes
+          if (!location.pathname.startsWith('/admin')) {
             console.log('[INITIAL] Redirecting admin from', location.pathname, 'to /admin');
             navigate('/admin', { replace: true });
           } else {
-            console.log('[INITIAL] Admin already on admin page');
+            console.log('[INITIAL] Admin already on admin-related page:', location.pathname);
           }
           
           // Run database setup in background without blocking UI
@@ -356,8 +292,8 @@ console.log('Admin granted:', data, error);
         // Check if this is an admin user
         if (session.user.email === 'lashay@bofu.ai') {
           console.log('[AUTH] Admin user signed in');
-          // Navigate to admin if not already there
-          if (location.pathname !== '/admin') {
+          // Navigate to admin if not already on admin-related routes
+          if (!location.pathname.startsWith('/admin')) {
             navigate('/admin', { replace: true });
           }
           
@@ -380,7 +316,7 @@ console.log('Admin granted:', data, error);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, location.pathname]);
+  }, [navigate, autoSetupAdmin, location.pathname]);
   
   // This effect runs when the user state changes or loadResearchHistory callback changes
   useEffect(() => {
@@ -594,7 +530,7 @@ console.log('Admin granted:', data, error);
         loadProductById(id);
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, loadProductById, isProductPath]);
 
   // Determine what to show based on the current URL path
   const renderMainContent = (isAppRoute = false) => {
@@ -1001,7 +937,9 @@ console.log('Admin granted:', data, error);
                     </div>
                   </div>
                 ) : user ? (
-                  <GeneratedArticlesPage />
+                  <Suspense fallback={<PageLoading />}>
+                    <GeneratedArticlesPage />
+                  </Suspense>
                 ) : (
                   <Navigate to="/" replace />
                 )
@@ -1030,7 +968,9 @@ console.log('Admin granted:', data, error);
                     </div>
                   </div>
                 ) : user ? (
-                  <AdminRoute user={user} onLogout={handleSignOut} />
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminArticleEditorPage />
+                  </Suspense>
                 ) : (
                   <Navigate to="/" replace />
                 )
@@ -1039,10 +979,26 @@ console.log('Admin granted:', data, error);
               <Route path="/reset-password" element={<ResetPassword />} />
               
               {/* Test Routes - To be removed before production */}
-              <Route path="/user-selector-test" element={<UserSelectorTest />} />
-              <Route path="/admin-article-list-test" element={<AdminArticleListTest />} />
-              <Route path="/article-editor-admin-test" element={<ArticleEditorAdminTest />} />
-              <Route path="/audit-log-viewer-test" element={<AuditLogViewerTest />} />
+              <Route path="/user-selector-test" element={
+                <Suspense fallback={<PageLoading />}>
+                  <UserSelectorTest />
+                </Suspense>
+              } />
+              <Route path="/admin-article-list-test" element={
+                <Suspense fallback={<PageLoading />}>
+                  <AdminArticleListTest />
+                </Suspense>
+              } />
+              <Route path="/article-editor-admin-test" element={
+                <Suspense fallback={<PageLoading />}>
+                  <ArticleEditorAdminTest />
+                </Suspense>
+              } />
+              <Route path="/audit-log-viewer-test" element={
+                <Suspense fallback={<PageLoading />}>
+                  <AuditLogViewerTest />
+                </Suspense>
+              } />
 
               <Route path="/article-editor/:id" element={
                 isAuthLoading ? (
@@ -1059,7 +1015,11 @@ console.log('Admin granted:', data, error);
                 )
               } />
 
-              <Route path="/profile-test" element={<ProfileTest />} />
+              <Route path="/profile-test" element={
+                <Suspense fallback={<PageLoading />}>
+                  <ProfileTest />
+                </Suspense>
+              } />
 
               <Route path="/user-settings" element={
                 isAuthLoading ? (
@@ -1070,7 +1030,9 @@ console.log('Admin granted:', data, error);
                     </div>
                   </div>
                 ) : user ? (
-                  <UserSettingsPage />
+                  <Suspense fallback={<PageLoading />}>
+                    <UserSettingsPage />
+                  </Suspense>
                 ) : (
                   <Navigate to="/" replace />
                 )

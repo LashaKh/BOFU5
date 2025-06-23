@@ -1228,10 +1228,16 @@ export async function getMentionableUsers(
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error('❌ User not authenticated for getMentionableUsers:', authError);
       throw new Error('User not authenticated');
     }
 
-    console.log('🔍 Getting mentionable users:', { articleId, searchTerm });
+    console.log('🔍 Getting mentionable users:', { 
+      articleId, 
+      searchTerm,
+      currentUser: user.email,
+      userId: user.id 
+    });
 
     const { data, error } = await supabase.rpc('get_mentionable_users', {
       article_id_param: articleId || null,
@@ -1239,14 +1245,31 @@ export async function getMentionableUsers(
     });
 
     if (error) {
-      console.error('❌ Error getting mentionable users:', error);
+      console.error('❌ Error getting mentionable users RPC:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // Check if it's a function not found error
+      if (error.code === '42883') {
+        console.error('❌ Function get_mentionable_users does not exist or has wrong signature');
+        console.error('🔧 Please run the COMPLETE_MENTION_SYSTEM_FIX.sql migration');
+      }
+      
       throw error;
     }
 
-    console.log('✅ Retrieved mentionable users:', data?.length || 0);
+    console.log('✅ Retrieved mentionable users:', {
+      count: data?.length || 0,
+      users: data?.map(u => ({ email: u.email, isAdmin: u.is_admin, mentionText: u.mention_text })) || []
+    });
+    
     return data || [];
   } catch (error) {
-    console.error('❌ Error getting mentionable users:', error);
+    console.error('❌ Exception in getMentionableUsers:', error);
     throw error;
   }
 }
@@ -1516,35 +1539,75 @@ export const getMentionNotifications = async (
     
     if (!targetUserId) throw new Error('User ID required');
 
-    const { data, error } = await supabase
+    // First get the basic mention data
+    const { data: mentions, error: mentionsError } = await supabase
       .from('comment_mentions')
-      .select(`
-        *,
-        comment:article_comments!inner(
-          id,
-          content,
-          content_type,
-          image_url,
-          created_at,
-          article_id,
-          user:profiles!article_comments_user_id_fkey(
-            id,
-            email,
-            name
-          )
-        ),
-        mentioned_by_user:profiles!comment_mentions_mentioned_by_user_id_fkey(
-          id,
-          email,
-          name
-        )
-      `)
+      .select('*')
       .eq('mentioned_user_id', targetUserId)
       .eq('notification_sent', false)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (mentionsError) throw mentionsError;
+    
+    if (!mentions || mentions.length === 0) {
+      return [];
+    }
+
+    // Get comment data separately
+    const commentIds = mentions.map(m => m.comment_id);
+    const { data: comments, error: commentsError } = await supabase
+      .from('article_comments')
+      .select(`
+        id,
+        content,
+        content_type,
+        image_url,
+        created_at,
+        article_id,
+        user_id
+      `)
+      .in('id', commentIds);
+
+    if (commentsError) throw commentsError;
+
+    // Get user profiles separately
+    const userIds = [
+      ...mentions.map(m => m.mentioned_by_user_id),
+      ...(comments || []).map(c => c.user_id)
+    ].filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Combine the data
+    const result: MentionNotification[] = mentions.map(mention => {
+      const comment = comments?.find(c => c.id === mention.comment_id);
+      const commentUser = profiles?.find(p => p.id === comment?.user_id);
+      const mentionedByUser = profiles?.find(p => p.id === mention.mentioned_by_user_id);
+
+      return {
+        ...mention,
+        comment: comment ? {
+          ...comment,
+          user: commentUser ? {
+            id: commentUser.id,
+            email: commentUser.email,
+            name: commentUser.name
+          } : undefined
+        } as any : undefined,
+        mentioned_by_user: mentionedByUser ? {
+          id: mentionedByUser.id,
+          email: mentionedByUser.email,
+          name: mentionedByUser.name
+        } : undefined
+      };
+    });
+
+    return result;
   } catch (error) {
     console.error('Error fetching mention notifications:', error);
     return [];

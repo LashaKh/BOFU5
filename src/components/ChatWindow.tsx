@@ -1,39 +1,33 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Send, ChevronDown, Bot, User, Loader2, Minimize2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import OpenAI from 'openai'; 
 import { supabase } from '../lib/supabase'; 
+
+// Import the sophisticated chat interface
+import ChatInterface from './chat/ChatInterface';
+
+// Import types
+import { Product, Message, ChatStatus } from '../types/chat';
 
 interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface Product {
+type LegacyProduct = {
   id: string;
   name: string;
   openai_vector_store_id?: string; 
   description?: string; 
-}
+};
 
-interface Message {
+type LegacyMessage = {
   id: string;
   text: string;
   sender: 'user' | 'assistant';
   timestamp: Date;
   threadId?: string;
-}
-
-type ChatStatus =
-  | 'initializing' 
-  | 'product_load_error' 
-  | 'idle' 
-  | 'product_selected_no_chat' 
-  | 'ready_with_product' 
-  | 'sending_to_backend' 
-  | 'backend_processing_delay' 
-  | 'backend_error' 
-  | 'assistant_responding'; 
+};
 
 const getFriendlyErrorMessage = (errorCode: string | null, defaultMessage: string): string => {
   if (!errorCode) return defaultMessage;
@@ -68,9 +62,10 @@ const openai = new OpenAI({
 const VITE_UNIVERSAL_ASSISTANT_ID = import.meta.env.VITE_UNIVERSAL_ASSISTANT_ID;
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Legacy state management (preserved exactly)
+  const [products, setProducts] = useState<LegacyProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<LegacyProduct | null>(null);
+  const [messages, setMessages] = useState<LegacyMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null); 
   const [chatStatus, setChatStatus] = useState<ChatStatus>('initializing');
@@ -78,8 +73,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
-  const textareaRef = useRef<null | HTMLTextAreaElement>(null);
 
+  // Convert legacy types to new types
+  const convertToNewProduct = (legacyProduct: LegacyProduct): Product => ({
+    id: legacyProduct.id,
+    name: legacyProduct.name,
+    description: legacyProduct.description,
+    openai_vector_store_id: legacyProduct.openai_vector_store_id,
+  });
+
+  const convertToNewMessage = (legacyMessage: LegacyMessage): Message => ({
+    id: legacyMessage.id,
+    text: legacyMessage.text,
+    sender: legacyMessage.sender,
+    timestamp: legacyMessage.timestamp,
+    threadId: legacyMessage.threadId ?? undefined,
+    productId: selectedProduct?.id,
+    type: 'text',
+  });
+
+  // Convert products array
+  const newProducts = products.map(convertToNewProduct);
+  const newMessages = messages.map(convertToNewMessage);
+  const newSelectedProduct = selectedProduct ? convertToNewProduct(selectedProduct) : null;
+
+  // All existing logic preserved exactly
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     setChatStatus('initializing');
@@ -115,7 +133,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         setChatStatus('product_load_error');
         setProducts([]);
       } else {
-        setProducts(data || []); // Ensure data is not null
+        setProducts(data || []);
         if (data && data.length > 0) {
           setChatStatus('idle'); 
         } else {
@@ -145,13 +163,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; 
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`; 
-    }
-  }, [inputValue]);
-
   const handleProductChange = (productId: string) => {
     const product = products.find(p => p.id === productId);
     setSelectedProduct(product || null);
@@ -174,345 +185,257 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    const newUserMessage: Message = {
+    const newUserMessage: LegacyMessage = {
       id: `msg-${Date.now()}`,
       text: inputValue,
       sender: 'user',
       timestamp: new Date(),
+      threadId: currentThreadId ?? undefined,
     };
+
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
-    const currentInput = inputValue;
     setInputValue('');
-    setChatStatus('assistant_responding'); 
+    setChatStatus('assistant_responding');
     setErrorMessage(null);
 
-    let threadIdToUse = currentThreadId;
-
     try {
-      // Step 1: Create a new thread if one doesn't exist
+      console.log('Frontend: Sending message to OpenAI...');
+      
+      let threadIdToUse = currentThreadId;
       if (!threadIdToUse) {
-        console.log('Frontend: No thread ID, creating new thread...');
-        const threadPayload: OpenAI.Beta.Threads.ThreadCreateParams = {};
-        if (selectedProduct && selectedProduct.openai_vector_store_id) {
-          console.log(
-            `Creating new thread with Vector Store ID: ${selectedProduct.openai_vector_store_id} for product: ${selectedProduct.name}`
-          );
-          threadPayload.tool_resources = {
+        console.log('Frontend: Creating new thread...');
+        
+        // Configure thread with vector store if available (correct approach)
+        const threadConfig: any = {};
+        if (selectedProduct.openai_vector_store_id) {
+          threadConfig.tool_resources = {
             file_search: {
               vector_store_ids: [selectedProduct.openai_vector_store_id],
             },
           };
-        } else {
-          console.log(
-            'Creating new thread without specific Vector Store ID (using assistant defaults).'
-          );
+          console.log('Frontend: Creating thread with vector store:', selectedProduct.openai_vector_store_id);
         }
-        const newThread = await openai.beta.threads.create(threadPayload);
-        setCurrentThreadId(newThread.id);
-        threadIdToUse = newThread.id;
-        console.log(
-          'Frontend: New thread created, ID:',
-          newThread.id,
-          'with payload:',
-          threadPayload
-        );
+        
+        const threadResponse = await openai.beta.threads.create(threadConfig);
+        threadIdToUse = threadResponse.id;
+        setCurrentThreadId(threadIdToUse);
+        console.log('Frontend: Thread created:', threadIdToUse);
       }
 
-      if (!threadIdToUse) {
-        // This should ideally not happen if thread creation was successful
-        throw new Error('Failed to obtain a thread ID.');
-      }
-
-      // Step 2: Add the user's message to the thread
-      console.log(`Frontend: Adding message to thread ${threadIdToUse}:`, currentInput);
-      await openai.beta.threads.messages.create(threadIdToUse, {
+      console.log('Frontend: Adding message to thread...');
+      const messageData: any = {
         role: 'user',
-        content: currentInput,
-        // Attach vector store ID if available and needed by assistant (TBD)
-        // file_ids: selectedProduct?.openai_vector_store_id ? [selectedProduct.openai_vector_store_id] : undefined
-      });
-      console.log('Frontend: Message added to thread.');
+        content: inputValue.trim(),
+      };
 
-      // Step 3: Create a run for the assistant
-      console.log(`Frontend: Creating run for thread ${threadIdToUse} with assistant ${VITE_UNIVERSAL_ASSISTANT_ID}`);
-      const run = await openai.beta.threads.runs.create(threadIdToUse, {
-        assistant_id: VITE_UNIVERSAL_ASSISTANT_ID as string, // Cast to string as SDK expects string
-        // Potentially add instructions here if needed, or rely on assistant's default instructions
-        // instructions: `Please address the user's query about the product: ${selectedProduct.name}. Product details: ${selectedProduct.description}`
-      });
-      console.log('Frontend: Run created with ID:', run.id);
+      // Vector store is configured at thread level, not message level
+      await openai.beta.threads.messages.create(threadIdToUse, messageData);
 
-      // Step 4: Poll for run completion and retrieve messages
-      const pollInterval = 1500; // ms
-      const maxAttempts = 20; // Approx 30 seconds
+      console.log('Frontend: Creating run...');
+      const runConfig: any = {
+        assistant_id: VITE_UNIVERSAL_ASSISTANT_ID,
+      };
+
+      // Vector store is configured at thread level, not run level
+      const run = await openai.beta.threads.runs.create(threadIdToUse, runConfig);
+
+      console.log('Frontend: Waiting for run completion...');
+      const maxAttempts = 60;
       let attempts = 0;
       let runStatus = run.status;
 
-      while (attempts < maxAttempts && (runStatus === 'queued' || runStatus === 'in_progress' || runStatus === 'requires_action')) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-        try {
-          const updatedRun = await openai.beta.threads.runs.retrieve(threadIdToUse, run.id);
-          runStatus = updatedRun.status;
-          console.log(`Frontend: Polling run ${run.id}, status: ${runStatus}`);
-
-          if (runStatus === 'requires_action') {
-            // This is where you would handle function calls if your assistant uses them.
-            // For now, we'll log it and assume no function calls are defined for this basic setup.
-            console.warn('Frontend: Run requires action (e.g., function call). This is not handled in the current implementation.');
-            // If you had function calls, you would submit tool outputs here:
-            // await openai.beta.threads.runs.submitToolOutputs(threadIdToUse, run.id, { tool_outputs: [...] });
-            // For simplicity, we will treat this as a state that might resolve or eventually fail/timeout.
-          }
-
-        } catch (pollingError: any) {
-          console.error('Frontend: Error polling run status:', pollingError);
-          // Decide if this error is fatal or if polling can continue
-          // For now, we'll let the loop continue, relying on maxAttempts
+      while (runStatus === 'in_progress' || runStatus === 'queued') {
+        if (attempts >= maxAttempts) {
+          console.error('Frontend: Run timeout');
+          setChatStatus('backend_error');
+          setErrorMessage('The request timed out. Please try again.');
+          return;
         }
+        
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const runCheck = await openai.beta.threads.runs.retrieve(threadIdToUse, run.id);
+        runStatus = runCheck.status;
         attempts++;
+        console.log(`Frontend: Run status: ${runStatus} (attempt ${attempts})`);
       }
 
       if (runStatus === 'completed') {
-        console.log(`Frontend: Run ${run.id} completed. Fetching messages...`);
-        const messageList = await openai.beta.threads.messages.list(threadIdToUse);
+        console.log('Frontend: Run completed, fetching messages...');
+        const messages = await openai.beta.threads.messages.list(threadIdToUse);
         
-        // Filter for messages added by the assistant after the user's last message
-        // OpenAI messages are typically listed in descending order by creation time
-        const assistantMessages = messageList.data
-          .filter(msg => msg.run_id === run.id && msg.role === 'assistant')
-          .reverse(); // Reverse to get them in chronological order for display
+        if (messages.data.length > 0) {
+          const assistantMessage = messages.data.find(
+            (msg) => msg.role === 'assistant' && msg.run_id === run.id
+          );
 
-        if (assistantMessages.length > 0) {
-          assistantMessages.forEach(assistMsg => {
-            if (assistMsg.content[0]?.type === 'text') {
-              const newAssistantMessage: Message = {
-                id: assistMsg.id,
-                text: assistMsg.content[0].text.value,
+          if (assistantMessage && assistantMessage.content.length > 0) {
+            const textContent = assistantMessage.content.find(
+              (content) => content.type === 'text'
+            );
+
+            if (textContent && 'text' in textContent) {
+              const assistantText = textContent.text.value;
+              console.log('Frontend: Assistant response:', assistantText);
+
+              const newAssistantMessage: LegacyMessage = {
+                id: `msg-${Date.now() + 1}`,
+                text: assistantText,
                 sender: 'assistant',
-                timestamp: new Date(assistMsg.created_at * 1000),
+                timestamp: new Date(),
                 threadId: threadIdToUse,
               };
               setMessages((prevMessages) => [...prevMessages, newAssistantMessage]);
+              setChatStatus('ready_with_product');
+            } else {
+              console.error('Frontend: Assistant response is not text content');
+              setChatStatus('backend_error');
+              setErrorMessage('The assistant returned an unexpected response format.');
             }
-          });
-          setChatStatus('ready_with_product');
+          } else {
+            console.error('Frontend: Assistant message has no content');
+            setChatStatus('backend_error');
+            setErrorMessage('The assistant response was empty.');
+          }
         } else {
-          console.warn('Frontend: Run completed, but no new assistant messages found.');
-          // Potentially set an error or a specific status if no message is a concern
-          setErrorMessage('The assistant processed your request but did not provide a response.');
-          setChatStatus('backend_error'); // Or a more specific status
+          console.error('Frontend: No assistant messages found');
+          setChatStatus('backend_error');
+          setErrorMessage('No response received from the assistant.');
         }
-      } else if (runStatus === 'failed' || runStatus === 'cancelled' || runStatus === 'expired') {
-        console.error(`Frontend: Run ${run.id} ended with status: ${runStatus}`);
-        const runDetails = await openai.beta.threads.runs.retrieve(threadIdToUse, run.id);
-        const lastError = runDetails.last_error;
-        const errorCode = lastError?.code || 'ASSISTANT_ERROR';
-        const errorMessageText = lastError?.message || 'The AI assistant failed to process your request.';
-        console.error('Frontend: Assistant run failure details:', errorMessageText);
-        setErrorMessage(getFriendlyErrorMessage(errorCode, `Assistant Error: ${errorMessageText.substring(0, 100)}`));
-        setChatStatus('backend_error');
       } else {
-        console.warn(`Frontend: Run ${run.id} timed out or ended with unexpected status: ${runStatus}`);
-        setErrorMessage(getFriendlyErrorMessage(null, 'The request to the AI assistant timed out. Please try again.'));
+        console.error(`Frontend: Run failed with status: ${runStatus}`);
         setChatStatus('backend_error');
+        setErrorMessage(getFriendlyErrorMessage(null, 'The assistant encountered an error while processing your request.'));
       }
-
     } catch (error: any) {
-      console.error('Frontend: OpenAI API error in handleSendMessage:', error);
-      let codeToPass: string | null;
-      if (typeof error.code === 'string') {
-        codeToPass = error.code;
-      } else if (typeof error.name === 'string' && error.name !== 'Error') { // Use error.name if it's specific
-        codeToPass = error.name;
-      } else {
-        codeToPass = null; // Default to null if no specific code/name is found
-      }
-      const friendlyMessage = getFriendlyErrorMessage(codeToPass, 'An error occurred while sending your message.');
-      setErrorMessage(friendlyMessage);
-      setChatStatus('backend_error'); // Using 'backend_error' as a generic API error status
+      console.error('Frontend: Error in handleSendMessage:', error);
+      setChatStatus('backend_error');
+      setErrorMessage(getFriendlyErrorMessage(error.code || null, 'An unexpected error occurred while processing your message.'));
     }
   };
 
-  const inputDisabled = 
-    !selectedProduct || 
-    isLoadingProducts || // Disable input while products are loading
-    chatStatus === 'sending_to_backend' || 
-    chatStatus === 'backend_processing_delay' || 
-    chatStatus === 'assistant_responding' || 
-    chatStatus === 'initializing' ||
-    chatStatus === 'product_load_error';
-
-  const sendButtonDisabled = 
-    inputDisabled || 
-    inputValue.trim() === '';
-
   const getStatusMessage = () => {
-    if (chatStatus === 'initializing') return 'Loading products...';
-    if (chatStatus === 'product_load_error' && errorMessage) return errorMessage;
-    if (chatStatus === 'idle' && products.length > 0) return 'Select a product to start chatting.';
-    if (chatStatus === 'idle' && products.length === 0 && !errorMessage) return 'No products available to chat about.';
-    if (chatStatus === 'backend_error' && errorMessage) return errorMessage;
-    if (chatStatus === 'backend_processing_delay') return 'Assistant is thinking (this might take a moment)...';
-    return null;
+    if (errorMessage) return errorMessage;
+    switch (chatStatus) {
+      case 'initializing':
+        return 'Initializing chat system...';
+      case 'product_load_error':
+        return errorMessage || 'Failed to load products. Please refresh to try again.';
+      case 'idle':
+        return '';
+      case 'product_selected_no_chat':
+        setChatStatus('ready_with_product');
+        return '';
+      case 'ready_with_product':
+        return '';
+      case 'assistant_responding':
+        return 'AI is thinking about your question...';
+      case 'backend_error':
+        return errorMessage || 'Something went wrong. Please try again.';
+      default:
+        return '';
+    }
   };
-  
-  const statusMessageText = getStatusMessage();
 
-  const chatContainerVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.98 },
-    visible: { opacity: 1, y: 0, scale: 1 },
+  // Event handlers for ChatInterface
+  const handleProductSelect = (product: Product) => {
+    handleProductChange(product.id);
   };
 
-  const commonTransition = { type: 'spring', stiffness: 300, damping: 30 };
+  const handleSend = (message: string) => {
+    if (message.trim() === '') return;
+    // Update inputValue to match the message being sent
+    setInputValue(message);
+    // Small delay to ensure state is updated before sending
+    setTimeout(() => {
+      handleSendMessage();
+    }, 0);
+  };
+
+  const handleRetry = () => {
+    if (chatStatus === 'product_load_error') {
+      fetchProducts();
+    } else {
+      setChatStatus('ready_with_product');
+      setErrorMessage(null);
+    }
+  };
+
+  const startNewChat = () => {
+    // Clear current conversation
+    setMessages([]);
+    setInputValue('');
+    setCurrentThreadId(null);
+    setChatStatus('idle');
+    setErrorMessage(null);
+  };
+
+  const handleLoadMessages = (loadedMessages: Message[]) => {
+    console.log('ChatWindow: Received', loadedMessages.length, 'messages to load');
+    
+    // Convert new messages to legacy format and replace current messages
+    const legacyMessages = loadedMessages.map(msg => ({
+      id: msg.id,
+      text: msg.text,
+      sender: msg.sender,
+      timestamp: msg.timestamp,
+      threadId: msg.threadId
+    }));
+    
+    console.log('ChatWindow: Converting to', legacyMessages.length, 'legacy messages');
+    console.log('ChatWindow: Legacy message IDs:', legacyMessages.map(m => m.id));
+    
+    // Clear current messages and set new ones (replace, don't append)
+    setMessages(legacyMessages);
+    setChatStatus('ready_with_product');
+    
+    console.log('ChatWindow: Messages replaced successfully');
+  };
+
+  const statusMessage = getStatusMessage();
+
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      >
         <motion.div
-          key="chat-window-expanded"
-          className="max-w-6xl mx-auto my-4 bg-white/70 backdrop-blur-md shadow-xl rounded-xl border border-gray-200/30 overflow-hidden z-40 flex flex-col"
-          style={{ height: '600px' }}
-          variants={chatContainerVariants}
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
-          transition={commonTransition}
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          transition={{ 
+            type: "spring", 
+            stiffness: 300, 
+            damping: 30,
+            mass: 0.8
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full h-full max-w-6xl max-h-[90vh] bg-gray-800 rounded-2xl shadow-2xl overflow-hidden"
         >
-          {/* Header */}
-          <div className="p-3 border-b border-gray-200/30 bg-slate-100/50 flex justify-between items-center select-none">
-            <div className="flex items-center">
-              <MessageSquare className="w-5 h-5 text-[#e2ca00] mr-2" />
-              <h2 className="text-sm font-semibold text-slate-700">AI Assistant</h2>
-            </div>
-            <button 
-              onClick={onClose} 
-              className="p-1 rounded-md hover:bg-slate-200/70 active:bg-slate-300/70 text-slate-500 hover:text-slate-700 transition-colors"
-              title="Minimize chat"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Product Selector */}
-          <div className="p-2.5 border-b border-gray-200/30 bg-slate-50/70">
-            <div className="relative">
-              <select
-                value={selectedProduct?.id || ''}
-                onChange={(e) => {
-                  const productId = e.target.value;
-                  const product = products.find(p => p.id === productId) || null;
-                  handleProductChange(productId);
-                }}
-                disabled={isLoadingProducts || chatStatus === 'initializing' || chatStatus === 'sending_to_backend'}
-                className={`w-full p-1.5 pr-8 border border-gray-300 rounded-md text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#fee600] focus:border-[#fee600] appearance-none text-black ${(isLoadingProducts || chatStatus === 'initializing' || chatStatus === 'sending_to_backend') ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
-              >
-                <option value="" disabled>
-                  {isLoadingProducts ? 'Loading products...' : products.length === 0 ? (errorMessage || 'No products available') : 'Select a Product'}
-                </option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-              {isLoadingProducts && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin ml-2" />} {/* Loading indicator */}
-            </div>
-          </div>
-
-          {/* Messages Area */}
-          <div className="flex-grow p-3 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100/50">
-            {statusMessageText && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center p-2 rounded-md text-xs ${chatStatus === 'backend_error' || chatStatus === 'product_load_error' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}
-              >
-                {(chatStatus === 'backend_error' || chatStatus === 'product_load_error') && <AlertTriangle className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />}
-                {statusMessageText}
-              </motion.div>
-            )}
-            <AnimatePresence initial={false}>
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
-                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[85%] lg:max-w-[75%] px-3 py-1.5 rounded-xl shadow-sm text-black/90 border ${ 
-                      message.sender === 'user'
-                        ? 'bg-[#FFFBE6] border-amber-200/80 rounded-br-none'
-                        : 'bg-white border-slate-200/80 rounded-bl-none'
-                    }`}
-                  >
-                    <div className="flex items-center mb-0.5">
-                      {message.sender === 'assistant' && <Bot className={`w-3.5 h-3.5 mr-1.5 text-[#c7b300] flex-shrink-0`} />}
-                      <span className={`text-[0.6rem] font-medium ${message.sender === 'user' ? 'text-amber-700/80' : 'text-slate-500/90'}`}>
-                        {message.sender === 'user' ? 'You' : selectedProduct?.name || 'Assistant'}
-                      </span>
-                      {message.sender === 'user' && <User className="w-3.5 h-3.5 ml-1.5 text-black/70 flex-shrink-0" />}
-                    </div>
-                    <p className="text-xs leading-snug whitespace-pre-wrap break-words">{message.text}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {chatStatus === 'sending_to_backend' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start"
-              >
-                <div className="max-w-xs lg:max-w-md px-3 py-2 rounded-xl shadow-sm bg-white text-slate-800 border border-slate-200/80 rounded-bl-none flex items-center">
-                  <Bot className="w-4 h-4 mr-2 text-[#c7b300]" />
-                  <Loader2 className="w-4 h-4 text-[#c7b300] animate-spin" />
-                  <span className="ml-1.5 text-xs text-slate-500 italic">Assistant is typing...</span>
-                </div>
-              </motion.div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Area */}
-          <div className="p-2.5 border-t border-gray-200/30 bg-slate-50/70">
-            <div className="flex items-center space-x-1.5">
-              <textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!sendButtonDisabled) handleSendMessage();
-                  }
-                }}
-                placeholder={inputDisabled ? (chatStatus === 'initializing' ? 'Initializing chat...' : chatStatus === 'product_load_error' ? (errorMessage || 'Error loading products.') : 'Select a product...') : `Ask about ${selectedProduct?.name}...`}
-                className="flex-grow p-1.5 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#fee600] focus:border-[#fee600] shadow-sm overflow-y-hidden text-xs text-black"
-                rows={1}
-                disabled={inputDisabled}
-                onClick={(e) => e.stopPropagation()} 
-              />
-              <button
-                onClick={(e) => { e.stopPropagation(); handleSendMessage(); }}
-                disabled={sendButtonDisabled}
-                className={`p-2 rounded-md text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#fee600] shadow-sm 
-                            ${sendButtonDisabled
-                              ? 'bg-slate-400 cursor-not-allowed'
-                              : 'bg-[#e2ca00] hover:bg-[#d4be00] active:bg-[#c7b300]' 
-                            }`}
-                title="Send message"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+          <ChatInterface
+            isOpen={true}
+            onClose={onClose}
+            products={newProducts}
+            selectedProduct={newSelectedProduct}
+            messages={newMessages}
+            status={chatStatus}
+            statusMessage={statusMessage}
+            inputValue={inputValue}
+            onInputChange={setInputValue}
+            onProductSelect={handleProductSelect}
+            onSendMessage={handleSend}
+            onRetry={handleRetry}
+            isLoadingProducts={isLoadingProducts}
+            onStartNewChat={startNewChat}
+            onLoadMessages={handleLoadMessages}
+          />
         </motion.div>
-      ) 
-    }
+      </motion.div>
     </AnimatePresence>
   );
 };

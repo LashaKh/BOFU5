@@ -163,7 +163,7 @@ export function parseProductData(input: any): ProductAnalysis[] {
       
       try {
         console.log("Attempting to parse processed string as JSON");
-        let parsedData = JSON.parse(processedInput);
+        const parsedData = JSON.parse(processedInput);
         
         if (Array.isArray(parsedData)) {
           console.log("Parsed string is an array, processing items");

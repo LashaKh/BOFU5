@@ -188,7 +188,7 @@ export async function getResolutionAnalytics(
   topResolutionReasons: Array<{ reason: string; count: number }>;
 }> {
   try {
-    let query = supabase
+    const query = supabase
       .from('comment_status_history')
       .select(`
         *,

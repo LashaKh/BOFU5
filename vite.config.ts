@@ -39,59 +39,114 @@ export default defineConfig({
     dedupe: ['react', 'react-dom']
   },
   build: {
-    // Break into more chunks to reduce individual file sizes
+    target: 'es2020',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
-      external: [],
       output: {
-        manualChunks: (id) => {
-          // React core and related hooks libraries
-          if (id.includes('react') || id.includes('react-dom') || id.includes('use-isomorphic-layout-effect')) {
-            return 'react-vendor';
-          }
+        manualChunks: {
+          // React ecosystem
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           
-          // TipTap editor libraries
-          if (id.includes('@tiptap') || id.includes('prosemirror')) {
-            return 'editor-vendor';
-          }
+          // UI and animation libraries
+          'ui-vendor': [
+            '@headlessui/react',
+            '@heroicons/react',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-select',
+            '@radix-ui/react-slot',
+            'framer-motion',
+            'react-hot-toast',
+            'lucide-react'
+          ],
           
-          // UI/styling libraries
-          if (id.includes('framer-motion') || id.includes('lucide-react')) {
-            return 'ui-vendor';
-          }
+          // Editor ecosystem  
+          'editor-vendor': [
+            '@tiptap/core',
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+            '@tiptap/extension-character-count',
+            '@tiptap/extension-code-block',
+            '@tiptap/extension-collaboration',
+            '@tiptap/extension-collaboration-cursor',
+            '@tiptap/extension-color',
+            '@tiptap/extension-highlight',
+            '@tiptap/extension-horizontal-rule',
+            '@tiptap/extension-image',
+            '@tiptap/extension-link',
+            '@tiptap/extension-strike',
+            '@tiptap/extension-subscript',
+            '@tiptap/extension-superscript',
+            '@tiptap/extension-table',
+            '@tiptap/extension-table-cell',
+            '@tiptap/extension-table-header',
+            '@tiptap/extension-table-row',
+            '@tiptap/extension-task-item',
+            '@tiptap/extension-task-list',
+            '@tiptap/extension-text-align',
+            '@tiptap/extension-text-style',
+            '@tiptap/extension-typography',
+            '@tiptap/extension-underline',
+            'yjs'
+          ],
           
-          // Supabase and other APIs
-          if (id.includes('@supabase') || id.includes('supabase')) {
-            return 'supabase-vendor';
-          }
+          // PDF handling
+          'pdf-vendor': [
+            'pdfjs-dist',
+            'jspdf',
+            'html2canvas'
+          ],
           
-          // Large utility libraries
-          if (id.includes('lodash') || id.includes('date-fns')) {
-            return 'utils-vendor';
-          }
+          // Database and auth
+          'supabase-vendor': [
+            '@supabase/supabase-js'
+          ],
           
-          // PDF and document processing
-          if (id.includes('pdfjs') || id.includes('pdf')) {
-            return 'pdf-vendor';
-          }
+          // Document processing
+          'document-vendor': [
+            'docx',
+            'mammoth',
+            'jszip',
+            'file-saver',
+            'turndown',
+            'markdown-it',
+            'marked',
+            'react-markdown',
+            'remark',
+            'remark-gfm',
+            'remark-parse',
+            'remark-stringify'
+          ],
           
-          // Node modules that aren't separated above
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-        // Ensure globals are properly defined
-        globals: {
-          'react': 'React',
-          'react-dom': 'ReactDOM'
+          // Utilities and other libraries
+          'utils-vendor': [
+            'axios',
+            'lodash',
+            'date-fns',
+            'diff',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+            'react-dropzone',
+            'react-textarea-autosize',
+            'base64-arraybuffer'
+          ],
+          
+          // Sentry monitoring
+          'sentry-vendor': [
+            '@sentry/react'
+          ]
         }
       }
     },
-    // Target modern browsers for better performance
-    target: 'es2020',
-    // Ensure source maps for debugging
     sourcemap: true,
-    // Optimize chunk size warnings
-    chunkSizeWarningLimit: 1000
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
   },
   server: {
     port: 5173,

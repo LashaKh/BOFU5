@@ -482,7 +482,7 @@ export function ProductCardActions({
         {context === 'admin' && (
           <ActionButton
             icon={<Send className="w-4 h-4" />}
-            label="Send to AirOps"
+            label="Send to AirOps to generate content brief"
             variant="secondary"
             isLoading={actionStates.sendToAirOps}
             disabled={disabled}

@@ -296,6 +296,7 @@ export function ProductCard(props: any) {
       },
       capabilities: product.capabilities || [],
       competitors: product.competitors || undefined,
+      keywords: product.keywords || [],  // Keywords corruption is now handled in ContentBriefManagement
       isApproved: product.isApproved || false,
       google_doc: product.google_doc,
       competitorAnalysisUrl: product.competitorAnalysisUrl,
@@ -306,7 +307,7 @@ export function ProductCard(props: any) {
     
     return transformed;
   }, [props.product]);
-
+  
   // Extract context and other props
   const context = props.context || 'product';
   const isExpanded = props.isExpanded || false;
@@ -367,7 +368,7 @@ export function ProductCard(props: any) {
           showCapabilities={true}
           showCompetitorAnalysis={true}
           showActions={true}
-          enableEditing={true} // Always enable editing
+          enableEditing={props.enableEditing || false} // Use the actual enableEditing prop
           index={props.index || 0}
         />
       </Container>
