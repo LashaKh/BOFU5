@@ -96,9 +96,9 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
       broader_competitors: []
     };
     
-    // Check if the selected category already has 3 competitors
-    if (updatedCompetitors[newCompetitor.type].length >= 3) {
-      toast.error(`Maximum limit of 3 ${newCompetitor.type.replace('_', ' ')} reached`);
+    // Check if the selected category already has 12 competitors
+    if (updatedCompetitors[newCompetitor.type].length >= 12) {
+      toast.error(`Maximum limit of 12 ${newCompetitor.type.replace('_', ' ')} reached`);
       return;
     }
 
@@ -557,8 +557,39 @@ export function CompetitorAnalysis({ product, onUpdate, onUpdateCompetitors }: C
   };
 
   return (
-    <div className="space-y-4">
-      <h4 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Competitor Analysis</h4>
+    <div className="space-y-6">
+      {/* Premium Header */}
+      <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="p-3 bg-gradient-to-br from-red-500 via-pink-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+              <Target className="w-6 h-6 text-white" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-400 rounded-full border-2 border-white shadow-sm"></div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                Competitor Analysis
+              </h4>
+              {(product.competitors && (
+                (product.competitors.direct_competitors?.length || 0) + 
+                (product.competitors.niche_competitors?.length || 0) + 
+                (product.competitors.broader_competitors?.length || 0) > 0
+              )) && (
+                <div className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                  {(product.competitors.direct_competitors?.length || 0) + 
+                   (product.competitors.niche_competitors?.length || 0) + 
+                   (product.competitors.broader_competitors?.length || 0)} competitors
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+              Identify and analyze your market competition
+            </p>
+          </div>
+        </div>
+      </div>
       
       {/* Two separate action buttons */}
       <div className="space-y-3">

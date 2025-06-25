@@ -72,7 +72,7 @@ const ContentSection = ({
 // List component with enhanced styling and animations
 const AnimatedList = ({ 
   items, 
-  maxItems = 3, 
+  maxItems = 12, 
   showExpandButton = true,
   styles,
   isReducedMotion,
@@ -226,7 +226,7 @@ const TargetPersona = ({
 export function ProductCardContent({
   product,
   isExpanded = false,
-  maxItems = 3,
+  maxItems = 12,
   showExpandButton = true,
   researchResultId,
   userUUID,
