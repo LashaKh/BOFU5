@@ -757,7 +757,7 @@ export function ProductCardContent({
                         setIsCapabilitiesExpanded(true);
                       }
                     }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md"
                     title="Add new capability"
                   >
                     <Plus size={16} />
@@ -1013,7 +1013,37 @@ export function ProductCardContent({
                       </div>
                     </motion.div>
                   ))
-                ) : (
+                ) : null}
+                
+                {/* Add button at the end of capabilities list */}
+                {enableEditing && editableProduct.capabilities && editableProduct.capabilities.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.2 }}
+                    className="flex justify-center pt-4"
+                  >
+                    <button
+                      onClick={() => {
+                        const newCapability = {
+                          title: '',
+                          description: '',
+                          content: '',
+                          images: []
+                        };
+                        const updatedCapabilities = [...(editableProduct.capabilities || []), newCapability];
+                        updateField('capabilities', updatedCapabilities);
+                      }}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-md hover:shadow-lg border-2 border-dashed border-yellow-300 hover:border-yellow-400"
+                    >
+                      <Plus size={18} />
+                      Add Another Capability
+                    </button>
+                  </motion.div>
+                )}
+                
+                {/* Empty state */}
+                {(!editableProduct.capabilities || editableProduct.capabilities.length === 0) && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
