@@ -13,6 +13,144 @@ import { useAuth } from '../../lib/auth';
 import { deleteCapabilityImage, UploadResult } from '../../lib/storage';
 import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
+// Premium Collapsible Section Component
+const CollapsibleSection = ({ 
+  title, 
+  description, 
+  children, 
+  icon, 
+  gradientColors,
+  accentColor,
+  defaultExpanded = true,
+  count
+}: { 
+  title: string; 
+  description: string;
+  children: React.ReactNode; 
+  icon: React.ReactNode; 
+  gradientColors: string;
+  accentColor: string;
+  defaultExpanded?: boolean;
+  count?: number;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Update isExpanded when defaultExpanded prop changes
+  React.useEffect(() => {
+    setIsExpanded(defaultExpanded);
+  }, [defaultExpanded]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className="space-y-4"
+    >
+      {/* Premium Header */}
+      <div 
+        className="relative overflow-hidden rounded-xl border border-gray-200/60 shadow-sm hover:shadow-lg transition-all duration-500 p-6 group cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          background: `
+            linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.95) 0%, 
+              rgba(248, 250, 252, 0.9) 50%, 
+              rgba(241, 245, 249, 0.95) 100%
+            )
+          `,
+          backdropFilter: 'blur(10px) saturate(180%)',
+        }}
+      >
+        {/* Floating decorative elements */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-2 right-8 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-purple-500/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-2 left-8 w-24 h-24 bg-gradient-to-br from-pink-400/20 to-orange-500/20 rounded-full blur-xl"></div>
+        </div>
+        
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div 
+                className={`p-3 ${gradientColors} rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105`}
+                style={{
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+                }}
+              >
+                {icon}
+              </div>
+              <div className={`absolute -top-1 -right-1 w-3 h-3 ${accentColor} rounded-full border-2 border-white shadow-sm animate-pulse`}></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3">
+                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-all duration-300">
+                  {title}
+                </h4>
+                {count !== undefined && count > 0 && (
+                  <span 
+                    className={`px-3 py-1 ${accentColor} text-white text-xs font-bold rounded-full shadow-sm transform transition-transform duration-200 group-hover:scale-110`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200 mt-1">
+                {description}
+              </p>
+            </div>
+          </div>
+          
+          {/* Enhanced Chevron */}
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            className="p-3 rounded-xl bg-white/60 backdrop-blur-sm border border-gray-200/60 group-hover:bg-white/80 group-hover:border-gray-300/60 transition-all duration-300 shadow-sm"
+          >
+            <ChevronDown className="w-5 h-5 text-gray-600" />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Collapsible Content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div 
+              className="relative overflow-hidden rounded-xl border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-300 p-6"
+              style={{
+                background: `
+                  linear-gradient(135deg, 
+                    rgba(255, 255, 255, 0.98) 0%, 
+                    rgba(248, 250, 252, 0.95) 50%, 
+                    rgba(241, 245, 249, 0.98) 100%
+                  )
+                `,
+                backdropFilter: 'blur(20px) saturate(180%)',
+              }}
+            >
+              {/* Content background pattern */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-4 right-12 w-20 h-20 bg-gradient-to-br from-blue-400/30 to-purple-500/30 rounded-full blur-xl"></div>
+                <div className="absolute bottom-4 left-12 w-16 h-16 bg-gradient-to-br from-pink-400/30 to-orange-500/30 rounded-full blur-lg"></div>
+              </div>
+              
+              <div className="relative z-10">
+                {children}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 interface ProductCardContentProps {
   product: ProductAnalysis;
   isExpanded?: boolean;
@@ -262,6 +400,14 @@ export function ProductCardContent({
 
   // Add state for capabilities collapse (collapsed by default)
   const [isCapabilitiesExpanded, setIsCapabilitiesExpanded] = useState(false);
+  
+  // Add state for controlling all sections based on isExpanded prop
+  const [sectionsExpanded, setSectionsExpanded] = useState(isExpanded);
+
+  // Update sectionsExpanded when isExpanded prop changes
+  React.useEffect(() => {
+    setSectionsExpanded(isExpanded);
+  }, [isExpanded]);
 
   // Update editable product when the original product changes
   React.useEffect(() => {
@@ -474,93 +620,61 @@ export function ProductCardContent({
 
       {/* Always show all editable fields */}
       <div className="space-y-8">
-        {/* Basic Information - Enhanced */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-6"
+        {/* Basic Information - Premium Collapsible */}
+        <CollapsibleSection
+          title="Basic Information"
+          description="Core company and product details"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600"
+          accentColor="bg-emerald-400"
+          defaultExpanded={sectionsExpanded}
         >
-          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="p-3 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
-                  </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
-                  Basic Information
-                </h4>
-                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
-                  Core company and product details
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+              <EditableField
+                label=""
+                value={editableProduct.companyName || ''}
+                onSave={(value) => updateField('companyName', value as string)}
+                type="text"
+                placeholder="Enter company name"
+                maxLength={100}
+                disabled={!enableEditing}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+              <EditableField
+                label=""
+                value={editableProduct.productDetails?.name || ''}
+                onSave={(value) => updateNestedField('productDetails', 'name', value as string)}
+                type="text"
+                placeholder="Enter product name"
+                maxLength={100}
+                disabled={!enableEditing}
+              />
             </div>
           </div>
-          
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
-                <EditableField
-                  label=""
-                  value={editableProduct.companyName || ''}
-                  onSave={(value) => updateField('companyName', value as string)}
-                  type="text"
-                  placeholder="Enter company name"
-                  maxLength={100}
-                  disabled={!enableEditing}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
-                <EditableField
-                  label=""
-                  value={editableProduct.productDetails?.name || ''}
-                  onSave={(value) => updateNestedField('productDetails', 'name', value as string)}
-                  type="text"
-                  placeholder="Enter product name"
-                  maxLength={100}
-                  disabled={!enableEditing}
-                />
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        </CollapsibleSection>
 
-        {/* Business Overview - Enhanced */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="space-y-6"
+        {/* Business Overview - Premium Collapsible */}
+        <CollapsibleSection
+          title="Business Overview"
+          description="Company mission, industry, and operations"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-amber-500 via-orange-500 to-red-600"
+          accentColor="bg-amber-400"
+          defaultExpanded={sectionsExpanded}
         >
-          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="p-3 bg-gradient-to-br from-amber-500 via-orange-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
-                  </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
-                  Business Overview
-                </h4>
-                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
-                  Company mission, industry, and operations
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 space-y-6">
+          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-700">Mission Statement</label>
@@ -600,37 +714,22 @@ export function ProductCardContent({
               />
             </div>
           </div>
-        </motion.div>
+        </CollapsibleSection>
 
-        {/* Target Persona - Enhanced */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="space-y-6"
+        {/* Target Persona - Premium Collapsible */}
+        <CollapsibleSection
+          title="Target Persona"
+          description="Define your ideal customer profile"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-rose-500 via-pink-500 to-purple-600"
+          accentColor="bg-rose-400"
+          defaultExpanded={sectionsExpanded}
         >
-          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="p-3 bg-gradient-to-br from-rose-500 via-pink-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-400 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
-                  Target Persona
-                </h4>
-                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
-                  Define your ideal customer profile
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 space-y-6">
+          <div className="space-y-6">
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">Primary Audience</label>
               <EditableField
@@ -681,40 +780,26 @@ export function ProductCardContent({
               />
             </div>
           </div>
-        </motion.div>
+        </CollapsibleSection>
 
-        {/* Value Propositions - Enhanced Production-Ready Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="space-y-6"
+        {/* Value Propositions - Premium Collapsible */}
+        <CollapsibleSection
+          title="Value Propositions"
+          description="What makes your product unique and valuable"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600"
+          accentColor="bg-cyan-400"
+          defaultExpanded={sectionsExpanded}
+          count={(editableProduct.usps?.length || 0) + (editableProduct.painPoints?.length || 0)}
         >
-          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="p-3 bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
-                  Value Propositions
-                </h4>
-                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
-                  What makes your product unique and valuable
-                </p>
-              </div>
-            </div>
-          </div>
-
           <div className="space-y-6">
             {/* USPs */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
                 <div className="p-1.5 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-lg border border-purple-200">
                   <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -733,8 +818,8 @@ export function ProductCardContent({
             </div>
 
             {/* Pain Points */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
                 <div className="p-1.5 bg-gradient-to-br from-red-100 to-rose-100 rounded-lg border border-red-200">
                   <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -752,7 +837,7 @@ export function ProductCardContent({
               />
             </div>
           </div>
-        </motion.div>
+        </CollapsibleSection>
 
         {/* Features and Capabilities - Enhanced Production-Ready Section */}
         <motion.div
@@ -1135,169 +1220,175 @@ export function ProductCardContent({
         </motion.div>
       </div>
 
-      {/* Competitor Analysis - Moved to bottom */}
+      {/* Competitor Analysis - Premium Collapsible */}
       {showCompetitorAnalysis && (
-        <CompetitorAnalysis
-          product={editableProduct}
-          onUpdate={(url: string) => {
-            // Update the competitor analysis URL in the product
-            const updatedProduct = {
-              ...editableProduct,
-              competitorAnalysisUrl: url,
-              google_doc: url
-            };
-            setEditableProduct(updatedProduct);
-            
-            // Also call the parent update if available
-            if (onUpdateSection) {
-              onUpdateSection(index ?? 0, 'competitorAnalysisUrl', url);
-            }
-          }}
-          onUpdateCompetitors={(competitors: any) => {
-            console.log("ProductCardContent.onUpdateCompetitors called with:", competitors);
-            
-            // Set flag to prevent useEffect from resetting competitors
-            isUpdatingCompetitors.current = true;
-            
-            // Update the competitors data in the product immediately
-            const updatedProduct = {
-              ...editableProduct,
-              competitors: competitors
-            };
-            
-            console.log("ProductCardContent setting editableProduct with competitors:", updatedProduct.competitors);
-            setEditableProduct(updatedProduct);
-            
-            // Immediately call the parent update to persist the data
-            if (onUpdateSection) {
-              console.log("ProductCardContent calling onUpdateSection with competitors:", competitors);
-              onUpdateSection(index ?? 0, 'competitors', competitors).then(() => {
-                console.log("ProductCardContent: onUpdateSection completed successfully");
-                // DO NOT clear the flag here - let the useEffect handle it when parent prop updates
-                console.log("ProductCardContent: Waiting for parent product prop to reflect competitors before clearing flag");
-              }).catch(error => {
-                console.error("Failed to update competitors in parent:", error);
-                // Clear flag on error
+        <div className="mt-8">
+          <CollapsibleSection
+          title="Competitor Analysis"
+          description="Analyze your competitive landscape"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-red-500 via-pink-500 to-purple-600"
+          accentColor="bg-red-400"
+          defaultExpanded={sectionsExpanded}
+          count={
+            ((editableProduct.competitors?.direct_competitors?.length || 0) +
+             (editableProduct.competitors?.niche_competitors?.length || 0) +
+             (editableProduct.competitors?.broader_competitors?.length || 0)) || 0
+          }
+        >
+          <CompetitorAnalysis
+            product={editableProduct}
+            onUpdate={(url: string) => {
+              // Update the competitor analysis URL in the product
+              const updatedProduct = {
+                ...editableProduct,
+                competitorAnalysisUrl: url,
+                google_doc: url
+              };
+              setEditableProduct(updatedProduct);
+              
+              // Also call the parent update if available
+              if (onUpdateSection) {
+                onUpdateSection(index ?? 0, 'competitorAnalysisUrl', url);
+              }
+            }}
+            onUpdateCompetitors={(competitors: any) => {
+              console.log("ProductCardContent.onUpdateCompetitors called with:", competitors);
+              
+              // Set flag to prevent useEffect from resetting competitors
+              isUpdatingCompetitors.current = true;
+              
+              // Update the competitors data in the product immediately
+              const updatedProduct = {
+                ...editableProduct,
+                competitors: competitors
+              };
+              
+              console.log("ProductCardContent setting editableProduct with competitors:", updatedProduct.competitors);
+              setEditableProduct(updatedProduct);
+              
+              // Immediately call the parent update to persist the data
+              if (onUpdateSection) {
+                console.log("ProductCardContent calling onUpdateSection with competitors:", competitors);
+                onUpdateSection(index ?? 0, 'competitors', competitors).then(() => {
+                  console.log("ProductCardContent: onUpdateSection completed successfully");
+                  // DO NOT clear the flag here - let the useEffect handle it when parent prop updates
+                  console.log("ProductCardContent: Waiting for parent product prop to reflect competitors before clearing flag");
+                }).catch(error => {
+                  console.error("Failed to update competitors in parent:", error);
+                  // Clear flag on error
+                  setTimeout(() => {
+                    isUpdatingCompetitors.current = false;
+                  }, 1000);
+                });
+              } else {
+                console.warn("ProductCardContent: onUpdateSection is not available");
+                // Clear flag if no onUpdateSection available
                 setTimeout(() => {
                   isUpdatingCompetitors.current = false;
                 }, 1000);
-              });
-            } else {
-              console.warn("ProductCardContent: onUpdateSection is not available");
-              // Clear flag if no onUpdateSection available
-              setTimeout(() => {
-                isUpdatingCompetitors.current = false;
-              }, 1000);
-            }
-          }}
-        />
+              }
+            }}
+          />
+        </CollapsibleSection>
+        </div>
       )}
 
       {/* Keywords Section - Admin Only */}
       {context === 'admin' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="space-y-6"
+        <CollapsibleSection
+          title="Keywords & Tags"
+          description="Identify and manage keywords for content brief generation"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          }
+          gradientColors="bg-gradient-to-br from-yellow-500 via-orange-500 to-amber-600"
+          accentColor="bg-yellow-400"
+          defaultExpanded={sectionsExpanded}
+          count={editableProduct.keywords?.length}
         >
-          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="p-3 bg-gradient-to-br from-yellow-500 via-orange-500 to-amber-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="space-y-4">
+            {/* Keywords Display and Management */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
-                    Keywords & Tags
-                  </h4>
-                  <div className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">
-                    Admin
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
-                  Identify and manage keywords for content brief generation
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
-            <div className="space-y-4">
-              {/* Keywords Display and Management */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    Content Keywords
-                    <span className="text-xs text-gray-500 font-normal">
-                      ({(editableProduct.keywords || []).length} keyword{(editableProduct.keywords || []).length !== 1 ? 's' : ''})
-                    </span>
+                  Content Keywords
+                  <span className="text-xs text-gray-500 font-normal">
+                    ({(editableProduct.keywords || []).length} keyword{(editableProduct.keywords || []).length !== 1 ? 's' : ''})
                   </span>
-                </label>
+                </span>
+              </label>
 
-                <EditableField
-                  label=""
-                  value={editableProduct.keywords || []}
-                  onSave={(value) => updateField('keywords', value)}
-                  type="array"
-                  arrayItemPlaceholder="Add keyword (e.g., automation, productivity, SaaS, analytics)..."
-                  disabled={!enableEditing}
-                  className="rounded-lg"
-                />
-              </div>
+              <EditableField
+                label=""
+                value={editableProduct.keywords || []}
+                onSave={(value) => updateField('keywords', value)}
+                type="array"
+                arrayItemPlaceholder="Add keyword (e.g., automation, productivity, SaaS, analytics)..."
+                disabled={!enableEditing}
+                className="rounded-lg"
+              />
+            </div>
 
-              {/* Keywords Preview */}
-              {editableProduct.keywords && editableProduct.keywords.length > 0 && (
-                <div className="mt-4 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Keyword Tags
-                  </h5>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {editableProduct.keywords.map((keyword, index) => (
-                      <motion.span
-                        key={index}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.2, delay: index * 0.05 }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-medium rounded-full shadow-sm hover:shadow-md transition-all duration-200"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        {keyword}
-                      </motion.span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Admin Instructions */}
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {/* Keywords Preview */}
+            {editableProduct.keywords && editableProduct.keywords.length > 0 && (
+              <div className="mt-4 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                <h5 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <div className="text-xs text-blue-700">
-                    <p className="font-medium mb-1">Admin Keywords:</p>
-                    <p>These keywords will be included when sending data to AirOps for content brief generation. Keywords help improve content relevance and SEO targeting.</p>
-                  </div>
+                  Keyword Tags
+                </h5>
+                
+                <div className="flex flex-wrap gap-2">
+                  {editableProduct.keywords.map((keyword, index) => (
+                    <motion.span
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-medium rounded-full shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      {keyword}
+                    </motion.span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Admin Instructions */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-start gap-2">
+                <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-xs text-blue-700">
+                  <p className="font-medium mb-1">Admin Keywords:</p>
+                  <p>These keywords will be included when sending data to AirOps for content brief generation. Keywords help improve content relevance and SEO targeting.</p>
                 </div>
               </div>
             </div>
+
+            {/* Admin Badge */}
+            <div className="flex justify-end">
+              <div className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">
+                Admin
+              </div>
+            </div>
           </div>
-        </motion.div>
+        </CollapsibleSection>
       )}
 
       {/* Advanced sections - only show when expanded and needed */}
