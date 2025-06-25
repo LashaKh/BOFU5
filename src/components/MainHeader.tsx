@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast';
 import { ProfileManager } from '../components/profile/ProfileManager';
 import { NotificationCenter } from './user-dashboard/NotificationCenter';
 import { getMentionNotifications } from '../lib/commentApi';
-import { MentionSystemDebugger } from './debug/MentionSystemDebugger';
+
 
 // Logo SVG component
 const Logo = () => (
@@ -37,7 +37,7 @@ export function MainHeader({
   const [user, setUser] = React.useState(propUser);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
-  const [showMentionDebugger, setShowMentionDebugger] = useState(false);
+
   const navigate = useNavigate();
 
   // Helper function to get display name
@@ -247,18 +247,7 @@ export function MainHeader({
                   )}
                 </motion.button>
                 
-                {/* Debug Button (Development Only) */}
-                {process.env.NODE_ENV === 'development' && (
-                  <motion.button
-                    onClick={() => setShowMentionDebugger(true)}
-                    className="p-2 rounded-lg hover:bg-secondary-800/70 text-gray-300 hover:text-primary-300 border border-transparent hover:border-primary-500/20 transition-all"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    title="Debug Mention System"
-                  >
-                    🐛
-                  </motion.button>
-                )}
+
                 
                 {/* User Menu */}
                 <Menu as="div" className="relative">
@@ -381,13 +370,7 @@ export function MainHeader({
         }}
       />
       
-      {/* Mention System Debugger (Development Only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <MentionSystemDebugger
-          isVisible={showMentionDebugger}
-          onClose={() => setShowMentionDebugger(false)}
-        />
-      )}
+
     </header>
   );
 }
