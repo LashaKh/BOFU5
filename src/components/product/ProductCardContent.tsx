@@ -481,15 +481,24 @@ export function ProductCardContent({
           transition={{ duration: 0.5 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Basic Information</h4>
-              <p className="text-sm text-gray-500">Core company and product details</p>
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                  Basic Information
+                </h4>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  Core company and product details
+                </p>
+              </div>
             </div>
           </div>
           
@@ -530,15 +539,24 @@ export function ProductCardContent({
           transition={{ duration: 0.5, delay: 0.2 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Business Overview</h4>
-              <p className="text-sm text-gray-500">Company mission, industry, and operations</p>
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-amber-500 via-orange-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-2 8l4-4 4 4" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-white shadow-sm"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                  Business Overview
+                </h4>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  Company mission, industry, and operations
+                </p>
+              </div>
             </div>
           </div>
 
@@ -591,15 +609,24 @@ export function ProductCardContent({
           transition={{ duration: 0.5, delay: 0.3 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-rose-500 to-pink-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Target Persona</h4>
-              <p className="text-sm text-gray-500">Define your ideal customer profile</p>
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-rose-500 via-pink-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-400 rounded-full border-2 border-white shadow-sm"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                  Target Persona
+                </h4>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  Define your ideal customer profile
+                </p>
+              </div>
             </div>
           </div>
 
@@ -663,15 +690,24 @@ export function ProductCardContent({
           transition={{ duration: 0.5, delay: 0.4 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Value Propositions</h4>
-              <p className="text-sm text-gray-500">What makes your product unique and valuable</p>
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full border-2 border-white shadow-sm"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                  Value Propositions
+                </h4>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  What makes your product unique and valuable
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1165,15 +1201,29 @@ export function ProductCardContent({
           transition={{ duration: 0.5, delay: 0.6 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">Keywords & Tags</h4>
-              <p className="text-sm text-gray-500">Identify and manage keywords for content brief generation</p>
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-6 group mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-yellow-500 via-orange-500 to-amber-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white shadow-sm"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                    Keywords & Tags
+                  </h4>
+                  <div className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">
+                    Admin
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  Identify and manage keywords for content brief generation
+                </p>
+              </div>
             </div>
           </div>
 
