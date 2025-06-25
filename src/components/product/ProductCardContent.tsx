@@ -739,7 +739,31 @@ export function ProductCardContent({
                 <h4 className="text-xl font-semibold text-gray-900">Features and Capabilities</h4>
                 <p className="text-sm text-gray-500">Define your product's key capabilities and features</p>
               </div>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
+                {enableEditing && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newCapability = {
+                        title: '',
+                        description: '',
+                        content: '',
+                        images: []
+                      };
+                      const updatedCapabilities = [...(editableProduct.capabilities || []), newCapability];
+                      updateField('capabilities', updatedCapabilities);
+                      // Expand the section when adding a new capability
+                      if (!isCapabilitiesExpanded) {
+                        setIsCapabilitiesExpanded(true);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                    title="Add new capability"
+                  >
+                    <Plus size={16} />
+                    Add
+                  </button>
+                )}
                 {isCapabilitiesExpanded ? (
                   <ChevronUp className="w-5 h-5 text-gray-400" />
                 ) : (
