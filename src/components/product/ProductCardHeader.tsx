@@ -12,66 +12,149 @@ interface ProductCardHeaderProps {
   isExpanded?: boolean;
 }
 
-// Status badge component with sophisticated styling
+// Premium status badge component with sophisticated styling
 const StatusBadge = ({ isApproved, theme }: { isApproved?: boolean; theme: any }) => {
-  const badgeClasses = isApproved
-    ? 'bg-green-500/20 text-green-300 border-green-400/30'
-    : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30';
-
+  const isApprovedStatus = isApproved;
+  
   return (
     <motion.div
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: 0.3, duration: 0.4, ease: 'backOut' }}
-      className={`
-        ${badgeClasses}
-        px-3 py-1.5 rounded-full text-xs font-semibold 
-        border backdrop-blur-sm
-        flex items-center space-x-1.5
-      `}
+      initial={{ scale: 0, opacity: 0, rotate: -10 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{ delay: 0.3, duration: 0.6, ease: 'backOut' }}
+      className="relative"
     >
-      <div className={`w-2 h-2 rounded-full ${isApproved ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`} />
-      <span>{isApproved ? 'Approved' : 'Pending'}</span>
+      <div
+        className="px-4 py-2.5 rounded-xl text-sm font-bold flex items-center space-x-2 shadow-lg border backdrop-blur-md"
+        style={{
+          background: isApprovedStatus 
+            ? `linear-gradient(135deg, 
+                rgba(34, 197, 94, 0.9) 0%, 
+                rgba(16, 185, 129, 0.8) 50%, 
+                rgba(5, 150, 105, 0.9) 100%
+              )`
+            : `linear-gradient(135deg, 
+                rgba(245, 158, 11, 0.9) 0%, 
+                rgba(251, 191, 36, 0.8) 50%, 
+                rgba(217, 119, 6, 0.9) 100%
+              )`,
+          color: 'white',
+          border: isApprovedStatus 
+            ? '1px solid rgba(34, 197, 94, 0.3)'
+            : '1px solid rgba(245, 158, 11, 0.3)',
+          boxShadow: isApprovedStatus
+            ? '0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2)'
+            : '0 4px 6px -1px rgba(245, 158, 11, 0.3), 0 2px 4px -1px rgba(245, 158, 11, 0.2)',
+        }}
+      >
+        {/* Premium status indicator */}
+        <div className="relative">
+          <div 
+            className={`w-3 h-3 rounded-full ${
+              isApprovedStatus ? 'bg-green-200' : 'bg-yellow-200'
+            } animate-pulse`}
+          />
+          <div 
+            className={`absolute inset-0 w-3 h-3 rounded-full ${
+              isApprovedStatus ? 'bg-green-100' : 'bg-yellow-100'
+            } animate-ping`}
+          />
+        </div>
+        
+        {/* Status text with icon */}
+        <div className="flex items-center space-x-1">
+          {isApprovedStatus ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span className="font-bold tracking-wide">
+            {isApprovedStatus ? 'Approved' : 'Pending Review'}
+          </span>
+        </div>
+      </div>
+      
+      {/* Floating glow effect */}
+      <div 
+        className={`absolute inset-0 rounded-xl blur-md opacity-50 ${
+          isApprovedStatus ? 'bg-green-400' : 'bg-yellow-400'
+        } -z-10`}
+      />
     </motion.div>
   );
 };
 
-// Company branding section with enhanced typography
+// Premium company branding section with enhanced typography and visual hierarchy
 const CompanyBranding = ({ product, styles }: { product: ProductAnalysis; styles: any }) => {
   return (
-    <div className="flex-1 min-w-0">
-      {/* Company Name */}
-      <motion.h2
-        initial={{ opacity: 0, y: -10 }}
+    <div className="flex-1 min-w-0 space-y-3">
+      {/* Company Name with premium styling */}
+      <motion.div
+        initial={{ opacity: 0, y: -15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.5 }}
-        className={`
-          ${styles.primaryText}
-          text-xl md:text-2xl font-bold tracking-tight
-          truncate group-hover:text-primary-400 
-          transition-colors duration-300
-        `}
+        transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
+        className="relative"
       >
-        {product.companyName || 'Unknown Company'}
-      </motion.h2>
+        <h2
+          className="text-2xl md:text-3xl font-bold tracking-tight truncate"
+          style={{
+            background: `
+              linear-gradient(135deg, 
+                #1e293b 0%, 
+                #334155 50%, 
+                #475569 100%
+              )
+            `,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          {product.companyName || 'Unknown Company'}
+        </h2>
+        {/* Subtle underline accent */}
+        <div 
+          className="absolute -bottom-1 left-0 h-0.5 w-1/3 rounded-full"
+          style={{
+            background: `
+              linear-gradient(90deg, 
+                rgba(59, 130, 246, 0.8) 0%, 
+                rgba(147, 51, 234, 0.6) 50%, 
+                transparent 100%
+              )
+            `,
+          }}
+        />
+      </motion.div>
 
-      {/* Product Name */}
+      {/* Product Name with enhanced styling */}
       {product.productDetails?.name && (
         <motion.h3
-          initial={{ opacity: 0, y: -5 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className={`
-            ${styles.secondaryText}
-            text-base md:text-lg font-medium 
-            truncate
-          `}
+          className="text-lg md:text-xl font-semibold text-gray-600 truncate"
+          style={{
+            background: `
+              linear-gradient(135deg, 
+                #64748b 0%, 
+                #94a3b8 100%
+              )
+            `,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
         >
           {product.productDetails.name}
         </motion.h3>
       )}
 
-      {/* Competitor Analysis URL or Google Doc with enhanced styling */}
+      {/* Premium document link with enhanced styling */}
       {(product.competitorAnalysisUrl || product.google_doc) && (
         <motion.a
           href={product.competitorAnalysisUrl || product.google_doc}
@@ -80,27 +163,35 @@ const CompanyBranding = ({ product, styles }: { product: ProductAnalysis; styles
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.25, duration: 0.4 }}
-          className={`
-            ${styles.accentText}
-            text-xs md:text-sm font-medium mt-2
-            inline-flex items-center space-x-1
-            hover:text-primary-300 transition-colors duration-200
-            hover:underline decoration-primary-400/50 underline-offset-2
-          `}
+          className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 group/link"
+          style={{
+            background: `
+              linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.1) 0%, 
+                rgba(147, 51, 234, 0.08) 100%
+              )
+            `,
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            color: '#3b82f6',
+          }}
         >
-          <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          <span className="truncate max-w-[200px]">
+          <div className="relative">
+            <svg className="w-4 h-4 transition-transform duration-200 group-hover/link:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            <div className="absolute inset-0 bg-blue-400 rounded-full blur-sm opacity-0 group-hover/link:opacity-30 transition-opacity duration-200" />
+          </div>
+          <span className="truncate max-w-[180px] font-semibold">
             {(product.competitorAnalysisUrl || product.google_doc || '').replace(/^https?:\/\//, '')}
           </span>
+          <div className="w-1 h-1 bg-blue-400 rounded-full opacity-0 group-hover/link:opacity-100 transition-opacity duration-200" />
         </motion.a>
       )}
     </div>
   );
 };
 
-// Action buttons with micro-interactions
+// Premium action buttons with sophisticated micro-interactions
 const ActionButtons = ({ 
   onToggleDetails, 
   isExpanded, 
@@ -115,33 +206,80 @@ const ActionButtons = ({
   if (!onToggleDetails) return null;
 
   return (
-    <div className="flex items-center space-x-2">
-      {/* Expand/Collapse Button */}
+    <div className="flex items-center space-x-3">
+      {/* Premium Expand/Collapse Button */}
       <motion.button
         onClick={onToggleDetails}
-        whileHover={!isReducedMotion ? { scale: 1.05 } : undefined}
+        whileHover={!isReducedMotion ? { scale: 1.05, y: -2 } : undefined}
         whileTap={!isReducedMotion ? { scale: 0.95 } : undefined}
-        className={`
-          px-3 py-1.5 rounded-lg text-xs font-medium
-          bg-gray-100 text-gray-600 border border-gray-200
-          flex items-center space-x-1
-          hover:shadow-md
-          focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1
-          transition-all duration-200
-        `}
-        title={isExpanded ? "Show Less" : "Show More"}
+        className="relative group"
+        title={isExpanded ? "Show Less Details" : "Show More Details"}
+        style={{
+          background: `
+            linear-gradient(135deg, 
+              rgba(59, 130, 246, 0.9) 0%, 
+              rgba(147, 51, 234, 0.8) 50%, 
+              rgba(236, 72, 153, 0.9) 100%
+            )
+          `,
+          padding: '12px 16px',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: `
+            0 4px 6px -1px rgba(59, 130, 246, 0.3),
+            0 2px 4px -1px rgba(59, 130, 246, 0.2),
+            0 0 0 1px rgba(255, 255, 255, 0.1) inset
+          `,
+          backdropFilter: 'blur(10px) saturate(180%)',
+          color: 'white',
+          fontWeight: '600',
+          fontSize: '14px',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
-        <span>{isExpanded ? 'Less' : 'More'}</span>
-        <motion.svg 
-          className="w-3 h-3" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-          animate={{ rotate: isExpanded ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </motion.svg>
+        {/* Background glow effect */}
+        <div 
+          className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"
+          style={{
+            background: `
+              linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.4) 0%, 
+                rgba(147, 51, 234, 0.3) 50%, 
+                rgba(236, 72, 153, 0.4) 100%
+              )
+            `,
+          }}
+        />
+        
+        <div className="relative flex items-center space-x-2">
+          <span className="font-bold tracking-wide">
+            {isExpanded ? 'Show Less' : 'Show More'}
+          </span>
+          
+          {/* Premium chevron with smooth rotation */}
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="relative"
+          >
+            <svg 
+              className="w-4 h-4" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            
+            {/* Subtle glow on icon */}
+            <div className="absolute inset-0 bg-white rounded-full blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-200" />
+          </motion.div>
+        </div>
+        
+        {/* Floating particles effect */}
+        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 animate-ping transition-opacity duration-200" />
+        <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 bg-pink-300 rounded-full opacity-0 group-hover:opacity-100 animate-pulse transition-opacity duration-200 delay-100" />
       </motion.button>
     </div>
   );
@@ -159,26 +297,64 @@ export function ProductCardHeader({
   const styles = useAdaptiveStyles();
 
   return (
-    <div className="flex items-start justify-between space-x-4">
-      {/* Left side: Company branding */}
-      <CompanyBranding product={product} styles={styles} />
+    <div 
+      className="relative overflow-hidden"
+      style={{
+        background: `
+          linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.9) 0%, 
+            rgba(248, 250, 252, 0.8) 50%, 
+            rgba(241, 245, 249, 0.9) 100%
+          )
+        `,
+        backdropFilter: 'blur(10px) saturate(180%)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        padding: '24px',
+        boxShadow: `
+          0 0 0 1px rgba(15, 23, 42, 0.05),
+          0 2px 4px -1px rgba(15, 23, 42, 0.1),
+          0 4px 6px -1px rgba(15, 23, 42, 0.1)
+        `,
+      }}
+    >
+      {/* Premium background pattern */}
+      <div 
+        className="absolute inset-0 opacity-30"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(147, 51, 234, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(236, 72, 153, 0.05) 0%, transparent 50%)
+          `,
+        }}
+      />
+      
+      {/* Floating decorative elements */}
+      <div className="absolute top-2 right-2 w-16 h-16 bg-gradient-to-br from-blue-400/10 to-purple-500/10 rounded-full blur-xl" />
+      <div className="absolute bottom-2 left-2 w-12 h-12 bg-gradient-to-tr from-pink-400/10 to-yellow-500/10 rounded-full blur-lg" />
+      
+      <div className="relative z-10 flex items-start justify-between space-x-6">
+        {/* Left side: Enhanced Company branding */}
+        <CompanyBranding product={product} styles={styles} />
 
-      {/* Right side: Status and actions */}
-      <div className="flex items-center space-x-3 flex-shrink-0">
-        {/* Status badge */}
-        {showStatus && (
-          <StatusBadge isApproved={product.isApproved} theme={theme} />
-        )}
+        {/* Right side: Enhanced Status and actions */}
+        <div className="flex items-center space-x-4 flex-shrink-0">
+          {/* Status badge */}
+          {showStatus && (
+            <StatusBadge isApproved={product.isApproved} theme={theme} />
+          )}
 
-        {/* Action buttons */}
-        {showActions && (
-          <ActionButtons
-            onToggleDetails={onToggleDetails}
-            isExpanded={isExpanded}
-            styles={styles}
-            isReducedMotion={isReducedMotion}
-          />
-        )}
+          {/* Action buttons */}
+          {showActions && (
+            <ActionButtons
+              onToggleDetails={onToggleDetails}
+              isExpanded={isExpanded}
+              styles={styles}
+              isReducedMotion={isReducedMotion}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
