@@ -1418,6 +1418,7 @@ const DedicatedProductPage: React.FC = () => {
                   }}
                   isMultipleProducts={false} // It's a single product page
                   isAdmin={false} // Pass isAdmin status
+                  enableEditing={true} // Enable editing for capabilities and other product fields
                   onClose={() => navigate('/dashboard/products')} // Example: navigate back on close
                   research_result_id={product?.id} // Pass the research_result_id (product.id)
                 />
