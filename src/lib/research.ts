@@ -155,6 +155,34 @@ export async function getApprovedProducts(): Promise<any[]> {
   }
 }
 
+// Function to update an approved product's data
+export async function updateApprovedProduct(
+  id: string,
+  updatedProductData: any
+): Promise<void> {
+  try {
+    console.log('[research] Updating approved product:', { id, updatedProductData });
+    
+    const { error } = await supabase
+      .from('approved_products')
+      .update({
+        product_data: updatedProductData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[research] Error updating approved product:', error);
+      throw error;
+    }
+    
+    console.log('[research] Successfully updated approved product:', id);
+  } catch (error) {
+    console.error('[research] Error updating approved product:', error);
+    throw error;
+  }
+}
+
 // Function to update an approved product's review status
 export async function updateApprovedProductStatus(
   id: string,

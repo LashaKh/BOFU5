@@ -8,7 +8,7 @@ import { ContentBriefDisplay } from '../content-brief/ContentBriefDisplay';
 import { ProductCard } from '../product/ProductCard';
 import { ResponsiveApprovalButton } from '../common/ResponsiveApprovalButton';
 import { ContentBrief } from '../../types/contentBrief';
-import { getApprovedProducts } from '../../lib/research';
+import { getApprovedProducts, updateApprovedProduct } from '../../lib/research';
 
 // Interface for research results from database
 interface ResearchResult {
@@ -527,6 +527,52 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
   };
 
   // New function to handle product updates in research results
+  // Handler for updating approved products (Company Brief view)
+  const handleUpdateApprovedProduct = async (approvedProductId: string, sectionType: string, newValue: any) => {
+    try {
+      console.log('🚀 handleUpdateApprovedProduct called:', { approvedProductId, sectionType, newValue });
+      
+      // Find the approved product to update
+      const approvedProduct = approvedProducts.find(p => p.id === approvedProductId);
+      if (!approvedProduct) {
+        console.error('❌ Approved product not found:', approvedProductId);
+        return;
+      }
+
+      // Update the product data
+      const updatedProductData = {
+        ...approvedProduct.product_data,
+        [sectionType]: newValue
+      };
+
+      console.log('📝 Updating approved product data:', {
+        productName: updatedProductData?.productDetails?.name || updatedProductData?.companyName,
+        sectionType,
+        newValue
+      });
+
+      // Update local state first (prevents race condition)
+      setApprovedProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === approvedProductId 
+            ? { ...product, product_data: updatedProductData }
+            : product
+        )
+      );
+      console.log('✅ Local approved products state updated immediately');
+
+      // Update the database
+      await updateApprovedProduct(approvedProductId, updatedProductData);
+      console.log('✅ Database update successful for approved product:', approvedProductId);
+      
+    } catch (error) {
+      console.error('💥 Error updating approved product:', error);
+      // Revert local state on error
+      await fetchApprovedProductsData();
+      throw error;
+    }
+  };
+
   const handleUpdateSection = async (productIndex: number, sectionType: string, newValue: any) => {
     try {
       console.log('🚀 handleUpdateSection called:', { productIndex, sectionType, newValue });
@@ -1066,13 +1112,22 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                             });
                             
                             return (
-                              <ProductCard 
+                                                            <ProductCard
                                 product={cleanProduct}
                                 isExpanded={true}
                                 showExpandButton={false}
                                 className="bg-transparent"
                                 context="admin"
-                                enableEditing={false}
+                                enableEditing={true}
+                                onUpdateSection={(productIndex: number, sectionType: keyof ProductAnalysis, newValue: any) => {
+                                  console.log('🎯 Product update in approved products section:', {
+                                    approvedProductId: approvedProduct.id,
+                                    sectionType,
+                                    newValue
+                                  });
+                                  // Handle the update for approved products using the new handler
+                                  handleUpdateApprovedProduct(approvedProduct.id, sectionType, newValue);
+                                }}
                                 onGenerateArticle={handleGenerateArticleSuccess}
                               />
                             );
