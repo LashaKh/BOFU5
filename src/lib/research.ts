@@ -140,12 +140,13 @@ export async function getApprovedProducts(): Promise<any[]> {
 
     if (error) throw error;
     
-    // Add research_result_id to each product's data
+    // Add source ID (either research_result_id or product_id) to each product's data
     return (data || []).map(item => ({
       ...item,
       product_data: {
         ...item.product_data,
-        research_result_id: item.research_result_id
+        research_result_id: item.research_result_id,
+        product_id: item.product_id
       }
     }));
   } catch (error) {

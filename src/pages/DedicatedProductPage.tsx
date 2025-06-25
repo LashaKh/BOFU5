@@ -584,21 +584,45 @@ const DedicatedProductPage: React.FC = () => {
       }
 
       if (newApprovedState) { // Product is being approved or re-approved
-        const dataToUpsert = {
-          research_result_id: product.id, // Use product.id since we already validated it exists above
+        // Get the user's company name from their profile instead of using the product's company
+        const { data: userProfile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('company_name')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          toast.error('Failed to get user profile information');
+          setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+          return;
+        }
+
+        // For products from the product page, use product_id instead of research_result_id
+        const dataToUpsert: any = {
           approved_by: session.user.id,
-          product_index: safeProductIndex, // Use the safe product index
-          product_name: prod.productDetails.name,
-          product_description: prod.productDetails.description,
-          company_name: prod.companyName, // Product's own company name
+          product_index: 0, // Always 0 for standalone products
+          product_name: prod.productDetails?.name || 'Unnamed Product',
+          product_description: prod.productDetails?.description || '',
+          company_name: userProfile.company_name || '', // Use the user's company name, not the product's
           product_data: { ...prod, isApproved: true, userUUID: session.user.id }, // Store enriched product with approval state
           // approved_at, created_at, updated_at have db defaults or are set on update by Supabase/triggers
         };
+        
+        // Check if the migration has been applied by trying to use product_id
+        // If it fails, fall back to creating a research_result entry
+        try {
+          dataToUpsert.product_id = product.id;
+          // Don't include research_result_id at all if using product_id
+        } catch (e) {
+          // Fallback: migration not applied yet
+          console.warn('[DedicatedProductPage] product_id column might not exist, falling back to research_result approach');
+        }
 
         const { data: existingApproval, error: fetchError } = await supabase
           .from('approved_products')
           .select('id')
-          .eq('research_result_id', product.id)
+          .eq('product_id', product.id)
           .eq('approved_by', session.user.id!)
           .single();
 
@@ -617,10 +641,10 @@ const DedicatedProductPage: React.FC = () => {
           const { error: updateError } = await supabase
             .from('approved_products')
             .update({
-              product_index: safeProductIndex, // Use the safe product index
-              product_name: prod.productDetails.name,
-              product_description: prod.productDetails.description,
-              company_name: prod.companyName,
+              product_index: 0, // Always 0 for standalone products
+              product_name: prod.productDetails?.name || 'Unnamed Product',
+              product_description: prod.productDetails?.description || '',
+              company_name: userProfile.company_name || '', // Use user's company, not product's
               product_data: { ...prod, isApproved: true, userUUID: session.user.id },
               updated_at: new Date().toISOString(),
             })
@@ -644,6 +668,57 @@ const DedicatedProductPage: React.FC = () => {
 
           if (insertError) {
             console.error('Error approving product:', insertError);
+            
+            // Check if error is due to missing product_id column or constraint
+            if (insertError.message.includes('product_id') || insertError.code === '23503') {
+              console.log('[DedicatedProductPage] Migration not applied, falling back to research_result approach');
+              
+              // Create a research_result entry for this standalone product
+              const { data: newResearchResult, error: createError } = await supabase
+                .from('research_results')
+                .insert({
+                  title: `Product Analysis - ${prod.productDetails?.name || prod.companyName}`,
+                  data: [prod],
+                  is_draft: false,
+                  is_approved: true,
+                  user_id: session.user.id
+                })
+                .select('id')
+                .single();
+                
+              if (createError) {
+                console.error('[DedicatedProductPage] Error creating research result:', createError);
+                toast.error('Failed to create research result entry');
+                setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+                return;
+              }
+              
+              // Retry with research_result_id
+              const fallbackData = {
+                research_result_id: newResearchResult.id,
+                approved_by: session.user.id,
+                product_index: 0,
+                product_name: prod.productDetails?.name || 'Unnamed Product',
+                product_description: prod.productDetails?.description || '',
+                company_name: userProfile.company_name || '', // Use user's company, not product's
+                product_data: { ...prod, isApproved: true, userUUID: session.user.id }
+              };
+              
+              const { error: retryError } = await supabase
+                .from('approved_products')
+                .insert([fallbackData]);
+                
+              if (retryError) {
+                console.error('Error in fallback approval:', retryError);
+                toast.error('Failed to approve product');
+                setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
+                return;
+              }
+              
+              toast.success('Product approved successfully!');
+              return;
+            }
+            
             toast.error(insertError.message || 'Failed to approve product.');
             setParsedAnalysisData((prev) => prev ? { ...prev, isApproved: prod.isApproved } : null);
             if (product && parsedAnalysisData && product.id === parsedAnalysisData.research_result_id) {
@@ -657,7 +732,7 @@ const DedicatedProductPage: React.FC = () => {
         const { error: deleteError } = await supabase
           .from('approved_products')
           .delete()
-          .eq('research_result_id', product.id)
+          .eq('product_id', product.id)
           .eq('approved_by', session.user.id!);
 
         if (deleteError) {

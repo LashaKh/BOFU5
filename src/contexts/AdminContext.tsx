@@ -64,12 +64,13 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
   // Error state
   const [error, setError] = useState<string | null>(null);
 
+  // Track if admin status has been initialized for this user
+  const [initializedForUserId, setInitializedForUserId] = useState<string | null>(null);
+
   // Initialize admin status when user changes
   useEffect(() => {
     const initializeAdminStatus = async () => {
-      setIsLoading(true);
-      setError(null);
-      
+      // Only initialize if user has changed or hasn't been initialized
       if (!user) {
         // User signed out - reset all admin state
         setIsAdmin(false);
@@ -81,8 +82,18 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
         setAllAdmins([]);
         setUnassignedClients([]);
         setIsLoading(false);
+        setInitializedForUserId(null);
         return;
       }
+
+      // Skip initialization if already done for this user
+      if (initializedForUserId === user.id && isAdmin !== undefined) {
+        console.log('[AdminContext] Admin status already initialized for user:', user.email);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
 
       try {
         console.log('[AdminContext] Checking admin status for user:', user.email);
@@ -106,6 +117,9 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
           setAdminId(null);
           setAdminEmail(null);
         }
+        
+        // Mark as initialized for this user
+        setInitializedForUserId(user.id);
       } catch (err) {
         console.error('[AdminContext] Error checking admin status:', err);
         setError('Failed to verify admin status');
@@ -119,7 +133,7 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
     };
 
     initializeAdminStatus();
-  }, [user]);
+  }, [user, initializedForUserId, isAdmin]);
 
   // Load admin-specific data based on role
   const loadAdminData = async (role: 'super_admin' | 'sub_admin') => {

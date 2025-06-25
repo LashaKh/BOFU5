@@ -340,7 +340,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
         
         {/* Logo/Title */}
         <div className="flex-1 text-center">
-          <h1 className="text-lg font-semibold text-gray-900">BOFU AI</h1>
+          <h1 className="text-lg font-semibold text-gray-900">BOFU.ai</h1>
         </div>
         
         {/* Search/Profile Button */}

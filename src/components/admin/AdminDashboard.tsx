@@ -200,12 +200,14 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [dataInitialized, setDataInitialized] = useState(false);
 
   // Article Management state
   const [selectedUserForArticles, setSelectedUserForArticles] = useState<{ user: UserProfile | null; companyGroup?: CompanyGroup | null }>({ user: null, companyGroup: null });
 
   const refreshData = () => {
     console.log('[AdminDashboard] Manually refreshing data at:', new Date().toISOString());
+    setDataInitialized(false); // Force re-initialization
     setRefreshCounter(prev => prev + 1);
   };
 
@@ -307,8 +309,18 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   };
 
   useEffect(() => {
+    let mounted = true;
+    
     const checkAndSetupDatabase = async () => {
       try {
+        if (!mounted) return;
+        
+        // Skip if data is already initialized (unless refreshCounter changes)
+        if (dataInitialized) {
+          console.log('[AdminDashboard] Data already initialized, skipping setup');
+          return;
+        }
+        
         setIsLoading(true);
         setSetupError(null);
         
@@ -318,6 +330,7 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
         const tables = ['admin_profiles', 'research_results'];
         
         for (const table of tables) {
+          if (!mounted) return;
           const { error } = await supabase.from(table).select('id').limit(1);
           if (error) {
             console.error(`[AdminDashboard] Table ${table} check failed:`, error);
@@ -327,22 +340,31 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
         
         // ... existing admin setup code ...
         
+        if (!mounted) return;
         setIsSetupMode(false);
         
         // Now proceed with normal data fetching
-        await Promise.all([fetchStats(), fetchUsers()]);
+        if (mounted) {
+          await Promise.all([fetchStats(), fetchUsers()]);
+          setDataInitialized(true);
+        }
         
       } catch (error) {
+        if (!mounted) return;
         console.error('[AdminDashboard] Setup error:', error);
         setSetupError(`Database setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     // Fetch basic stats 
     const fetchStats = async () => {
       try {
+        if (!mounted) return;
+        
         // User count
         const { count: userCount } = await supabase
           .from('user_profiles')
@@ -353,6 +375,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           .from('research_results')
           .select('*', { count: 'exact', head: true });
 
+        if (!mounted) return;
+        
         setStats({
           totalUsers: userCount || 0,
           totalResearches: researchCount || 0,
@@ -368,6 +392,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
     // Fetch all non-admin users (updated to use role-based API)
     const fetchUsers = async () => {
       try {
+        if (!mounted) return;
+        
         console.log(`[AdminDashboard] Fetching users with admin permissions...`);
         
         if (!supabaseAdmin) {
@@ -383,9 +409,11 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
 
         if (mainError) {
           console.error('[AdminDashboard] Error fetching main users:', mainError);
-          setSetupError('Failed to load main users');
+          if (mounted) setSetupError('Failed to load main users');
           return;
         }
+
+        if (!mounted) return;
 
         // Fetch sub accounts from company_profiles using admin client
         const { data: subProfiles, error: subError } = await supabaseAdmin
@@ -396,6 +424,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
         if (subError) {
           console.error('[AdminDashboard] Error fetching sub profiles:', subError);
         }
+
+        if (!mounted) return;
 
         console.log('[AdminDashboard] Main users fetched:', mainUsers?.length || 0);
         console.log('[AdminDashboard] Sub profiles fetched:', subProfiles?.length || 0);
@@ -445,6 +475,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           });
         });
         
+        if (!mounted) return;
+        
         console.log('[AdminDashboard] Total transformed users:', transformedUsers.length);
         console.log('[AdminDashboard] Main users:', transformedUsers.filter(u => u.user_type === 'main').length);
         console.log('[AdminDashboard] Sub users:', transformedUsers.filter(u => u.user_type === 'sub').length);
@@ -460,6 +492,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           .select('user_id, product_name, id')
           .in('user_id', uniqueUserIds)
           .not('article_content', 'is', null);
+
+        if (!mounted) return;
 
         if (articleError) {
           console.error('[AdminDashboard] Error fetching article counts:', articleError);
@@ -518,10 +552,14 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           });
         }
 
-        setUsers(transformedUsers);
+        if (mounted) {
+          setUsers(transformedUsers);
+        }
       } catch (error) {
         console.error('[AdminDashboard] Exception fetching users:', error);
-        setSetupError(`Failed to fetch users: ${(error as any)?.message || String(error)}`);
+        if (mounted) {
+          setSetupError(`Failed to fetch users: ${(error as any)?.message || String(error)}`);
+        }
       }
     };
 
@@ -530,11 +568,14 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
     
     // Set up a refresh interval (every 30 seconds)
     const refreshInterval = setInterval(() => {
-      console.log('[AdminDashboard] Auto-refreshing data...');
-      fetchUsers();
+      if (mounted) {
+        console.log('[AdminDashboard] Auto-refreshing data...');
+        fetchUsers();
+      }
     }, 30000);
     
     return () => {
+      mounted = false;
       clearInterval(refreshInterval);
     };
   }, [refreshCounter]);

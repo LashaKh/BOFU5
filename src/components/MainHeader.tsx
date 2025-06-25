@@ -171,7 +171,7 @@ export function MainHeader({
             >
               <Logo />
               <span className="ml-3 text-xl font-bold text-yellow-500 hover:text-yellow-400 transition-colors">
-                BOFU ai
+                BOFU.ai
               </span>
             </motion.div>
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
