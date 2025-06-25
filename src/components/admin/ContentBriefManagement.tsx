@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
-import { User, ArrowLeft, Loader2, Eye, Calendar, Search, Filter, BookOpen, FileText, Plus, Edit, Save, X, MessageSquare, Package, Building2, Users, Crown, UserCog, ChevronDown, ChevronRight, Badge } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, Search, Filter, BookOpen, FileText, Edit, X, MessageSquare, Package, Building2, Users, Crown, UserCog, ChevronDown, ChevronRight, Badge, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ProductAnalysis } from '../../types/product/types';
 import { ContentBriefDisplay } from '../content-brief/ContentBriefDisplay';
 import { ProductCard } from '../product/ProductCard';
 import { ResponsiveApprovalButton } from '../common/ResponsiveApprovalButton';
 import { ContentBrief } from '../../types/contentBrief';
+import { getApprovedProducts } from '../../lib/research';
 
 // Interface for research results from database
 interface ResearchResult {
@@ -65,6 +66,8 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
   const [isLoadingBriefs, setIsLoadingBriefs] = useState(true);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [approvedProducts, setApprovedProducts] = useState<any[]>([]);
+  const [isLoadingApproved, setIsLoadingApproved] = useState(true);
 
   // Fetch all users with enhanced company and profile data using admin permissions
   const fetchUsers = async () => {
@@ -845,8 +848,25 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
     }
   });
 
+  // Fetch approved products
+  const fetchApprovedProductsData = async () => {
+    try {
+      setIsLoadingApproved(true);
+      console.log('🔍 Fetching approved products...');
+      const products = await getApprovedProducts();
+      console.log('✅ Approved products fetched:', products.length);
+      setApprovedProducts(products);
+    } catch (error) {
+      console.error('❌ Error fetching approved products:', error);
+      toast.error('Failed to load approved products');
+    } finally {
+      setIsLoadingApproved(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchApprovedProductsData();
   }, []);
 
   useEffect(() => {
@@ -914,228 +934,159 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
           </div>
         </div>
 
-        {/* Company Research Results Section (Product Cards) */}
+        {/* Approved Product Cards Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-gray-800/60 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/30 p-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <FileText className="h-6 w-6 text-blue-400" />
-            <h3 className="text-xl font-semibold text-white">Research Results & Product Cards</h3>
-            <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium border border-blue-500/30">
-              {userResearchResults.length} results
+            <CheckCircle className="h-6 w-6 text-green-400" />
+            <h3 className="text-xl font-semibold text-white">Approved Product Cards</h3>
+            <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-sm font-medium border border-green-500/30">
+              {approvedProducts.filter(p => p.company_name === companyGroup.company_name).length} approved
             </span>
           </div>
 
-          {isLoadingResearch ? (
+          {isLoadingApproved || isLoadingResearch ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-3 text-gray-300">
                 <Loader2 className="h-6 w-6 animate-spin" />
-                <span>Loading company research results...</span>
+                <span>Loading approved products...</span>
               </div>
             </div>
-          ) : userResearchResults.length > 0 ? (
+          ) : approvedProducts.filter(p => p.company_name === companyGroup.company_name).length > 0 ? (
             <div className="space-y-4">
-              {userResearchResults.map((result) => {
-                // Find which user created this research result
-                const resultCreator = companyGroup.main_account.id === result.user_id 
-                  ? companyGroup.main_account 
-                  : companyGroup.sub_accounts.find(sub => sub.id === result.user_id);
-                
-                return (
-                  <div key={result.id} className="bg-gray-700/40 rounded-lg p-4 border border-gray-600/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="text-white font-semibold">Research Result #{result.id}</h4>
-                        <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
-                          <span>Status: {result.is_approved ? 'Approved' : (result.is_draft ? 'Draft' : 'Pending')}</span>
-                          <span>•</span>
-                          <span>Created: {new Date(result.created_at).toLocaleDateString()}</span>
-                          <span>•</span>
-                          <span>
-                            By: {resultCreator ? (resultCreator.profile_name || resultCreator.email) : 'Unknown User'}
-                            {resultCreator?.user_type === 'main' && <Crown className="w-3 h-3 text-yellow-400 inline ml-1" />}
-                          </span>
+              {approvedProducts
+                .filter(p => p.company_name === companyGroup.company_name)
+                .map((approvedProduct) => {
+                  const product = approvedProduct.product_data;
+                  const expandKey = `approved-${approvedProduct.id}`;
+                  const isExpanded = expandedProductIndex === expandKey;
+                  
+                  return (
+                    <div key={approvedProduct.id}>
+                      <div 
+                        onClick={() => {
+                          const expandKey = `approved-${approvedProduct.id}`;
+                          setExpandedProductIndex(expandedProductIndex === expandKey ? null : expandKey);
+                        }}
+                        className="bg-gray-700/40 rounded-lg p-4 border border-gray-600/30 cursor-pointer hover:bg-gray-600/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-white font-semibold">
+                                {product?.productDetails?.name || product?.companyName || approvedProduct.product_name || 'Unnamed Product'}
+                              </h4>
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/20 rounded-full">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                <span className="text-xs text-green-400 font-medium">Approved</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+                              <span>Approved: {new Date(approvedProduct.approved_at).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>Status: {approvedProduct.reviewed_status}</span>
+                              <span>•</span>
+                              <span>Source: {approvedProduct.research_result_id ? `Research ${approvedProduct.research_result_id.slice(0, 8)}...` : `Product Page`}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <Eye className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                              {isExpanded ? 'Hide Details' : 'View Full Card'}
+                            </span>
+                          </div>
                         </div>
+                        
+                        {/* Product Stats */}
+                        {product && (
+                          <div className="mt-3 bg-gray-600/30 rounded p-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              {product.usps?.length > 0 && (
+                                <div>
+                                  <span className="text-gray-400">USPs:</span>
+                                  <span className="text-white ml-2">{product.usps.length}</span>
+                                </div>
+                              )}
+                              {product.features?.length > 0 && (
+                                <div>
+                                  <span className="text-gray-400">Features:</span>
+                                  <span className="text-white ml-2">{product.features.length}</span>
+                                </div>
+                              )}
+                              {product.painPoints?.length > 0 && (
+                                <div>
+                                  <span className="text-gray-400">Pain Points:</span>
+                                  <span className="text-white ml-2">{product.painPoints.length}</span>
+                                </div>
+                              )}
+                              {product.capabilities?.length > 0 && (
+                                <div>
+                                  <span className="text-gray-400">Capabilities:</span>
+                                  <span className="text-white ml-2">{product.capabilities.length}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <FileText className="w-4 h-4 text-blue-400" />
-                        <span className="text-sm text-blue-400 font-medium">Research Result</span>
-                      </div>
-                    </div>
-                    
-                    {/* Display products in this research result */}
-                    {result.data && result.data.length > 0 ? (
-                      <div className="mt-4">
-                        <p className="text-gray-400 text-sm mb-3">
-                          Contains {result.data.length} product{result.data.length !== 1 ? 's' : ''}
-                        </p>
-                        <div className="space-y-3">
-                          {result.data.map((product, index) => {
-                            const expandKey = `${result.id}-${index}`;
-                            const isExpanded = expandedProductIndex === expandKey;
+
+                      
+                      {/* Expanded ProductCard */}
+                      {isExpanded && product && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-4 bg-gray-700/40 rounded-lg p-4 border border-gray-600/30"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex justify-between items-center mb-4">
+                            <h6 className="text-white font-medium">Full Product Analysis</h6>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedProductIndex(null);
+                              }}
+                              className="text-gray-400 hover:text-white"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {(() => {
+                            // Ensure product data is properly formatted
+                            const cleanProduct = product || {};
+                            console.log('🎯 Rendering ProductCard for approved product:', {
+                              id: approvedProduct.id,
+                              productName: cleanProduct.productDetails?.name || cleanProduct.companyName,
+                              hasData: !!cleanProduct,
+                              keys: Object.keys(cleanProduct)
+                            });
                             
                             return (
-                              <div key={index}>
-                                {/* Product Summary Card */}
-                                <div 
-                                  onClick={() => {
-                                    console.log(`Product ${index + 1} clicked in research result ${result.id}`);
-                                    handleProductClick(product, result.id, index);
-                                  }}
-                                  className="bg-gray-600/30 rounded p-3 cursor-pointer hover:bg-gray-600/50 transition-colors border border-gray-600/20 hover:border-gray-500/40"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <h5 className="text-white text-sm font-medium">
-                                        {product.productDetails?.name || product.companyName || `Product ${index + 1}`}
-                                      </h5>
-                                      <p className="text-gray-400 text-xs mt-1">
-                                        {product.companyName || 'No company name'}
-                                      </p>
-                                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
-                                        {product.usps?.length > 0 && (
-                                          <span>USPs: {product.usps.length}</span>
-                                        )}
-                                        {product.features?.length > 0 && (
-                                          <span>Features: {product.features.length}</span>
-                                        )}
-                                        {product.painPoints?.length > 0 && (
-                                          <span>Pain Points: {product.painPoints.length}</span>
-                                        )}
-                                        {product.capabilities?.length > 0 && (
-                                          <span>Capabilities: {product.capabilities.length}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2 text-blue-400">
-                                      <Eye className="w-4 h-4" />
-                                      <span className="text-sm font-medium">
-                                        {isExpanded ? 'Hide Details' : 'View Full Card'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Expanded ProductCard with editing */}
-                                {isExpanded && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="mt-4 bg-gray-700/40 rounded-lg p-4 border border-gray-600/30"
-                                  >
-                                    <div className="flex justify-between items-center mb-4">
-                                      <h6 className="text-white font-medium">Full Product Analysis</h6>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setExpandedProductIndex(null);
-                                        }}
-                                        className="text-gray-400 hover:text-white"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                    {(() => {
-                                      // Extract keywords properly, handling corrupted format
-                                      const extractKeywords = (productData: any): string[] => {
-                                        if (Array.isArray(productData.keywords)) {
-                                          return productData.keywords;
-                                        }
-                                        if (productData["0"] === "keywords") {
-                                          const extractedKeywords: string[] = [];
-                                          Object.keys(productData).forEach(key => {
-                                            if (key !== "0" && !isNaN(Number(key)) && typeof productData[key] === 'string') {
-                                              extractedKeywords.push(productData[key]);
-                                            }
-                                          });
-                                          return extractedKeywords;
-                                        }
-                                        return [];
-                                      };
-                                      
-                                      const productWithKeywords = {
-                                        ...product,
-                                        keywords: extractKeywords(product)
-                                      };
-                                      
-                                      return (
-                                        <ProductCard 
-                                          product={productWithKeywords}
-                                          isExpanded={true}
-                                          showExpandButton={false}
-                                          className="bg-transparent"
-                                          context="admin"
-                                          enableEditing={true}
-                                          onUpdateSection={(localProductIndex: number, sectionType: keyof ProductAnalysis, newValue: any) => {
-                                            // Calculate the global product index across all research results
-                                            // We need to find where this specific product sits globally
-                                            let globalIndex = 0;
-                                            let found = false;
-                                            const currentResultId = result.id;
-                                            const currentLocalIndex = index; // This is the actual index within this result
-                                            
-                                            console.log('🎯 Calculating global index for product update:', {
-                                              currentResultId,
-                                              currentLocalIndex,
-                                              localProductIndex,
-                                              sectionType,
-                                              totalResults: userResearchResults.length
-                                            });
-                                            
-                                            // Loop through all research results to find the global position
-                                            for (const searchResult of userResearchResults) {
-                                              if (searchResult.data && Array.isArray(searchResult.data)) {
-                                                for (let i = 0; i < searchResult.data.length; i++) {
-                                                  // Check if this is our target product
-                                                  if (searchResult.id === currentResultId && i === currentLocalIndex) {
-                                                    found = true;
-                                                    console.log('🎯 Found target product at global index:', globalIndex);
-                                                    break;
-                                                  }
-                                                  globalIndex++;
-                                                }
-                                              }
-                                              if (found) break;
-                                            }
-                                            
-                                            if (found) {
-                                              console.log('📡 Calling handleUpdateSection with:', {
-                                                globalIndex,
-                                                sectionType,
-                                                newValue
-                                              });
-                                              handleUpdateSection(globalIndex, sectionType, newValue);
-                                            } else {
-                                              console.error('❌ Could not find target product for update');
-                                            }
-                                          }}
-                                        />
-                                      );
-                                    })()}
-                                  </motion.div>
-                                )}
-                              </div>
+                              <ProductCard 
+                                product={cleanProduct}
+                                isExpanded={true}
+                                showExpandButton={false}
+                                className="bg-transparent"
+                                context="admin"
+                                enableEditing={false}
+                                onGenerateArticle={handleGenerateArticleSuccess}
+                              />
                             );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-gray-500">
-                        <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No product analysis available</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                          })()}
+                        </motion.div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           ) : (
             <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-400">No research results found for this company</p>
+              <CheckCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400">No approved products found for this company</p>
               <p className="text-gray-500 text-sm mt-2">
                 Research results and product cards will appear here once company users upload documents
               </p>
@@ -1719,8 +1670,8 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
       <div className="space-y-6">
         {sortedCompanyGroups.map((company) => {
           const totalCompanyBriefs = company.main_account.briefCount || 0;
-          const totalResearchResults = company.main_account.researchResultsCount || 0;
-          const hasAnyContent = totalCompanyBriefs > 0 || totalResearchResults > 0;
+          const companyApprovedProducts = approvedProducts.filter(p => p.company_name === company.company_name);
+          const hasAnyContent = totalCompanyBriefs > 0 || companyApprovedProducts.length > 0;
           
           return (
             <motion.div
@@ -1751,14 +1702,14 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <FileText className="h-4 w-4 text-blue-400" />
-                          <span className="text-sm text-blue-300 font-medium">
-                            {totalResearchResults} Product Card{totalResearchResults !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                          <span className="text-sm text-green-300 font-medium">
+                            {companyApprovedProducts.length} Approved Product{companyApprovedProducts.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
+                    </div>
+                  </div>
                   <div className="flex items-center space-x-2">
                     {hasAnyContent ? (
                       <div className="flex items-center space-x-2 text-green-400">

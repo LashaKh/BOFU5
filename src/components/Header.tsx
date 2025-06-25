@@ -75,7 +75,7 @@ export function Header() {
                 backgroundSize: "200% 200%"
               }}
             >
-              BOFU ai
+              BOFU.ai
             </motion.span>
             <br />
             <motion.span 
