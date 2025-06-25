@@ -725,21 +725,33 @@ export function ProductCardContent({
           transition={{ duration: 0.5, delay: 0.5 }}
           className="space-y-6"
         >
-          <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
             <button
               onClick={() => setIsCapabilitiesExpanded(!isCapabilitiesExpanded)}
-              className="flex items-center gap-3 flex-1 text-left hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors duration-200"
+              className="flex items-center gap-4 flex-1 text-left w-full p-6 hover:bg-white/50 rounded-xl transition-all duration-300 group"
             >
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+              <div className="relative">
+                <div className="p-3 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white shadow-sm"></div>
               </div>
-              <div className="flex-1">
-                <h4 className="text-xl font-semibold text-gray-900">Features and Capabilities</h4>
-                <p className="text-sm text-gray-500">Define your product's key capabilities and features</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-200">
+                    Features and Capabilities
+                  </h4>
+                  <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                    {editableProduct.capabilities?.length || 0}
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 group-hover:text-gray-500 transition-colors duration-200">
+                  Define your product's key capabilities and features
+                </p>
               </div>
-              <div className="ml-auto flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {enableEditing && (
                   <button
                     onClick={(e) => {
@@ -757,18 +769,20 @@ export function ProductCardContent({
                         setIsCapabilitiesExpanded(true);
                       }
                     }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-yellow-500 text-black text-sm font-bold rounded-lg hover:bg-yellow-400 transition-all duration-200 shadow-lg border-2 border-yellow-600"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black text-sm font-bold rounded-lg hover:bg-yellow-400 hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl border-2 border-yellow-600"
                     title="Add new capability"
                   >
                     <Plus size={16} />
                     Add
                   </button>
                 )}
-                {isCapabilitiesExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
+                <div className="p-2 rounded-lg bg-white/60 group-hover:bg-white transition-all duration-200">
+                  {isCapabilitiesExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors duration-200" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors duration-200" />
+                  )}
+                </div>
               </div>
             </button>
           </div>
