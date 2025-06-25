@@ -757,7 +757,7 @@ export function ProductCardContent({
                         setIsCapabilitiesExpanded(true);
                       }
                     }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-yellow-500 text-black text-sm font-bold rounded-lg hover:bg-yellow-400 transition-all duration-200 shadow-lg border-2 border-yellow-600"
                     title="Add new capability"
                   >
                     <Plus size={16} />
@@ -1034,7 +1034,7 @@ export function ProductCardContent({
                         const updatedCapabilities = [...(editableProduct.capabilities || []), newCapability];
                         updateField('capabilities', updatedCapabilities);
                       }}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-md hover:shadow-lg border-2 border-dashed border-yellow-300 hover:border-yellow-400"
+                                             className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-all duration-200 shadow-lg border-2 border-dashed border-yellow-600 hover:border-yellow-700"
                     >
                       <Plus size={18} />
                       Add Another Capability
