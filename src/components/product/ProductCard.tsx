@@ -147,6 +147,14 @@ function EnhancedProductCard({
   theme,
   variant = 'default',
 }: EnhancedProductCardProps) {
+  
+  // Debug what props are being received
+  console.log('🔍 ProductCard received props:', {
+    researchResultId,
+    approvedProductId,
+    context,
+    productName: product?.productDetails?.name || product?.companyName
+  });
   const [isExpandedState, setIsExpanded] = useState(isExpanded);
   const [isEditMode, setIsEditMode] = useState(true);
 
