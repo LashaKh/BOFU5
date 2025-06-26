@@ -916,9 +916,19 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
   };
 
   useEffect(() => {
+    console.log('🔍 ContentBriefManagement component mounted, fetching data...');
     fetchUsers();
     fetchApprovedProductsData();
   }, []);
+
+  // Debug current view state
+  console.log('🔍 Current view state:', {
+    selectedUser: selectedUser?.email,
+    selectedUserForBriefs: selectedUserForBriefs?.user?.email,
+    selectedCompany: selectedUserForBriefs?.companyGroup?.company_name,
+    approvedProductsCount: approvedProducts.length,
+    isLoadingApproved
+  });
 
   useEffect(() => {
     if (selectedUser) {
