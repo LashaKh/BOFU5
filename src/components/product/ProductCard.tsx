@@ -56,6 +56,13 @@ interface EnhancedProductCardProps {
   onDelete?: (product: import('../../types/product/types').ProductAnalysis) => void;
   onShare?: (product: import('../../types/product/types').ProductAnalysis) => void;
   onUpdateSection?: (productIndex: number, sectionType: keyof import('../../types/product/types').ProductAnalysis, newValue: any) => Promise<void>;
+  // AirOps integration props
+  researchResultId?: string;
+  approvedProductId?: string;
+  userUUID?: string;
+  userEmail?: string;
+  userCompanyName?: string;
+  onGenerateArticle?: () => void;
   // Phase 2: Feature toggles
   showCapabilities?: boolean;
   showCompetitorAnalysis?: boolean;
@@ -127,6 +134,12 @@ function EnhancedProductCard({
   onDelete,
   onShare,
   onUpdateSection,
+  researchResultId,
+  approvedProductId,
+  userUUID,
+  userEmail,
+  userCompanyName,
+  onGenerateArticle,
   showCapabilities = true,
   showCompetitorAnalysis = true,
   showActions = true,
@@ -198,6 +211,12 @@ function EnhancedProductCard({
           onExport={onExport}
           onEdit={onEdit}
           onDelete={onDelete}
+          researchResultId={researchResultId}
+          approvedProductId={approvedProductId}
+          userUUID={userUUID}
+          userEmail={userEmail}
+          userCompanyName={userCompanyName}
+          onGenerateArticle={onGenerateArticle}
           onShare={onShare}
           onUpdateSection={handleProductUpdate}
           showCapabilities={showCapabilities}

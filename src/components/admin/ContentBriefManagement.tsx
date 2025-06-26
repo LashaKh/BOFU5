@@ -1119,6 +1119,11 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                 className="bg-transparent"
                                 context="admin"
                                 enableEditing={true}
+                                researchResultId={approvedProduct.research_result_id || ''}
+                                approvedProductId={approvedProduct.id?.toString()}
+                                userUUID={selectedUser?.id}
+                                userEmail={selectedUser?.email}
+                                userCompanyName={selectedUser?.company_name}
                                 onUpdateSection={(productIndex: number, sectionType: keyof ProductAnalysis, newValue: any) => {
                                   console.log('🎯 Product update in approved products section:', {
                                     approvedProductId: approvedProduct.id,
@@ -1488,6 +1493,10 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                         className="bg-transparent"
                                         context="admin"
                                         enableEditing={true}
+                                        researchResultId={result.id}
+                                        userUUID={selectedUser?.id}
+                                        userEmail={selectedUser?.email}
+                                        userCompanyName={selectedUser?.company_name}
                                         onUpdateSection={(localProductIndex: number, sectionType: keyof ProductAnalysis, newValue: any) => {
                                           // Calculate the global product index across all research results
                                           // We need to find where this specific product sits globally
