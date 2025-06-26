@@ -1119,7 +1119,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                 className="bg-transparent"
                                 context="admin"
                                 enableEditing={true}
-                                researchResultId={approvedProduct.research_result_id || ''}
+                                researchResultId={approvedProduct.research_result_id || undefined}
                                 approvedProductId={approvedProduct.id?.toString()}
                                 userUUID={selectedUser?.id}
                                 userEmail={selectedUser?.email}
