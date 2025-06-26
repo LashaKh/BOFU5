@@ -1136,16 +1136,12 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                           {(() => {
                             // Ensure product data is properly formatted
                             const cleanProduct = product || {};
-                            console.log('🎯 Rendering ProductCard for approved product:', {
-                              id: approvedProduct.id,
-                              productName: cleanProduct.productDetails?.name || cleanProduct.companyName,
-                              hasData: !!cleanProduct,
-                              keys: Object.keys(cleanProduct),
-                              approvedProductFull: approvedProduct,
-                              approvedProductKeys: Object.keys(approvedProduct),
-                              idToString: approvedProduct.id?.toString(),
-                              researchResultIdProp: approvedProduct.research_result_id || undefined,
-                              approvedProductIdProp: approvedProduct.id?.toString()
+                            console.log('🚨 APPROVED PRODUCT CARD RENDER:', {
+                              approvedProductId: approvedProduct.id,
+                              approvedProductIdString: approvedProduct.id?.toString(),
+                              researchResultId: approvedProduct.research_result_id,
+                              companyName: cleanProduct.companyName || 'Unknown',
+                              productName: cleanProduct.productDetails?.name || 'Unknown'
                             });
                             
                             return (
@@ -1531,6 +1527,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                         context="admin"
                                         enableEditing={true}
                                         researchResultId={result.id}
+                                        approvedProductId={result.id}
                                         userUUID={selectedUser?.id}
                                         userEmail={selectedUser?.email}
                                         userCompanyName={selectedUser?.company_name}
