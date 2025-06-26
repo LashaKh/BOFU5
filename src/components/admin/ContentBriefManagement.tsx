@@ -1006,6 +1006,14 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
               {approvedProducts
                 .filter(p => p.company_name === companyGroup.company_name)
                 .map((approvedProduct) => {
+                  console.log('🔍 Debug approved product structure:', {
+                    approvedProduct,
+                    hasId: !!approvedProduct.id,
+                    idValue: approvedProduct.id,
+                    idType: typeof approvedProduct.id,
+                    keys: Object.keys(approvedProduct)
+                  });
+                  
                   const product = approvedProduct.product_data;
                   const expandKey = `approved-${approvedProduct.id}`;
                   const isExpanded = expandedProductIndex === expandKey;
@@ -1111,7 +1119,9 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                               keys: Object.keys(cleanProduct),
                               approvedProductFull: approvedProduct,
                               approvedProductKeys: Object.keys(approvedProduct),
-                              idToString: approvedProduct.id?.toString()
+                              idToString: approvedProduct.id?.toString(),
+                              researchResultIdProp: approvedProduct.research_result_id || undefined,
+                              approvedProductIdProp: approvedProduct.id?.toString()
                             });
                             
                             return (
