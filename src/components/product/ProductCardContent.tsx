@@ -388,6 +388,14 @@ export function ProductCardContent({
   enableEditing = false,
   index,
 }: ProductCardContentProps) {
+  
+  // Debug what props are being received
+  console.log('🔍 ProductCardContent received props:', {
+    researchResultId,
+    approvedProductId,
+    context,
+    productName: product?.productDetails?.name || product?.companyName
+  });
   const { user } = useAuth();
   const [editableProduct, setEditableProduct] = useState<ProductAnalysis>(product);
   const [autoSaveCount, setAutoSaveCount] = useState(0);
