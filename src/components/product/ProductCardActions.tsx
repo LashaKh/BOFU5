@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { sendToAirOps } from '../../lib/airops';
 import { toast } from 'react-hot-toast';
+import { ContentGenerationNotification } from '../ui/ContentGenerationNotification';
 
 interface ProductCardActionsProps {
   product: ProductAnalysis;
@@ -373,6 +374,8 @@ export function ProductCardActions({
   const styles = useAdaptiveStyles();
   
   const [actionStates, setActionStates] = useState<Record<string, boolean>>({});
+  const [showContentNotification, setShowContentNotification] = useState(false);
+  const [trackingId, setTrackingId] = useState<string>();
 
   const handleAction = async (actionName: string, actionFn?: () => Promise<void> | void) => {
     if (!actionFn || disabled) return;
@@ -415,6 +418,12 @@ export function ProductCardActions({
       return;
     }
 
+    // Show the notification after 5 seconds
+    setTimeout(() => {
+      setTrackingId(trackingId);
+      setShowContentNotification(true);
+    }, 5000);
+
     // Use the action handler for proper loading state management
     await handleAction('sendToAirOps', async () => {
       try {
@@ -431,7 +440,7 @@ export function ProductCardActions({
         };
 
         await sendToAirOps(airOpsData);
-        toast.success(`Product data sent to AirOps successfully! Tracking ID: ${trackingId}`);
+        toast.success('Successfully sent to AirOps for processing');
       } catch (error: any) {
         console.error('Error sending to AirOps:', error);
         
@@ -446,6 +455,7 @@ export function ProductCardActions({
   };
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -545,5 +555,13 @@ export function ProductCardActions({
         </motion.div>
       )}
     </motion.div>
+
+    {/* Content Generation Notification */}
+    <ContentGenerationNotification
+      isOpen={showContentNotification}
+      onClose={() => setShowContentNotification(false)}
+      trackingId={trackingId}
+    />
+    </>
   );
 } 
