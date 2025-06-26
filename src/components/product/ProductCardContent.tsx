@@ -389,26 +389,13 @@ export function ProductCardContent({
   index,
 }: ProductCardContentProps) {
   
-  // Debug what props are being received
-  console.log('🔍 ProductCardContent received props:', {
-    researchResultId,
-    approvedProductId,
-    context,
-    productName: product?.productDetails?.name || product?.companyName
-  });
+
   const { user } = useAuth();
   const [editableProduct, setEditableProduct] = useState<ProductAnalysis>(product);
   const [autoSaveCount, setAutoSaveCount] = useState(0);
   const isUpdatingCompetitors = useRef(false);
 
-  console.log('🎯 ProductCardContent: Received product data:', {
-    companyName: product.companyName,
-    productName: product.productDetails?.name,
-    keywords: product.keywords,
-    context,
-    enableEditing,
-    hasOnUpdateSection: !!onUpdateSection
-  });
+
 
   // Add state for capabilities collapse (collapsed by default)
   const [isCapabilitiesExpanded, setIsCapabilitiesExpanded] = useState(false);

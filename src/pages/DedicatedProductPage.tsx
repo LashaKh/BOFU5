@@ -1477,26 +1477,31 @@ const DedicatedProductPage: React.FC = () => {
               )}
 
               {!isGeneratingAnalysis && !analysisParsingError && parsedAnalysisData && (
-                <ProductCard
-                  product={parsedAnalysisData} // Pass the parsed analysis data
-                  index={0} // Since it's a single product view
-                  isActionLoading={isGeneratingAnalysis || isSavingSection || isCardActionLoading} // Combine loading states
-                  onSave={(updatedProduct: ProductAnalysis) => handleSaveProduct(updatedProduct)} // Type assertion
-                  onApprove={(approvedProduct: ProductAnalysis, idx: number) => handleApproveProduct(approvedProduct, idx)} // Type assertion
-                  onUpdateSection={handleProductSectionUpdate}
-                  updateProduct={(updatedData: ProductAnalysis) => {
-                    // When ProductCard internally updates, reflect it in parsedAnalysisData and product state
-                    setParsedAnalysisData(updatedData); 
-                    if (product) {
-                      setProduct({...product, generated_analysis_data: updatedData });
-                    }
-                  }}
-                  isMultipleProducts={false} // It's a single product page
-                  isAdmin={false} // Pass isAdmin status
-                  enableEditing={true} // Enable editing for capabilities and other product fields
-                  onClose={() => navigate('/dashboard/products')} // Example: navigate back on close
-                  research_result_id={product?.id} // Pass the research_result_id (product.id)
-                />
+                (() => {
+                  console.log('🔍 DedicatedProductPage: Rendering ProductCard with researchResultId:', product?.id);
+                  return (
+                    <ProductCard
+                    product={parsedAnalysisData} // Pass the parsed analysis data
+                    index={0} // Since it's a single product view
+                    isActionLoading={isGeneratingAnalysis || isSavingSection || isCardActionLoading} // Combine loading states
+                    onSave={(updatedProduct: ProductAnalysis) => handleSaveProduct(updatedProduct)} // Type assertion
+                    onApprove={(approvedProduct: ProductAnalysis, idx: number) => handleApproveProduct(approvedProduct, idx)} // Type assertion
+                    onUpdateSection={handleProductSectionUpdate}
+                    updateProduct={(updatedData: ProductAnalysis) => {
+                      // When ProductCard internally updates, reflect it in parsedAnalysisData and product state
+                      setParsedAnalysisData(updatedData); 
+                      if (product) {
+                        setProduct({...product, generated_analysis_data: updatedData });
+                      }
+                    }}
+                    isMultipleProducts={false} // It's a single product page
+                    isAdmin={false} // Pass isAdmin status
+                    enableEditing={true} // Enable editing for capabilities and other product fields
+                    onClose={() => navigate('/dashboard/products')} // Example: navigate back on close
+                      researchResultId={product?.id} // Pass the researchResultId (product.id) - FIXED: camelCase
+                    />
+                  );
+                })()
               )}
 
               {!isGeneratingAnalysis && !analysisParsingError && !parsedAnalysisData && (

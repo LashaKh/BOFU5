@@ -148,13 +148,7 @@ function EnhancedProductCard({
   variant = 'default',
 }: EnhancedProductCardProps) {
   
-  // Debug what props are being received
-  console.log('🔍 ProductCard received props:', {
-    researchResultId,
-    approvedProductId,
-    context,
-    productName: product?.productDetails?.name || product?.companyName
-  });
+
   const [isExpandedState, setIsExpanded] = useState(isExpanded);
   const [isEditMode, setIsEditMode] = useState(true);
 
@@ -219,13 +213,13 @@ function EnhancedProductCard({
           onExport={onExport}
           onEdit={onEdit}
           onDelete={onDelete}
+          onShare={onShare}
           researchResultId={researchResultId}
           approvedProductId={approvedProductId}
           userUUID={userUUID}
           userEmail={userEmail}
           userCompanyName={userCompanyName}
           onGenerateArticle={onGenerateArticle}
-          onShare={onShare}
           onUpdateSection={handleProductUpdate}
           showCapabilities={showCapabilities}
           showCompetitorAnalysis={showCompetitorAnalysis}
@@ -382,6 +376,7 @@ export function ProductCard(props: any) {
           showExpandButton={false} // Remove the "more" button as requested
           context={context}
           researchResultId={props.researchResultId} // Pass through researchResultId for AirOps
+          approvedProductId={props.approvedProductId} // Pass through approvedProductId for AirOps
           userUUID={props.userUUID} // Pass through user information for AirOps
           userEmail={props.userEmail}
           userCompanyName={props.userCompanyName}

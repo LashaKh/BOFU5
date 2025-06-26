@@ -902,10 +902,12 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
       const products = await getApprovedProducts();
       console.log('✅ Approved products fetched:', products.length);
       console.log('🔍 All approved products:', products);
-      console.log('🔍 SoundThinking products:', products.filter(p => 
+      const soundThinkingProducts = products.filter(p => 
         p.company_name?.toLowerCase().includes('soundthinking') || 
         p.product_name?.toLowerCase().includes('shotspotter')
-      ));
+      );
+      console.log('🔍 SoundThinking products:', soundThinkingProducts);
+      console.log('🔍 First SoundThinking product structure:', soundThinkingProducts[0]);
       setApprovedProducts(products);
     } catch (error) {
       console.error('❌ Error fetching approved products:', error);
@@ -1141,7 +1143,9 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                               approvedProductIdString: approvedProduct.id?.toString(),
                               researchResultId: approvedProduct.research_result_id,
                               companyName: cleanProduct.companyName || 'Unknown',
-                              productName: cleanProduct.productDetails?.name || 'Unknown'
+                              productName: cleanProduct.productDetails?.name || 'Unknown',
+                              approvedProductKeys: Object.keys(approvedProduct),
+                              fullApprovedProduct: approvedProduct
                             });
                             
                             return (
@@ -1154,9 +1158,9 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                 enableEditing={true}
                                 researchResultId={approvedProduct.research_result_id || undefined}
                                 approvedProductId={approvedProduct.id?.toString()}
-                                userUUID={selectedUser?.id}
-                                userEmail={selectedUser?.email}
-                                userCompanyName={selectedUser?.company_name}
+                                userUUID={companyGroup.main_account.id}
+                                userEmail={companyGroup.main_account.email}
+                                userCompanyName={companyGroup.company_name}
                                 onUpdateSection={(productIndex: number, sectionType: keyof ProductAnalysis, newValue: any) => {
                                   console.log('🎯 Product update in approved products section:', {
                                     approvedProductId: approvedProduct.id,

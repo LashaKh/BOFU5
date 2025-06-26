@@ -604,17 +604,29 @@ function ProductResultsPage({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <ProductCard 
-                  product={product}
-                  index={index}
-                  onSave={handleProductSave}
-                  onApprove={handleProductApprove}
-                  onUpdateSection={handleUpdateSection}
-                  updateProduct={handleUpdateProduct}
-                  isActionLoading={actionLoadingIndex === index}
-                  isMultipleProducts={editedProducts.length > 0}
-                  isAdmin={false}
-                />
+                {(() => {
+                  console.log('🔍 ProductResultsPage: Rendering ProductCard with IDs:', {
+                    researchResultId: existingId,
+                    approvedProductId: existingId,
+                    productName: product?.productDetails?.name,
+                    index
+                  });
+                  return (
+                    <ProductCard 
+                      product={product}
+                      index={index}
+                      onSave={handleProductSave}
+                      onApprove={handleProductApprove}
+                      onUpdateSection={handleUpdateSection}
+                      updateProduct={handleUpdateProduct}
+                      isActionLoading={actionLoadingIndex === index}
+                      isMultipleProducts={editedProducts.length > 0}
+                      isAdmin={false}
+                      researchResultId={existingId}
+                      approvedProductId={existingId}
+                    />
+                  );
+                })()}
               </motion.div>
               ))
             ) : (
