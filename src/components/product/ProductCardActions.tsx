@@ -24,6 +24,7 @@ interface ProductCardActionsProps {
   product: ProductAnalysis;
   context?: 'history' | 'product' | 'admin';
   researchResultId?: string; // Add research result ID for AirOps integration
+  approvedProductId?: string; // Add approved product ID as fallback for tracking
   // User information for AirOps integration
   userUUID?: string;
   userEmail?: string;
@@ -355,6 +356,7 @@ export function ProductCardActions({
   product,
   context = 'product',
   researchResultId,
+  approvedProductId,
   userUUID,
   userEmail,
   userCompanyName,
@@ -393,8 +395,11 @@ export function ProductCardActions({
   };
 
   const handleSendToAirOps = async () => {
-    if (!researchResultId) {
-      toast.error('Research result ID is required for AirOps integration');
+    // Use research result ID if available, otherwise fall back to approved product ID
+    const trackingId = researchResultId || approvedProductId;
+    
+    if (!trackingId) {
+      toast.error('Unable to send to AirOps: No tracking ID available. Please contact support.');
       return;
     }
 
@@ -410,11 +415,11 @@ export function ProductCardActions({
             userEmail,
             userCompanyName
           },
-          research_result_Id: researchResultId
+          research_result_Id: trackingId
         };
 
         await sendToAirOps(airOpsData);
-        toast.success('Product data sent to AirOps successfully!');
+        toast.success(`Product data sent to AirOps successfully! Tracking ID: ${trackingId}`);
       } catch (error: any) {
         console.error('Error sending to AirOps:', error);
         

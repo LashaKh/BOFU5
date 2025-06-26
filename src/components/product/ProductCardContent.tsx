@@ -157,10 +157,12 @@ interface ProductCardContentProps {
   maxItems?: number;
   showExpandButton?: boolean;
   researchResultId?: string;
+  approvedProductId?: string;
   // User information for AirOps integration
   userUUID?: string;
   userEmail?: string;
   userCompanyName?: string;
+  onGenerateArticle?: () => void;
   // Phase 2 action handlers
   onSave?: (product: ProductAnalysis) => Promise<void>;
   onApprove?: (product: ProductAnalysis) => Promise<void>;
@@ -367,9 +369,11 @@ export function ProductCardContent({
   maxItems = 12,
   showExpandButton = true,
   researchResultId,
+  approvedProductId,
   userUUID,
   userEmail,
   userCompanyName,
+  onGenerateArticle,
   onSave,
   onApprove,
   onExport,
@@ -1406,6 +1410,7 @@ export function ProductCardContent({
               onDelete={onDelete}
               onShare={onShare}
               researchResultId={researchResultId}
+              approvedProductId={approvedProductId}
               userUUID={userUUID}
               userEmail={userEmail}
               userCompanyName={userCompanyName}
