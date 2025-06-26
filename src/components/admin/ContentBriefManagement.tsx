@@ -901,6 +901,11 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
       console.log('🔍 Fetching approved products...');
       const products = await getApprovedProducts();
       console.log('✅ Approved products fetched:', products.length);
+      console.log('🔍 All approved products:', products);
+      console.log('🔍 SoundThinking products:', products.filter(p => 
+        p.company_name?.toLowerCase().includes('soundthinking') || 
+        p.product_name?.toLowerCase().includes('shotspotter')
+      ));
       setApprovedProducts(products);
     } catch (error) {
       console.error('❌ Error fetching approved products:', error);
@@ -1001,7 +1006,16 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                 <span>Loading approved products...</span>
               </div>
             </div>
-          ) : approvedProducts.filter(p => p.company_name === companyGroup.company_name).length > 0 ? (
+          ) : (() => {
+            const filteredProducts = approvedProducts.filter(p => p.company_name === companyGroup.company_name);
+            console.log('🔍 Filtering approved products for company:', {
+              companyName: companyGroup.company_name,
+              totalProducts: approvedProducts.length,
+              filteredCount: filteredProducts.length,
+              filteredProducts
+            });
+            return filteredProducts.length > 0;
+          })() ? (
             <div className="space-y-4">
               {approvedProducts
                 .filter(p => p.company_name === companyGroup.company_name)
