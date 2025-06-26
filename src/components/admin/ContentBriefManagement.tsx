@@ -1108,7 +1108,10 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                               id: approvedProduct.id,
                               productName: cleanProduct.productDetails?.name || cleanProduct.companyName,
                               hasData: !!cleanProduct,
-                              keys: Object.keys(cleanProduct)
+                              keys: Object.keys(cleanProduct),
+                              approvedProductFull: approvedProduct,
+                              approvedProductKeys: Object.keys(approvedProduct),
+                              idToString: approvedProduct.id?.toString()
                             });
                             
                             return (
