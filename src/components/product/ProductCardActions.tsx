@@ -396,7 +396,19 @@ export function ProductCardActions({
 
   const handleSendToAirOps = async () => {
     // Use research result ID if available, otherwise fall back to approved product ID
-    const trackingId = researchResultId || approvedProductId;
+    // Handle empty strings by treating them as falsy
+    const trackingId = (researchResultId && researchResultId.trim()) || (approvedProductId && approvedProductId.trim());
+    
+    // Debug logging to see what values we have
+    console.log('🔍 AirOps Tracking Debug:', {
+      researchResultId,
+      approvedProductId,
+      trackingId,
+      researchResultIdType: typeof researchResultId,
+      approvedProductIdType: typeof approvedProductId,
+      researchResultIdLength: researchResultId?.length,
+      approvedProductIdLength: approvedProductId?.length
+    });
     
     if (!trackingId) {
       toast.error('Unable to send to AirOps: No tracking ID available. Please contact support.');
