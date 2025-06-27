@@ -14,7 +14,7 @@ export interface BriefApprovalNotification {
 }
 
 /**
- * Create a brief approval notification for admins
+ * Create a brief approval notification for admins using Edge Function
  */
 export async function createBriefApprovalNotification({
   briefId,
@@ -26,73 +26,39 @@ export async function createBriefApprovalNotification({
   userId: string;
 }) {
   try {
-    console.log('Creating brief approval notification...', { briefId, briefTitle, userId });
+    console.log('Creating brief approval notification via Edge Function...', { briefId, briefTitle, userId });
 
-      // Get user profile information
-  const { data: userProfile, error: userError } = await supabase
-    .from('user_profiles')
-    .select('id, email, company_name')
-    .eq('id', userId)
-    .single();
-
-    if (userError) {
-      console.error('Error fetching user profile:', userError);
+    // Get the current session for authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.error('No active session found');
       return;
     }
 
-    if (!userProfile) {
-      console.error('User profile not found for userId:', userId);
-      return;
-    }
-
-    console.log('User profile found:', {
-      email: userProfile.email,
-      company: userProfile.company_name
-    });
-
-    // Create notifications for both main admin and assigned sub-admins
-    const adminIds = await getTargetAdminIds(userId);
-    console.log('Target admin IDs:', adminIds);
-
-    for (const adminId of adminIds) {
-      // Get admin details for personalized emails
-      const { data: adminProfile, error: adminError } = await supabase
-        .from('admin_profiles')
-        .select('id, email, name')
-        .eq('id', adminId)
-        .single();
-
-      if (adminError || !adminProfile) {
-        console.error('Error fetching admin profile:', adminError);
-        continue;
-      }
-
-      // Create in-app notification
-      const notification = await createInAppNotification({
-        adminId,
+    // Call the Edge Function with service role permissions
+    const { data, error } = await supabase.functions.invoke('send-brief-approval-notification', {
+      body: {
         briefId,
         briefTitle,
-        userEmail: userProfile.email,
-        userCompany: userProfile.company_name || 'Unknown Company'
-      });
+        userId
+      },
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      }
+    });
 
-      // Send email notification
-      const emailSent = await sendBriefApprovalEmailNotification({
-        adminEmail: adminProfile.email,
-        adminName: adminProfile.name || 'Admin',
-        userEmail: userProfile.email,
-        userCompany: userProfile.company_name || 'Unknown Company',
-        briefTitle
-      });
-
-      console.log(`Admin ${adminProfile.email}:`, {
-        inAppNotification: notification ? 'created' : 'failed',
-        emailNotification: emailSent ? 'sent' : 'failed'
-      });
+    if (error) {
+      console.error('Error calling notification Edge Function:', error);
+      throw error;
     }
+
+    console.log('✅ Edge Function response:', data);
+    return data;
 
   } catch (error) {
     console.error('Error creating brief approval notification:', error);
+    throw error;
   }
 }
 
