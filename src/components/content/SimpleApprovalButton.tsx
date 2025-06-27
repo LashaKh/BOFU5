@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { createBriefApprovalNotification } from '../../lib/briefApprovalNotifications';
 
 interface SimpleApprovalButtonProps {
   briefId: string;
@@ -51,6 +52,29 @@ export function SimpleApprovalButton({
         throw new Error(`Failed to approve content brief: ${error.message}`);
       }
 
+      // Get the current user and brief details for notifications
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: briefData } = await supabase
+        .from('content_briefs')
+        .select('product_name, user_id')
+        .eq('id', briefId)
+        .single();
+
+      // Send notifications to admins (both email and in-app)
+      if (user && briefData) {
+        try {
+          await createBriefApprovalNotification({
+            briefId,
+            briefTitle: briefData.product_name || 'Content Brief',
+            userId: briefData.user_id
+          });
+          console.log('✅ Brief approval notifications sent successfully');
+        } catch (notificationError) {
+          console.error('⚠️ Failed to send notifications:', notificationError);
+          // Don't fail the approval if notifications fail
+        }
+      }
+
       // Dismiss loading toast and show success
       toast.dismiss(loadingToast);
       toast.success(
@@ -58,7 +82,7 @@ export function SimpleApprovalButton({
           <CheckCircle className="h-5 w-5 text-green-500" />
           <div>
             <p className="font-medium">Content Approved</p>
-            <p className="text-sm text-gray-400">Your content brief has been marked as approved.</p>
+            <p className="text-sm text-gray-400">Your content brief has been marked as approved. Email notifications sent to admins.</p>
           </div>
         </div>
       );
