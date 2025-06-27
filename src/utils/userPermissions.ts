@@ -108,15 +108,43 @@ export async function canUserCreateProfiles(): Promise<boolean> {
 
     console.log('[canUserCreateProfiles] Checking permissions for user:', user.email);
     
-    const userType = await getUserType(user.id);
+    // Get the user's current default profile to check permissions
+    const { data: profiles, error: profileError } = await supabase
+      .from('company_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .single();
+
+    if (profileError || !profiles) {
+      console.log('[canUserCreateProfiles] No default profile found, checking if new user...');
+      
+      // If no profiles exist, this might be a new main user who hasn't been set up yet
+      const { data: allProfiles } = await supabase
+        .from('company_profiles')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (!allProfiles || allProfiles.length === 0) {
+        console.log('[canUserCreateProfiles] New user with no profiles - should have main account permissions');
+        return true; // New users should be able to create profiles
+      }
+      
+      return false;
+    }
+
+    // Check the actual canManageUsers permission
+    const canManageUsers = profiles.profile_permissions?.canManageUsers === true;
     
-    console.log('[canUserCreateProfiles] User type result:', {
+    console.log('[canUserCreateProfiles] Permission check result:', {
       userId: user.id,
       email: user.email,
-      userType: userType
+      profileRole: profiles.profile_role,
+      canManageUsers: canManageUsers,
+      permissions: profiles.profile_permissions
     });
     
-    return userType.canCreateProfiles;
+    return canManageUsers;
   } catch (error) {
     console.error('Error checking profile creation permissions:', error);
     return false;
