@@ -28,12 +28,12 @@ export async function createBriefApprovalNotification({
   try {
     console.log('Creating brief approval notification...', { briefId, briefTitle, userId });
 
-    // Get user profile information
-    const { data: userProfile, error: userError } = await supabase
-      .from('user_profiles')
-      .select('id, email, company_name, profile_name')
-      .eq('id', userId)
-      .single();
+      // Get user profile information
+  const { data: userProfile, error: userError } = await supabase
+    .from('user_profiles')
+    .select('id, email, company_name')
+    .eq('id', userId)
+    .single();
 
     if (userError) {
       console.error('Error fetching user profile:', userError);
@@ -73,7 +73,7 @@ export async function createBriefApprovalNotification({
         briefId,
         briefTitle,
         userEmail: userProfile.email,
-        userCompany: userProfile.company_name || userProfile.profile_name || 'Unknown Company'
+        userCompany: userProfile.company_name || 'Unknown Company'
       });
 
       // Send email notification
@@ -81,7 +81,7 @@ export async function createBriefApprovalNotification({
         adminEmail: adminProfile.email,
         adminName: adminProfile.name || 'Admin',
         userEmail: userProfile.email,
-        userCompany: userProfile.company_name || userProfile.profile_name || 'Unknown Company',
+        userCompany: userProfile.company_name || 'Unknown Company',
         briefTitle
       });
 
