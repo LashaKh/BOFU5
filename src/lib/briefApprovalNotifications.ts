@@ -166,30 +166,26 @@ async function getTargetAdminIds(userId: string): Promise<string[]> {
 
     if (mainAdmin) {
       adminIds.push(mainAdmin.id);
+      console.log('Added main admin:', mainAdmin.id);
     }
 
-    // Get sub-admins assigned to this user's company
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('company_id')
-      .eq('id', userId)
-      .single();
+    // Get sub-admins assigned directly to this user
+    const { data: assignments } = await supabase
+      .from('admin_client_assignments')
+      .select('admin_id')
+      .eq('client_user_id', userId)
+      .eq('is_active', true);
 
-    if (userProfile?.company_id) {
-      const { data: assignments } = await supabase
-        .from('admin_client_assignments')
-        .select('admin_id')
-        .contains('assigned_client_ids', [userProfile.company_id]);
-
-      if (assignments) {
-        for (const assignment of assignments) {
-          if (!adminIds.includes(assignment.admin_id)) {
-            adminIds.push(assignment.admin_id);
-          }
+    if (assignments) {
+      for (const assignment of assignments) {
+        if (!adminIds.includes(assignment.admin_id)) {
+          adminIds.push(assignment.admin_id);
+          console.log('Added sub-admin:', assignment.admin_id);
         }
       }
     }
 
+    console.log('Total target admin IDs:', adminIds);
     return adminIds;
   } catch (error) {
     console.error('Error getting target admin IDs:', error);
