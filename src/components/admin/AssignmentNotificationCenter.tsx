@@ -28,8 +28,8 @@ import {
   MentionNotification 
 } from '../../lib/commentApi';
 import {
-  getAdminBriefNotifications,
-  markBriefNotificationsAsRead,
+  getBriefApprovalNotifications,
+  markBriefApprovalNotificationsAsRead,
   BriefApprovalNotification
 } from '../../lib/briefApprovalNotifications';
 
@@ -137,7 +137,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         // Get current admin ID from authentication
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id) {
-          briefApprovals = await getAdminBriefNotifications(user.id);
+          briefApprovals = await getBriefApprovalNotifications(user.id);
           setBriefApprovalNotifications(briefApprovals);
           console.log('📄 Loaded brief approval notifications for admin:', briefApprovals.length);
         }
@@ -197,11 +197,10 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       message: 'Content Brief Approved',
       details: `${brief.user_email} from ${brief.user_company} approved: "${brief.brief_title}"`,
       timestamp: brief.created_at,
-      isRead: brief.is_read,
+      isRead: brief.read,
       priority: 'medium' as const,
       metadata: {
         briefId: brief.brief_id,
-        userId: brief.user_id,
         userEmail: brief.user_email,
         userCompany: brief.user_company,
         briefTitle: brief.brief_title
@@ -273,7 +272,11 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     if (notificationId.startsWith('brief-')) {
       const briefNotificationId = notificationId.replace('brief-', '');
       try {
-        await markBriefNotificationsAsRead([briefNotificationId]);
+        // Get current admin ID from authentication
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          await markBriefApprovalNotificationsAsRead(user.id, [briefNotificationId]);
+        }
       } catch (error) {
         console.error('Error marking brief notification as read:', error);
       }
@@ -310,7 +313,11 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     
     if (briefIds.length > 0) {
       try {
-        await markBriefNotificationsAsRead(briefIds);
+        // Get current admin ID from authentication
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          await markBriefApprovalNotificationsAsRead(user.id, briefIds);
+        }
       } catch (error) {
         console.error('Error marking brief notifications as read:', error);
       }
