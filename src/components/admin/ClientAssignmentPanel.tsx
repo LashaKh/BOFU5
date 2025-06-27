@@ -205,15 +205,15 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
                 </p>
               </div>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
                 {/* Current Assignments */}
-                <div>
+                <div className="flex flex-col overflow-hidden">
                   <h4 className="text-md font-semibold text-white mb-4 flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-400" />
                     Assigned Clients ({assignments.length})
                   </h4>
                   
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <div className="space-y-2 overflow-y-auto flex-1">
                     {isLoadingAssignments ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
@@ -256,7 +256,7 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
                 </div>
 
                 {/* Available Clients */}
-                <div>
+                <div className="flex flex-col overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-md font-semibold text-white flex items-center gap-2">
                       <Plus className="h-5 w-5 text-green-400" />
@@ -276,7 +276,7 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
                     />
                   </div>
                   
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-2 overflow-y-auto flex-1">
                     {filteredUnassignedClients.length > 0 ? (
                       filteredUnassignedClients.map((client) => (
                         <div

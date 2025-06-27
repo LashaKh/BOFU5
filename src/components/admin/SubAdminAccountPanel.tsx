@@ -304,7 +304,7 @@ export function SubAdminAccountPanel({ className = '' }: SubAdminAccountPanelPro
         </div>
       </div>
 
-      <div className="flex-1 space-y-6">
+      <div className="flex-1 space-y-6 overflow-y-auto">
         {/* Create Form */}
         {showCreateForm && (
           <motion.div
@@ -404,7 +404,7 @@ export function SubAdminAccountPanel({ className = '' }: SubAdminAccountPanelPro
               <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
             </div>
           ) : subAdmins.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3">
               {subAdmins.map((admin) => (
                 <motion.div
                   key={admin.id}

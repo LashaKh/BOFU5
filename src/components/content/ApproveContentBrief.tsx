@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { approveContentBrief } from '../../lib/airops';
 import { supabase } from '../../lib/supabase';
+import { createBriefApprovalNotification } from '../../lib/briefApprovalNotifications';
 
 interface ApproveContentBriefProps {
   contentBrief: string;
@@ -45,6 +46,12 @@ export function ApproveContentBrief({
     setIsApproving(true);
 
     try {
+      // Get current user
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (!currentUser.user) {
+        throw new Error('User not authenticated');
+      }
+
       // Fetch research_result_id from content_briefs table
       let researchResultId: string | null = null;
       if (briefId) {
@@ -71,6 +78,21 @@ export function ApproveContentBrief({
         research_result_id: researchResultId
       });
       
+      // Create notification for admins (both in-app and email)
+      if (briefId && currentUser.user) {
+        try {
+          await createBriefApprovalNotification({
+            briefId,
+            briefTitle: articleTitle,
+            userId: currentUser.user.id
+          });
+          console.log('Admin notifications (in-app and email) sent successfully');
+        } catch (notificationError) {
+          console.error('Failed to send admin notifications:', notificationError);
+          // Don't fail the approval process if notifications fail
+        }
+      }
+      
       // Dismiss loading toast and show success
       toast.dismiss(loadingToast);
       toast.success(
@@ -78,7 +100,7 @@ export function ApproveContentBrief({
           <CheckCircle className="h-5 w-5 text-green-500" />
           <div>
             <p className="font-medium">Content Brief Approved</p>
-            <p className="text-sm text-gray-400">Your content brief has been successfully processed.</p>
+            <p className="text-sm text-gray-400">Your content brief has been successfully processed. Admins have been notified via email and in-app notifications.</p>
           </div>
         </div>
       );

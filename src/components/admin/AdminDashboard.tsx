@@ -986,6 +986,12 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
       case 'commentManagement':
         return <EnhancedCommentDashboard />;
       case 'auditLogs':
+        // Only super admins can access audit logs
+        if (adminRole !== 'super_admin') {
+          setCurrentView('dashboard');
+          toast.error('Access denied: Only super admins can view security logs');
+          return null;
+        }
         return <AuditLogViewer />;
       case 'contentBriefManagement':
         return <ContentBriefManagement />;
@@ -1073,11 +1079,19 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   };
 
   // Filter and group users for User Management
-  const filteredUsers = users.filter(user => 
-    user.company_name?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-    user.profile_name?.toLowerCase().includes(userSearchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    // Apply text search filter
+    const matchesSearch = user.company_name?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      user.profile_name?.toLowerCase().includes(userSearchTerm.toLowerCase());
+      
+    // For sub-admins, only show users from assigned clients
+    if (adminRole === 'sub_admin' && assignedClientIds.length > 0) {
+      return matchesSearch && assignedClientIds.includes(user.id);
+    }
+    
+    return matchesSearch;
+  });
 
   const groupedUsers = groupUsersByCompany(filteredUsers);
   
@@ -1160,8 +1174,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                 { view: 'contentBriefManagement', label: 'Content Brief Management', icon: BookOpen },
                 { view: 'articleManagement', label: 'Article Management', icon: FileText },
                 { view: 'commentManagement', label: 'Comment Management', icon: MessageSquare },
-                { view: 'auditLogs', label: 'Security Logs', icon: Shield },
                 ...(adminRole === 'super_admin' ? [
+                  { view: 'auditLogs' as AdminView, label: 'Security Logs', icon: Shield },
                   { view: 'adminAssignmentHub' as AdminView, label: 'Admin Assignment Hub', icon: Users },
                 ] : []),
               ].map((item, index) => (

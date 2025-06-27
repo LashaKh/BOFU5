@@ -9,6 +9,7 @@ import { ProductCard } from '../product/ProductCard';
 import { ResponsiveApprovalButton } from '../common/ResponsiveApprovalButton';
 import { ContentBrief } from '../../types/contentBrief';
 import { getApprovedProducts, updateApprovedProduct } from '../../lib/research';
+import { useAdminContext } from '../../contexts/AdminContext';
 
 // Interface for research results from database
 interface ResearchResult {
@@ -53,6 +54,7 @@ interface ContentBriefManagementProps {
 }
 
 export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) {
+  const { adminRole, assignedClientIds } = useAdminContext();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [userResearchResults, setUserResearchResults] = useState<ResearchResult[]>([]);
   const [userContentBriefs, setUserContentBriefs] = useState<ContentBrief[]>([]);
@@ -872,11 +874,19 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
   };
 
   // Filter and group users
-  const filteredUsers = users.filter(user => 
-    user.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.profile_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    // Apply text search filter
+    const matchesSearch = user.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.profile_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    // For sub-admins, only show users from assigned clients
+    if (adminRole === 'sub_admin' && assignedClientIds.length > 0) {
+      return matchesSearch && assignedClientIds.includes(user.id);
+    }
+    
+    return matchesSearch;
+  });
 
   const groupedUsers = groupUsersByCompany(filteredUsers);
   
@@ -1257,37 +1267,6 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                     <div className="p-6">
                       {brief.brief_content && Object.keys(brief.brief_content).length > 0 ? (
                         <div className="space-y-6">
-                          <div className="bg-gray-600/20 rounded-lg p-4 border border-gray-600/30">
-                            <h5 className="text-white font-medium mb-3">📝 Content Brief Structure</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                              {Object.entries(brief.brief_content).map(([section, content]) => (
-                                <div key={section} className="bg-gray-700/30 rounded p-3">
-                                  <h6 className="text-blue-300 font-medium mb-2">{section}</h6>
-                                  <div className="text-gray-300 text-xs">
-                                    {typeof content === 'object' && content !== null ? (
-                                      <div className="space-y-1">
-                                        {Object.entries(content).map(([key, value]) => (
-                                          <div key={key}>
-                                            <span className="text-yellow-300">{key}:</span>{' '}
-                                            <span className="text-gray-300">
-                                              {Array.isArray(value) ? `${value.length} items` : 
-                                               typeof value === 'string' ? value.substring(0, 100) + (value.length > 100 ? '...' : '') :
-                                               typeof value}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-300">
-                                        {typeof content === 'string' ? content.substring(0, 150) + (content.length > 150 ? '...' : '') : String(content)}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          
                           {/* Editable Content Brief Display */}
                           <div className="bg-gray-700/20 rounded-lg p-4 border border-gray-600/30">
                             <h5 className="text-white font-medium mb-3 flex items-center gap-2">

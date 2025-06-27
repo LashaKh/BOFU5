@@ -27,6 +27,11 @@ import {
   markMentionNotificationsAsSent,
   MentionNotification 
 } from '../../lib/commentApi';
+import {
+  getAdminBriefNotifications,
+  markBriefNotificationsAsRead,
+  BriefApprovalNotification
+} from '../../lib/briefApprovalNotifications';
 
 interface AssignmentNotificationCenterProps {
   isVisible: boolean;
@@ -35,7 +40,7 @@ interface AssignmentNotificationCenterProps {
 
 interface NotificationItem {
   id: string;
-  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation' | 'mention' | 'comment';
+  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation' | 'mention' | 'comment' | 'brief_approved';
   message: string;
   details?: string;
   timestamp: string;
@@ -68,8 +73,9 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [recentActivities, setRecentActivities] = useState<AssignmentActivity[]>([]);
   const [mentionNotifications, setMentionNotifications] = useState<MentionNotification[]>([]);
+  const [briefApprovalNotifications, setBriefApprovalNotifications] = useState<BriefApprovalNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts' | 'mentions'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts' | 'mentions' | 'briefs'>('all');
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
 
   // Only super-admins can access this component
@@ -125,8 +131,22 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         console.error('Error loading mention notifications:', mentionError);
       }
       
-      // Generate notifications based on recent activities and mentions
-      generateNotificationsFromActivities(activities, mentions);
+      // Load brief approval notifications for admin
+      let briefApprovals: BriefApprovalNotification[] = [];
+      try {
+        // Get current admin ID from authentication
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          briefApprovals = await getAdminBriefNotifications(user.id);
+          setBriefApprovalNotifications(briefApprovals);
+          console.log('📄 Loaded brief approval notifications for admin:', briefApprovals.length);
+        }
+      } catch (briefError) {
+        console.error('Error loading brief approval notifications:', briefError);
+      }
+      
+      // Generate notifications based on recent activities, mentions, and brief approvals
+      generateNotificationsFromActivities(activities, mentions, briefApprovals);
 
     } catch (error) {
       console.error('Error loading recent activities:', error);
@@ -135,8 +155,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     }
   };
 
-  // Generate notifications from activities and mentions
-  const generateNotificationsFromActivities = (activities: AssignmentActivity[], mentions: MentionNotification[] = []) => {
+  // Generate notifications from activities, mentions, and brief approvals
+  const generateNotificationsFromActivities = (activities: AssignmentActivity[], mentions: MentionNotification[] = [], briefApprovals: BriefApprovalNotification[] = []) => {
     const generatedNotifications: NotificationItem[] = activities.map((activity, index) => ({
       id: `activity-${activity.id}`,
       type: 'assignment' as const,
@@ -170,6 +190,24 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       }
     }));
 
+    // Convert brief approval notifications to notification items
+    const briefApprovalNotificationItems: NotificationItem[] = briefApprovals.map((brief) => ({
+      id: `brief-${brief.id}`,
+      type: 'brief_approved' as const,
+      message: 'Content Brief Approved',
+      details: `${brief.user_email} from ${brief.user_company} approved: "${brief.brief_title}"`,
+      timestamp: brief.created_at,
+      isRead: brief.is_read,
+      priority: 'medium' as const,
+      metadata: {
+        briefId: brief.brief_id,
+        userId: brief.user_id,
+        userEmail: brief.user_email,
+        userCompany: brief.user_company,
+        briefTitle: brief.brief_title
+      }
+    }));
+
     // Add some system notifications
     const systemNotifications: NotificationItem[] = [
       {
@@ -195,7 +233,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     ];
 
     // Combine all notifications and sort by timestamp
-    const allNotifications = [...systemNotifications, ...mentionNotificationItems, ...generatedNotifications.slice(0, 20)]
+    const allNotifications = [...systemNotifications, ...mentionNotificationItems, ...briefApprovalNotificationItems, ...generatedNotifications.slice(0, 20)]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     setNotifications(allNotifications);
@@ -212,6 +250,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return ['account_created', 'account_deleted'].includes(notification.type);
       case 'mentions':
         return ['mention', 'comment'].includes(notification.type);
+      case 'briefs':
+        return notification.type === 'brief_approved';
       default:
         return true;
     }
@@ -226,6 +266,16 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         await markMentionNotificationsAsSent([mentionId]);
       } catch (error) {
         console.error('Error marking mention as read:', error);
+      }
+    }
+    
+    // Handle brief approval notifications separately
+    if (notificationId.startsWith('brief-')) {
+      const briefNotificationId = notificationId.replace('brief-', '');
+      try {
+        await markBriefNotificationsAsRead([briefNotificationId]);
+      } catch (error) {
+        console.error('Error marking brief notification as read:', error);
       }
     }
     
@@ -250,6 +300,19 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         await markMentionNotificationsAsSent(mentionIds);
       } catch (error) {
         console.error('Error marking mentions as read:', error);
+      }
+    }
+    
+    // Mark brief approval notifications as read
+    const briefIds = notifications
+      .filter(n => n.id.startsWith('brief-') && !n.isRead)
+      .map(n => n.id.replace('brief-', ''));
+    
+    if (briefIds.length > 0) {
+      try {
+        await markBriefNotificationsAsRead(briefIds);
+      } catch (error) {
+        console.error('Error marking brief notifications as read:', error);
       }
     }
     
@@ -297,6 +360,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return AtSign;
       case 'comment':
         return MessageSquare;
+      case 'brief_approved':
+        return CheckCircle;
       default:
         return Bell;
     }
@@ -395,7 +460,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
                   { key: 'unread', label: 'Unread', count: unreadCount },
                   { key: 'assignments', label: 'Assignments', count: notifications.filter(n => ['assignment', 'unassignment', 'transfer', 'bulk_operation'].includes(n.type)).length },
                   { key: 'accounts', label: 'Accounts', count: notifications.filter(n => ['account_created', 'account_deleted'].includes(n.type)).length },
-                  { key: 'mentions', label: 'Mentions', count: notifications.filter(n => ['mention', 'comment'].includes(n.type)).length }
+                  { key: 'mentions', label: 'Mentions', count: notifications.filter(n => ['mention', 'comment'].includes(n.type)).length },
+                  { key: 'briefs', label: 'Brief Approvals', count: notifications.filter(n => n.type === 'brief_approved').length }
                 ].map((tab) => (
                   <button
                     key={tab.key}
