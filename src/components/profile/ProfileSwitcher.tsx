@@ -40,17 +40,18 @@ export function ProfileSwitcher({
         console.log('[ProfileSwitcher] Starting permission check...');
         console.log('[ProfileSwitcher] Current profile:', currentProfile);
         
-        // More direct approach: check if user has admin or manager role
-        const hasManagementRole = currentProfile?.profile_role === 'admin' || currentProfile?.profile_role === 'manager';
+        // Check the actual canManageUsers permission from profile_permissions
+        const hasManageUsersPermission = currentProfile?.profile_permissions?.canManageUsers === true;
         
         console.log('[ProfileSwitcher] Permission check result:', {
-          hasManagementRole,
+          hasManageUsersPermission,
           currentProfileRole: currentProfile?.profile_role,
+          currentProfilePermissions: currentProfile?.profile_permissions,
           currentProfileIsDefault: currentProfile?.is_default,
           currentProfileId: currentProfile?.id
         });
         
-        setCanManageUsers(hasManagementRole);
+        setCanManageUsers(hasManageUsersPermission);
         setPermissionsChecked(true);
       } catch (error) {
         console.error('[ProfileSwitcher] Error checking permissions:', error);
