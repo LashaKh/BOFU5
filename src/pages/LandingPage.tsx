@@ -156,6 +156,8 @@ const StatCard: React.FC<StatProps> = ({ value, label, icon: Icon }) => (
 );
 
 const LandingPage: React.FC<LandingPageProps> = ({ user, onShowAuthModal, onSignOut }) => {
+  console.log('[LandingPage] Rendering with user:', user?.email);
+  
   return (
     <div className="min-h-screen text-white overflow-x-hidden" style={{ backgroundColor: '#1f2937' }}>
       <MainHeader 

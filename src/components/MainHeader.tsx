@@ -107,10 +107,12 @@ export function MainHeader({
   const handleSignOut = async () => {
     try {
       if (onSignOut) {
-        // Use the provided sign out handler
+        // Use the provided sign out handler from App.tsx
+        console.log('[MainHeader] Using provided onSignOut handler');
         await onSignOut();
       } else {
-        // First sign out from Supabase
+        // Fallback if no onSignOut prop provided
+        console.log('[MainHeader] Using fallback logout logic');
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         console.log("Signed out successfully");
@@ -118,14 +120,7 @@ export function MainHeader({
         // Use React Router for client-side navigation
         navigate('/', { replace: true });
         
-        // Show the authentication modal after sign out
-        if (onShowAuthModal) {
-          setTimeout(() => {
-            onShowAuthModal();
-          }, 100);
-        }
-        
-        // These state updates should now properly execute with client-side navigation
+        // Clear history state if available
         if (setShowHistory) {
           setShowHistory(false);
         }

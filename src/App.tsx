@@ -95,23 +95,28 @@ function App() {
 
   // Handle sign out and show auth modal
   const handleSignOut = async () => {
+    console.log('[DEBUG] ========== LOGOUT STARTED ==========');
     console.log('[DEBUG] handleSignOut called from:', new Error().stack?.split('\n')[2]?.trim());
+    console.log('[DEBUG] Current state before sign out:', {
+      user: user?.email,
+      currentPath: location.pathname,
+      isAuthLoading,
+      showAuthModal,
+      showAdminAuthModal
+    });
+    
     try {
-      console.log('[DEBUG] Starting sign out process...');
-      console.log('[DEBUG] Current state before sign out:', {
-        user: user?.email,
-        currentPath: location.pathname
-      });
+      console.log('[DEBUG] Calling supabase.auth.signOut()...');
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error('[DEBUG] Supabase signOut error:', error);
+        throw error;
+      }
       
-      console.log('[DEBUG] Supabase sign out successful');
-      // Don't manually set user to null or navigate here - let the auth state listener handle it
-      
-      console.log('[DEBUG] Sign out completed successfully');
+      console.log('[DEBUG] Supabase sign out successful - waiting for auth state listener...');
       notify('success', 'Signed out successfully');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[ERROR] Sign out failed:', error);
       console.error('[DEBUG] Sign out error details:', {
         name: (error as Error)?.name,
         message: (error as Error)?.message,
@@ -119,6 +124,7 @@ function App() {
       });
       notify('error', 'Failed to sign out');
     }
+    console.log('[DEBUG] ========== LOGOUT HANDLER FINISHED ==========');
   };
 
   
@@ -274,10 +280,12 @@ function App() {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[AUTH_STATE] Event: ${event} Session:`, session?.user?.email);
+      console.log(`[AUTH_STATE] Event: ${event}, Session:`, session?.user?.email, 'Current path:', location.pathname);
       
       if (event === 'SIGNED_IN' && session) {
+        console.log('[AUTH_STATE] Processing SIGNED_IN event');
         setUser(session.user);
+        setIsAuthLoading(false);
         
         // Check if this is an admin user
         if (session.user.email === 'lashay@bofu.ai') {
@@ -299,17 +307,25 @@ function App() {
           });
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('[AUTH_STATE] Processing SIGNED_OUT event');
         console.log('[AUTH] User signed out - clearing state and redirecting');
         setUser(null);
+        setIsAuthLoading(false);
         setResearchResults([]);
         setHistoryResults([]);
         setCurrentHistoryId(undefined);
         
-        // Only navigate if we're not already on the landing page
-        if (location.pathname !== '/') {
-          console.log('[AUTH] Navigating to landing page from:', location.pathname);
+        // Close any open auth modals
+        setShowAuthModal(false);
+        setShowAdminAuthModal(false);
+        
+        // Always navigate to landing page after logout, regardless of current path
+        console.log('[AUTH] Navigating to landing page from:', location.pathname);
+        
+        // Add a small delay to ensure state updates are processed
+        setTimeout(() => {
           navigate('/', { replace: true });
-        }
+        }, 50);
       }
     });
 
@@ -769,16 +785,23 @@ function App() {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
-                isAuthLoading ? (
-                  <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1f2937' }}>
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                      <p className="text-white">Loading...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />
-                )
+                (() => {
+                  console.log('[ROUTE] Landing page route - isAuthLoading:', isAuthLoading, 'user:', user?.email);
+                  if (isAuthLoading) {
+                    console.log('[ROUTE] Showing loading screen');
+                    return (
+                      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1f2937' }}>
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                          <p className="text-white">Loading...</p>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    console.log('[ROUTE] Showing landing page');
+                    return <LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />;
+                  }
+                })()
               } />
               
               <Route path="/research" element={

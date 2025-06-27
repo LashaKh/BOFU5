@@ -13,6 +13,7 @@ import type { ScrapedBlog } from '../utils/blogScraper';
 import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'; 
 import { MainHeader } from '../components/MainHeader'; 
 import ChatWindow from '../components/ChatWindow'; 
+import { createBriefApprovalNotification } from '../lib/briefApprovalNotifications';
 
 // Define a local composite type for the product state on this page
 interface PageProductData extends Product { 
@@ -726,6 +727,20 @@ const DedicatedProductPage: React.FC = () => {
             }
             return;
           }
+          
+          // Send notification to admins about product approval
+          try {
+            await createBriefApprovalNotification({
+              briefId: product.id, // Use product ID as brief ID
+              briefTitle: prod.productDetails?.name || 'Product Approval',
+              userId: session.user.id
+            });
+            console.log('Admin notifications sent for product approval');
+          } catch (notificationError) {
+            console.error('Failed to send admin notifications:', notificationError);
+            // Don't fail the approval process if notifications fail
+          }
+          
           toast.success('Product approved successfully!');
         }
       } else { // Product is being un-approved
