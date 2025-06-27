@@ -9,7 +9,7 @@ export interface BriefApprovalNotification {
   user_email: string;
   user_company: string;
   message: string;
-  read: boolean;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -133,7 +133,7 @@ async function createInAppNotification({
         user_email: userEmail,
         user_company: userCompany,
         message,
-        read: false
+        is_read: false
       })
       .select()
       .single();
@@ -227,7 +227,7 @@ export async function markBriefApprovalNotificationsAsRead(adminId: string, noti
   try {
     let query = supabase
       .from('brief_approval_notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('admin_id', adminId);
 
     if (notificationIds && notificationIds.length > 0) {

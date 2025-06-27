@@ -106,11 +106,7 @@ function App() {
       if (error) throw error;
       
       console.log('[DEBUG] Supabase sign out successful');
-      setUser(null); // Explicitly set user to null
-      
-      console.log('[DEBUG] State updated after sign out');
-      console.log('[DEBUG] Navigating to home...');
-      navigate('/', { replace: true });
+      // Don't manually set user to null or navigate here - let the auth state listener handle it
       
       console.log('[DEBUG] Sign out completed successfully');
       notify('success', 'Signed out successfully');
@@ -122,12 +118,6 @@ function App() {
         stack: (error as Error)?.stack
       });
       notify('error', 'Failed to sign out');
-    } finally {
-      console.log('[DEBUG] Sign out process finished');
-      console.log('[DEBUG] Final state after sign out:', {
-        user: user?.email,
-        currentPath: location.pathname
-      });
     }
   };
 
@@ -309,9 +299,17 @@ function App() {
           });
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('[AUTH] User signed out');
+        console.log('[AUTH] User signed out - clearing state and redirecting');
         setUser(null);
-        navigate('/', { replace: true });
+        setResearchResults([]);
+        setHistoryResults([]);
+        setCurrentHistoryId(undefined);
+        
+        // Only navigate if we're not already on the landing page
+        if (location.pathname !== '/') {
+          console.log('[AUTH] Navigating to landing page from:', location.pathname);
+          navigate('/', { replace: true });
+        }
       }
     });
 
@@ -770,7 +768,18 @@ function App() {
           
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
-              <Route path="/" element={<LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />} />
+              <Route path="/" element={
+                isAuthLoading ? (
+                  <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1f2937' }}>
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                      <p className="text-white">Loading...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <LandingPage user={user} onShowAuthModal={() => setShowAuthModal(true)} onSignOut={handleSignOut} />
+                )
+              } />
               
               <Route path="/research" element={
                 isAuthLoading ? (

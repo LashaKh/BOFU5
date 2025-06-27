@@ -197,7 +197,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       message: 'Content Brief Approved',
       details: `${brief.user_email} from ${brief.user_company} approved: "${brief.brief_title}"`,
       timestamp: brief.created_at,
-      isRead: brief.read,
+      isRead: brief.is_read,
       priority: 'medium' as const,
       metadata: {
         briefId: brief.brief_id,
