@@ -89,6 +89,9 @@ serve(async (req) => {
 
         if (notification) {
           notifications.push(notification)
+          console.log('✅ Notification created:', notification.id)
+        } else {
+          console.error('❌ Failed to create notification for admin:', adminId)
         }
 
         // Send email notification
@@ -114,6 +117,8 @@ serve(async (req) => {
         console.error(`Error processing admin ${adminId}:`, error)
       }
     }
+
+    console.log(`Final results: ${notifications.length} notifications created, ${emailResults.length} emails processed`)
 
     return new Response(
       JSON.stringify({
@@ -195,12 +200,24 @@ async function createInAppNotification(supabaseAdmin: any, {
 }) {
   try {
     const message = `${userEmail} from ${userCompany} has approved a content brief: "${briefTitle}"`
+    const title = `Content Brief Approved: ${briefTitle}`
+
+    console.log('Creating notification with data:', {
+      admin_id: adminId,
+      brief_id: briefId,
+      title,
+      brief_title: briefTitle,
+      user_email: userEmail,
+      user_company: userCompany,
+      message
+    })
 
     const { data, error } = await supabaseAdmin
       .from('brief_approval_notifications')
       .insert({
         admin_id: adminId,
         brief_id: briefId,
+        title: title,
         brief_title: briefTitle,
         user_email: userEmail,
         user_company: userCompany,
@@ -211,13 +228,14 @@ async function createInAppNotification(supabaseAdmin: any, {
       .single()
 
     if (error) {
-      console.error('Error creating in-app notification:', error)
+      console.error('Database error creating in-app notification:', error)
       return null
     }
 
+    console.log('Successfully created notification:', data)
     return data
   } catch (error) {
-    console.error('Error in createInAppNotification:', error)
+    console.error('Exception in createInAppNotification:', error)
     return null
   }
 }
