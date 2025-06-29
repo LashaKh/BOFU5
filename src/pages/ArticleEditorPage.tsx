@@ -22,6 +22,7 @@ import {
 import { ArticleEditor } from '../components/ArticleEditor';
 import { loadArticleContent, ArticleContent } from '../lib/articleApi';
 import { supabase } from '../lib/supabase';
+import { GoogleDocLink } from '../components/ui/GoogleDocLink';
 
 interface ArticleEditorPageProps {}
 
@@ -241,6 +242,13 @@ export const ArticleEditorPage: React.FC<ArticleEditorPageProps> = () => {
                       <Clock size={14} />
                       <span>Last saved {formattedLastSaved}</span>
                     </div>
+                    {article.google_doc_url && (
+                      <GoogleDocLink 
+                        url={article.google_doc_url}
+                        variant="light"
+                        size="md"
+                      />
+                    )}
                   </div>
                 </div>
               </div>

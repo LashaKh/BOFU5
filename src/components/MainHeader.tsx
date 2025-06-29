@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { ProfileManager } from '../components/profile/ProfileManager';
 import { NotificationCenter } from './user-dashboard/NotificationCenter';
 import { getMentionNotifications } from '../lib/commentApi';
+import { getBriefApprovalNotifications } from '../lib/briefApprovalNotifications';
 
 
 // Logo SVG component
@@ -58,14 +59,39 @@ export function MainHeader({
   const loadNotificationCount = async () => {
     if (user) {
       try {
-        console.log('🔔 Loading notification count for user:', user.email);
+        console.log('🔔 Loading notifications for user:', user.email);
+        
+        // Get mention notifications
         const notifications = await getMentionNotifications();
-        const unreadCount = notifications.filter(n => !n.notification_sent).length;
-        console.log('🔔 Notification count loaded:', { total: notifications.length, unread: unreadCount });
+        let unreadCount = notifications.filter(n => !n.notification_sent).length;
+        
+        // Check if user is admin and get brief approval notifications
+        try {
+          const { data: adminProfile } = await supabase
+            .from('admin_profiles')
+            .select('id, admin_role')
+            .eq('id', user.id)
+            .single();
+            
+          if (adminProfile) {
+            console.log('🔔 Admin user detected, loading brief approval notifications');
+            const briefNotifications = await getBriefApprovalNotifications(adminProfile.id);
+            const unreadBriefCount = briefNotifications.filter(n => !n.is_read).length;
+            unreadCount += unreadBriefCount;
+            console.log('🔔 Brief notifications loaded:', { total: briefNotifications.length, unread: unreadBriefCount });
+          }
+        } catch (adminError) {
+          // User is not an admin - this is normal, no need to log
+          // Only log if it's an unexpected error
+          if (adminError && typeof adminError === 'object' && 'code' in adminError && adminError.code !== 'PGRST116') {
+            console.log('🔔 Admin check failed (unexpected):', adminError);
+          }
+        }
+        
+        console.log('🔔 Total notifications:', { unread: unreadCount });
         setUnreadNotificationCount(unreadCount);
       } catch (error) {
         console.error('❌ Error loading notification count:', error);
-        // Don't show error to user unless it's a critical issue
         setUnreadNotificationCount(0);
       }
     }

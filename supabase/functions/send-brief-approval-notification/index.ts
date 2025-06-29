@@ -7,6 +7,8 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('🔄 [HARDCODED VARS] Edge Function started - using direct API keys')
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -222,6 +224,7 @@ async function createInAppNotification(supabaseAdmin: any, {
         user_email: userEmail,
         user_company: userCompany,
         message,
+        notification_type: 'brief_approved',
         is_read: false
       })
       .select()
@@ -241,7 +244,7 @@ async function createInAppNotification(supabaseAdmin: any, {
 }
 
 /**
- * Send email notification (placeholder - replace with actual email service)
+ * Send email notification using Resend API
  */
 async function sendEmailNotification({
   adminEmail,
@@ -257,19 +260,76 @@ async function sendEmailNotification({
   briefTitle: string
 }) {
   try {
-    // TODO: Implement actual email sending logic
-    // For now, just log the email details
-    console.log('Email notification details:', {
-      to: adminEmail,
-      subject: `Content Brief Approved: ${briefTitle}`,
-      content: `Hello ${adminName},\n\n${userEmail} from ${userCompany} has approved a content brief titled "${briefTitle}".\n\nPlease review the approval in the admin dashboard.`
-    })
+    // 🔧 EMAIL CONFIGURATION
+    const RESEND_API_KEY = "re_NVLwoaTM_PUxwR9fcMoD3jfdCzERYgQKb";
     
-    // Return true to simulate successful email sending
-    // Replace this with actual email service integration
+    // 🚀 PRODUCTION SETTINGS (uncomment when domain is verified)
+    // const FROM_EMAIL = "noreply@notifications.bofu.ai";  
+    // const RECIPIENT_EMAIL = adminEmail; // Send to actual admin
+    
+    // 🧪 TESTING MODE (comment out for production)
+    const FROM_EMAIL = "noreply@resend.dev";  
+    const RECIPIENT_EMAIL = "lasha.khosht@gmail.com"; // Your verified test email
+    
+    // 📝 TO SWITCH TO PRODUCTION:
+    // 1. Verify your domain shows "Verified" status in Resend dashboard
+    // 2. Comment out the 2 TESTING MODE lines above  
+    // 3. Uncomment the 2 PRODUCTION SETTINGS lines above
+    // 4. Deploy this function to Supabase
+    // 5. Test with a content brief approval
+    
+    console.log("🔑 Using hardcoded variables:");
+    console.log(`📧 FROM_EMAIL value: ${FROM_EMAIL}`);
+    console.log(`🔑 RESEND_API_KEY exists: ${!!RESEND_API_KEY}`);
+    console.log(`📧 Sending email via Resend: { to: "${RECIPIENT_EMAIL}", from: "${FROM_EMAIL}" }`);
+
+    if (!RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY not configured')
+      return false
+    }
+
+    const emailData = {
+      from: FROM_EMAIL,
+      to: RECIPIENT_EMAIL,
+      subject: `Content Brief Approved: ${briefTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Content Brief Approved</h2>
+          <p>Hello ${adminName},</p>
+          <p><strong>${userEmail}</strong> from <strong>${userCompany}</strong> has approved a content brief titled:</p>
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin: 0; color: #1f2937;">"${briefTitle}"</h3>
+          </div>
+          <p>Please review the approval in the admin dashboard.</p>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px;">This is an automated notification from BOFU AI.</p>
+        </div>
+      `
+    }
+
+    console.log('📧 Sending email via Resend:', { to: RECIPIENT_EMAIL, from: FROM_EMAIL })
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailData),
+    })
+
+    const result = await response.json()
+    console.log('📧 Resend API response:', { status: response.status, result })
+
+    if (!response.ok) {
+      console.error('❌ Resend API error:', result)
+      return false
+    }
+
+    console.log('✅ Email sent successfully via Resend:', result.id)
     return true
   } catch (error) {
-    console.error('Error sending email notification:', error)
+    console.error('❌ Error sending email notification:', error)
     return false
   }
 } 

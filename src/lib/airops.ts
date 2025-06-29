@@ -50,6 +50,64 @@ function safeLog(prefix: string, obj: any) {
 }
 
 /**
+ * Validates and processes capability images to ensure they are proper Supabase URLs
+ */
+function processCapabilityImages(capabilities: any[]): any[] {
+  if (!capabilities || !Array.isArray(capabilities)) {
+    console.warn('Invalid capabilities array provided');
+    return [];
+  }
+
+  return capabilities.map((capability, index) => {
+    const processedCapability = { ...capability };
+    
+    if (capability.images && Array.isArray(capability.images)) {
+      // Filter and validate image URLs
+      const validImages = capability.images.filter((imageUrl: string) => {
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          console.warn(`Invalid image URL at capability ${index}:`, imageUrl);
+          return false;
+        }
+        
+        // Check if it's a base64 data URL (should be converted to Supabase URL)
+        if (imageUrl.startsWith('data:')) {
+          console.warn(`Base64 image found at capability ${index}, should be Supabase URL:`, imageUrl.substring(0, 50));
+          return false;
+        }
+        
+        // Check if it's a valid Supabase Storage URL
+        if (imageUrl.includes('.supabase.co/storage/v1/object/public/capability-images/')) {
+          console.log(`Valid Supabase image URL at capability ${index}:`, imageUrl);
+          return true;
+        }
+        
+        // Check if it's any other valid HTTP/HTTPS URL
+        try {
+          const url = new URL(imageUrl);
+          if (url.protocol === 'http:' || url.protocol === 'https:') {
+            console.log(`Valid external image URL at capability ${index}:`, imageUrl);
+            return true;
+          }
+        } catch (error) {
+          console.warn(`Invalid URL format at capability ${index}:`, imageUrl, error);
+          return false;
+        }
+        
+        return false;
+      });
+      
+      processedCapability.images = validImages;
+      console.log(`Capability ${index}: ${capability.images.length} total images, ${validImages.length} valid images`);
+    } else {
+      // Ensure images is always an array
+      processedCapability.images = [];
+    }
+    
+    return processedCapability;
+  });
+}
+
+/**
  * Formats a Google Doc URL to the required format
  */
 function formatGoogleDocUrl(url: string): string {
@@ -126,8 +184,16 @@ export async function sendToAirOps(productData: AirOpsProductInput) {
   try {
     console.log('Sending data to AirOps...');
     
-    // Ensure a valid google_doc URL exists and is formatted correctly
+    // Process capabilities images to ensure they are valid URLs
     let formattedProductData = { ...productData };
+    
+    // Process capabilities images first
+    if (formattedProductData.product_card_information.capabilities) {
+      console.log('Processing capabilities images before sending to AirOps...');
+      formattedProductData.product_card_information.capabilities = processCapabilityImages(
+        formattedProductData.product_card_information.capabilities
+      );
+    }
     
     // Format the URL if it exists
     if (productData.product_card_information.google_doc) {

@@ -16,6 +16,7 @@ export interface ArticleContent {
   product_name?: string;
   created_at: string;
   updated_at: string;
+  google_doc_url?: string;
 }
 
 export interface ArticleSaveResult {
@@ -57,7 +58,8 @@ export async function loadArticleContent(articleId: string): Promise<ArticleLoad
         article_version,
         user_id,
         created_at,
-        updated_at
+        updated_at,
+        google_doc_url
       `)
       .eq('id', articleId)
       .single();
@@ -90,7 +92,8 @@ export async function loadArticleContent(articleId: string): Promise<ArticleLoad
         user_id: data.user_id,
         product_name: data.product_name,
         created_at: data.created_at,
-        updated_at: data.updated_at
+        updated_at: data.updated_at,
+        google_doc_url: data.google_doc_url
       }
     };
 
@@ -174,7 +177,8 @@ export async function saveArticleContent(
         article_version,
         user_id,
         created_at,
-        updated_at
+        updated_at,
+        google_doc_url
       `)
       .single();
 
@@ -206,7 +210,8 @@ export async function saveArticleContent(
         user_id: data.user_id,
         product_name: data.product_name,
         created_at: data.created_at,
-        updated_at: data.updated_at
+        updated_at: data.updated_at,
+        google_doc_url: data.google_doc_url
       }
     };
 
@@ -424,7 +429,8 @@ export const loadArticleContentAsAdmin = async (
         article_version,
         user_id,
         created_at,
-        updated_at
+        updated_at,
+        google_doc_url
       `)
       .eq('id', articleId)
       .single();
@@ -473,7 +479,8 @@ export const loadArticleContentAsAdmin = async (
       user_id: article.user_id,
       product_name: article.product_name,
       created_at: article.created_at,
-      updated_at: article.updated_at
+      updated_at: article.updated_at,
+      google_doc_url: article.google_doc_url
     } as ArticleContent;
 
     console.log('Formatted result for ArticleEditor:', {
@@ -547,7 +554,8 @@ export const saveArticleContentAsAdmin = async (
         article_version,
         user_id,
         created_at,
-        updated_at
+        updated_at,
+        google_doc_url
       `)
       .single();
 
@@ -583,7 +591,8 @@ export const saveArticleContentAsAdmin = async (
       user_id: updatedArticle.user_id,
       product_name: updatedArticle.product_name,
       created_at: updatedArticle.created_at,
-      updated_at: updatedArticle.updated_at
+      updated_at: updatedArticle.updated_at,
+      google_doc_url: updatedArticle.google_doc_url
     } as ArticleContent;
   } catch (error) {
     console.error('Error saving article content as admin:', error);

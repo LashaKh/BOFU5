@@ -308,36 +308,72 @@ export async function getAdminCommentAnalytics(
   dateTo?: string
 ): Promise<AdminCommentAnalytics> {
   try {
-    // Return mock analytics data since the database relationships aren't properly set up
-    console.log('[AdminCommentApi] Returning mock analytics data due to missing database relationships');
+    console.log('[AdminCommentApi] Fetching real analytics data from Supabase');
     
+    // Build date filter
+    const dateFilter = dateFrom && dateTo 
+      ? `created_at.gte.${dateFrom},created_at.lte.${dateTo}`
+      : '';
+
+    // Get all comments with date filtering if provided
+    let query = supabase
+      .from('article_comments')
+      .select('*');
+      
+    if (dateFrom) {
+      query = query.gte('created_at', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('created_at', dateTo);
+    }
+
+    const { data: comments, error } = await query;
+
+    if (error) throw error;
+
+    // Calculate analytics from real data
+    const total_comments = comments?.length || 0;
+    const admin_comments = comments?.filter(c => c.admin_comment_type || c.admin_metadata?.created_by_admin)?.length || 0;
+
+    // Priority breakdown
+    const priority_breakdown = {
+      low: comments?.filter(c => c.priority === 'low')?.length || 0,
+      normal: comments?.filter(c => c.priority === 'normal' || !c.priority)?.length || 0,
+      high: comments?.filter(c => c.priority === 'high')?.length || 0,
+      urgent: comments?.filter(c => c.priority === 'urgent')?.length || 0,
+      critical: comments?.filter(c => c.priority === 'critical')?.length || 0
+    };
+
+    // Status breakdown
+    const status_breakdown = {
+      active: comments?.filter(c => c.status === 'active')?.length || 0,
+      resolved: comments?.filter(c => c.status === 'resolved')?.length || 0,
+      archived: comments?.filter(c => c.status === 'archived')?.length || 0
+    };
+
+    // Approval breakdown
+    const approval_breakdown = {
+      pending: comments?.filter(c => c.approval_status === 'pending')?.length || 0,
+      approved: comments?.filter(c => c.approval_status === 'approved')?.length || 0,
+      rejected: comments?.filter(c => c.approval_status === 'rejected')?.length || 0
+    };
+
+    // Admin comment types breakdown
+    const admin_comment_types = {
+      admin_note: comments?.filter(c => c.admin_comment_type === 'admin_note')?.length || 0,
+      approval_comment: comments?.filter(c => c.admin_comment_type === 'approval_comment')?.length || 0,
+      priority_comment: comments?.filter(c => c.admin_comment_type === 'priority_comment')?.length || 0,
+      review_comment: comments?.filter(c => c.admin_comment_type === 'review_comment')?.length || 0,
+      escalation_comment: comments?.filter(c => c.admin_comment_type === 'escalation_comment')?.length || 0
+    };
+
     return {
-      total_comments: 42,
-      admin_comments: 12,
-      priority_breakdown: {
-        low: 8,
-        normal: 20,
-        high: 10,
-        urgent: 3,
-        critical: 1
-      },
-      status_breakdown: {
-        active: 35,
-        resolved: 5,
-        archived: 2
-      },
-      approval_breakdown: {
-        pending: 8,
-        approved: 30,
-        rejected: 4
-      },
-      admin_comment_types: {
-        admin_note: 5,
-        approval_comment: 8,
-        priority_comment: 3,
-        review_comment: 20,
-        system_notification: 6
-      },
+      total_comments,
+      admin_comments,
+      priority_breakdown,
+      status_breakdown,
+      approval_breakdown,
+      admin_comment_types,
       date_range: {
         from: dateFrom || '1970-01-01',
         to: dateTo || new Date().toISOString()
@@ -352,7 +388,7 @@ export async function getAdminCommentAnalytics(
       priority_breakdown: { low: 0, normal: 0, high: 0, urgent: 0, critical: 0 },
       status_breakdown: { active: 0, resolved: 0, archived: 0 },
       approval_breakdown: { pending: 0, approved: 0, rejected: 0 },
-      admin_comment_types: { admin_note: 0, approval_comment: 0, priority_comment: 0, review_comment: 0, system_notification: 0 },
+      admin_comment_types: { admin_note: 0, approval_comment: 0, priority_comment: 0, review_comment: 0, escalation_comment: 0 },
       date_range: { from: dateFrom || '1970-01-01', to: dateTo || new Date().toISOString() }
     };
   }
@@ -418,43 +454,86 @@ export async function getAdminCommentDashboardData(): Promise<AdminCommentDashbo
  */
 export async function getRecentComments(limit: number = 10): Promise<AdminArticleComment[]> {
   try {
-    // Return mock recent comments
-    console.log('[AdminCommentApi] Returning mock recent comments data due to missing database relationships');
+    console.log('[AdminCommentApi] Fetching real recent comments from Supabase');
     
-    const mockComments: AdminArticleComment[] = Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
-      id: `recent-comment-${i + 1}`,
-      article_id: `article-${i + 1}`,
-      user_id: `user-${i + 1}`,
-      parent_comment_id: undefined,
-      content: `Recent comment ${i + 1} content for testing`,
-      content_type: 'text',
-      selection_start: undefined,
-      selection_end: undefined,
-      status: 'active',
-      admin_comment_type: 'review_comment',
-      priority: i % 2 === 0 ? 'normal' : 'high',
-      approval_status: 'approved',
-      approved_by: undefined,
-      approved_at: undefined,
-      admin_notes: undefined,
-      is_admin_only: false,
-      requires_approval: false,
-      admin_metadata: {},
-      created_at: new Date(Date.now() - i * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - i * 60 * 60 * 1000).toISOString(),
-      user: {
-        id: `user-${i + 1}`,
-        email: `user${i + 1}@example.com`,
-        name: `User ${i + 1}`,
-        avatar_url: undefined,
-        is_admin: false
-      },
-      approver: undefined,
-      replies: [],
-      reply_count: 0
-    }));
+    const { data: comments, error } = await supabase
+      .from('article_comments')
+      .select(`
+        *,
+        content_briefs!inner(id, product_name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-    return mockComments;
+    if (error) throw error;
+
+    if (!comments || comments.length === 0) {
+      return [];
+    }
+
+    // Get user information for each comment
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    
+    const [userProfiles, adminProfiles] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('id, email, company_name')
+        .in('id', userIds),
+      supabase
+        .from('admin_profiles')
+        .select('id, email, name')
+        .in('id', userIds)
+    ]);
+
+    const users = userProfiles.data || [];
+    const admins = adminProfiles.data || [];
+
+    // Transform comments with user data
+    const transformedComments: AdminArticleComment[] = comments.map(comment => {
+      const userProfile = users.find(u => u.id === comment.user_id);
+      const adminProfile = admins.find(a => a.id === comment.user_id);
+      
+      const isAdmin = !!adminProfile || !!comment.admin_comment_type || !!comment.admin_metadata?.created_by_admin;
+      
+      return {
+        id: comment.id,
+        article_id: comment.article_id,
+        user_id: comment.user_id,
+        parent_comment_id: comment.parent_comment_id,
+        content: comment.content,
+        content_type: comment.content_type || 'text',
+        selection_start: comment.selection_start,
+        selection_end: comment.selection_end,
+        status: comment.status || 'active',
+        admin_comment_type: comment.admin_comment_type,
+        priority: comment.priority || 'normal',
+        approval_status: comment.approval_status || 'pending',
+        approved_by: comment.approved_by,
+        approved_at: comment.approval_date,
+        admin_notes: comment.admin_notes,
+        is_admin_only: comment.is_admin_only || false,
+        requires_approval: comment.approval_status === 'pending',
+        admin_metadata: comment.admin_metadata || {},
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        user: {
+          id: comment.user_id,
+          email: adminProfile?.email || userProfile?.email || 'unknown@example.com',
+          name: adminProfile?.name || userProfile?.company_name || 'Unknown User',
+          avatar_url: undefined,
+          is_admin: isAdmin
+        },
+        approver: undefined,
+        replies: [],
+        reply_count: 0,
+        article: {
+          id: comment.content_briefs?.id,
+          title: comment.content_briefs?.product_name || 'Untitled Article'
+        }
+      };
+    });
+
+    return transformedComments;
   } catch (error) {
     console.error('Error fetching recent comments:', error);
     return [];
@@ -466,43 +545,87 @@ export async function getRecentComments(limit: number = 10): Promise<AdminArticl
  */
 export async function getPendingApprovals(): Promise<AdminArticleComment[]> {
   try {
-    // Return mock pending approvals
-    console.log('[AdminCommentApi] Returning mock pending approvals data due to missing database relationships');
+    console.log('[AdminCommentApi] Fetching real pending approvals from Supabase');
     
-    const mockComments: AdminArticleComment[] = Array.from({ length: 3 }, (_, i) => ({
-      id: `pending-comment-${i + 1}`,
-      article_id: `article-${i + 1}`,
-      user_id: `user-${i + 1}`,
-      parent_comment_id: undefined,
-      content: `Pending approval comment ${i + 1}`,
-      content_type: 'text',
-      selection_start: undefined,
-      selection_end: undefined,
-      status: 'active',
-      admin_comment_type: 'review_comment',
-      priority: 'normal',
-      approval_status: 'pending',
-      approved_by: undefined,
-      approved_at: undefined,
-      admin_notes: undefined,
-      is_admin_only: false,
-      requires_approval: true,
-      admin_metadata: {},
-      created_at: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-      user: {
-        id: `user-${i + 1}`,
-        email: `user${i + 1}@example.com`,
-        name: `User ${i + 1}`,
-        avatar_url: undefined,
-        is_admin: false
-      },
-      approver: undefined,
-      replies: [],
-      reply_count: 0
-    }));
+    const { data: comments, error } = await supabase
+      .from('article_comments')
+      .select(`
+        *,
+        content_briefs!inner(id, product_name)
+      `)
+      .eq('approval_status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-    return mockComments;
+    if (error) throw error;
+
+    if (!comments || comments.length === 0) {
+      return [];
+    }
+
+    // Get user information for each comment
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    
+    const [userProfiles, adminProfiles] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('id, email, company_name')
+        .in('id', userIds),
+      supabase
+        .from('admin_profiles')
+        .select('id, email, name')
+        .in('id', userIds)
+    ]);
+
+    const users = userProfiles.data || [];
+    const admins = adminProfiles.data || [];
+
+    // Transform comments with user data
+    const transformedComments: AdminArticleComment[] = comments.map(comment => {
+      const userProfile = users.find(u => u.id === comment.user_id);
+      const adminProfile = admins.find(a => a.id === comment.user_id);
+      
+      const isAdmin = !!adminProfile || !!comment.admin_comment_type || !!comment.admin_metadata?.created_by_admin;
+      
+      return {
+        id: comment.id,
+        article_id: comment.article_id,
+        user_id: comment.user_id,
+        parent_comment_id: comment.parent_comment_id,
+        content: comment.content,
+        content_type: comment.content_type || 'text',
+        selection_start: comment.selection_start,
+        selection_end: comment.selection_end,
+        status: comment.status || 'active',
+        admin_comment_type: comment.admin_comment_type,
+        priority: comment.priority || 'normal',
+        approval_status: comment.approval_status || 'pending',
+        approved_by: comment.approved_by,
+        approved_at: comment.approval_date,
+        admin_notes: comment.admin_notes,
+        is_admin_only: comment.is_admin_only || false,
+        requires_approval: true,
+        admin_metadata: comment.admin_metadata || {},
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        user: {
+          id: comment.user_id,
+          email: adminProfile?.email || userProfile?.email || 'unknown@example.com',
+          name: adminProfile?.name || userProfile?.company_name || 'Unknown User',
+          avatar_url: undefined,
+          is_admin: isAdmin
+        },
+        approver: undefined,
+        replies: [],
+        reply_count: 0,
+        article: {
+          id: comment.content_briefs?.id,
+          title: comment.content_briefs?.product_name || 'Untitled Article'
+        }
+      };
+    });
+
+    return transformedComments;
   } catch (error) {
     console.error('Error fetching pending approvals:', error);
     return [];
@@ -514,43 +637,87 @@ export async function getPendingApprovals(): Promise<AdminArticleComment[]> {
  */
 export async function getHighPriorityComments(): Promise<AdminArticleComment[]> {
   try {
-    // Return mock high priority comments
-    console.log('[AdminCommentApi] Returning mock high priority comments data due to missing database relationships');
+    console.log('[AdminCommentApi] Fetching real high priority comments from Supabase');
     
-    const mockComments: AdminArticleComment[] = Array.from({ length: 2 }, (_, i) => ({
-      id: `high-priority-comment-${i + 1}`,
-      article_id: `article-${i + 1}`,
-      user_id: `user-${i + 1}`,
-      parent_comment_id: undefined,
-      content: `High priority comment ${i + 1} requiring immediate attention`,
-      content_type: 'text',
-      selection_start: undefined,
-      selection_end: undefined,
-      status: 'active',
-      admin_comment_type: 'priority_comment',
-      priority: i === 0 ? 'high' : 'urgent',
-      approval_status: 'approved',
-      approved_by: undefined,
-      approved_at: undefined,
-      admin_notes: undefined,
-      is_admin_only: false,
-      requires_approval: false,
-      admin_metadata: {},
-      created_at: new Date(Date.now() - i * 12 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - i * 12 * 60 * 60 * 1000).toISOString(),
-      user: {
-        id: `user-${i + 1}`,
-        email: `user${i + 1}@example.com`,
-        name: `User ${i + 1}`,
-        avatar_url: undefined,
-        is_admin: false
-      },
-      approver: undefined,
-      replies: [],
-      reply_count: 0
-    }));
+    const { data: comments, error } = await supabase
+      .from('article_comments')
+      .select(`
+        *,
+        content_briefs!inner(id, product_name)
+      `)
+      .in('priority', ['high', 'urgent', 'critical'])
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-    return mockComments;
+    if (error) throw error;
+
+    if (!comments || comments.length === 0) {
+      return [];
+    }
+
+    // Get user information for each comment
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    
+    const [userProfiles, adminProfiles] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('id, email, company_name')
+        .in('id', userIds),
+      supabase
+        .from('admin_profiles')
+        .select('id, email, name')
+        .in('id', userIds)
+    ]);
+
+    const users = userProfiles.data || [];
+    const admins = adminProfiles.data || [];
+
+    // Transform comments with user data
+    const transformedComments: AdminArticleComment[] = comments.map(comment => {
+      const userProfile = users.find(u => u.id === comment.user_id);
+      const adminProfile = admins.find(a => a.id === comment.user_id);
+      
+      const isAdmin = !!adminProfile || !!comment.admin_comment_type || !!comment.admin_metadata?.created_by_admin;
+      
+      return {
+        id: comment.id,
+        article_id: comment.article_id,
+        user_id: comment.user_id,
+        parent_comment_id: comment.parent_comment_id,
+        content: comment.content,
+        content_type: comment.content_type || 'text',
+        selection_start: comment.selection_start,
+        selection_end: comment.selection_end,
+        status: comment.status || 'active',
+        admin_comment_type: comment.admin_comment_type,
+        priority: comment.priority || 'normal',
+        approval_status: comment.approval_status || 'pending',
+        approved_by: comment.approved_by,
+        approved_at: comment.approval_date,
+        admin_notes: comment.admin_notes,
+        is_admin_only: comment.is_admin_only || false,
+        requires_approval: comment.approval_status === 'pending',
+        admin_metadata: comment.admin_metadata || {},
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        user: {
+          id: comment.user_id,
+          email: adminProfile?.email || userProfile?.email || 'unknown@example.com',
+          name: adminProfile?.name || userProfile?.company_name || 'Unknown User',
+          avatar_url: undefined,
+          is_admin: isAdmin
+        },
+        approver: undefined,
+        replies: [],
+        reply_count: 0,
+        article: {
+          id: comment.content_briefs?.id,
+          title: comment.content_briefs?.product_name || 'Untitled Article'
+        }
+      };
+    });
+
+    return transformedComments;
   } catch (error) {
     console.error('Error fetching high priority comments:', error);
     return [];

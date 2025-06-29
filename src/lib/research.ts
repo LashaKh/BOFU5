@@ -163,6 +163,16 @@ export async function updateApprovedProduct(
   try {
     console.log('[research] Updating approved product:', { id, updatedProductData });
     
+    // Log capabilities data to track if images are being preserved
+    if (updatedProductData.capabilities && Array.isArray(updatedProductData.capabilities)) {
+      console.log('[research] Capabilities data in update:', updatedProductData.capabilities.map((cap: any, index: number) => ({
+        index,
+        title: cap.title,
+        imageCount: cap.images ? cap.images.length : 0,
+        images: cap.images || []
+      })));
+    }
+    
     const { error } = await supabase
       .from('approved_products')
       .update({

@@ -22,6 +22,39 @@ export const sanitizeJsonContent = (content: string): string => {
 };
 
 /**
+ * Checks if a string is a URL or link
+ */
+const isUrl = (str: string): boolean => {
+  if (!str || typeof str !== 'string') return false;
+  
+  const trimmed = str.trim();
+  
+  // Check for absolute URLs
+  try {
+    new URL(trimmed);
+    return true;
+  } catch {
+    // Continue to other checks
+  }
+  
+  // Check for common URL patterns
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('www.') ||
+    trimmed.startsWith('//') ||
+    // Check for domain patterns (contains dot and looks like a domain)
+    /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(trimmed) ||
+    // Check for relative paths that look like links
+    /^\/[a-zA-Z0-9-_\/]*$/.test(trimmed) ||
+    // Check for anchor links
+    trimmed.startsWith('#') ||
+    // Check for email links
+    trimmed.startsWith('mailto:')
+  );
+};
+
+/**
  * Ensures a value is returned as an array, handling various input types
  */
 export const ensureArray = (value: string | string[] | undefined): string[] => {
@@ -34,7 +67,7 @@ export const ensureArray = (value: string | string[] | undefined): string[] => {
       if (Array.isArray(parsed)) {
         return parsed.filter(item => item && typeof item === 'string' && item.trim().length > 0);
       }
-    } catch (e) {
+    } catch {
       // Not JSON, treat as newline-separated string
     }
     return value.split('\n').filter(item => item && item.trim().length > 0);
@@ -82,6 +115,15 @@ export const parseContent = (
     const allSections = parsed;
     console.log('parseContent: Available top-level keys:', Object.keys(allSections));
     
+    // Early check for flat structure with direct internal_links field
+    if (parsed.internal_links) {
+      console.log('parseContent: Found direct internal_links field in flat structure');
+      const flatInternalLinks = ensureArray(parsed.internal_links);
+      if (flatInternalLinks.length > 0) {
+        console.log('parseContent: Using flat structure internal_links:', flatInternalLinks.length, 'items');
+      }
+    }
+    
     // Ensure all fields are arrays using the ensureArray helper
     const result: ContentBriefData = {};
     
@@ -93,6 +135,7 @@ export const parseContent = (
       'competitors',
       'target_audience',
       'keywords',
+      'internal_links',
       'notes',
       'content_objectives',
       'ctas'
@@ -142,9 +185,28 @@ export const parseContent = (
                 result.ctas = [...result.ctas, ...items];
                 console.log(`parseContent: Mapped "${sectionKey}" -> "${objectKey}" to ctas`);
               } else if (sectionKey.toLowerCase().includes('seo') || sectionKey.toLowerCase().includes('keyword')) {
-                if (!result.keywords) result.keywords = [];
-                result.keywords = [...result.keywords, ...items];
-                console.log(`parseContent: Mapped "${sectionKey}" -> "${objectKey}" to keywords`);
+                // Check if this is internal links within SEO section
+                if (objectKey.toLowerCase().includes('internal') && objectKey.toLowerCase().includes('link')) {
+                  if (!result.internal_links) result.internal_links = [];
+                  result.internal_links = [...result.internal_links, ...items];
+                  console.log(`parseContent: Mapped "${sectionKey}" -> "${objectKey}" to internal_links`);
+                } else {
+                  // Smart filtering: separate URLs from keywords
+                  const urlItems = items.filter(item => isUrl(item));
+                  const keywordItems = items.filter(item => !isUrl(item));
+                  
+                  if (urlItems.length > 0) {
+                    if (!result.internal_links) result.internal_links = [];
+                    result.internal_links = [...result.internal_links, ...urlItems];
+                    console.log(`parseContent: Filtered URLs from "${sectionKey}" -> "${objectKey}" to internal_links:`, urlItems.length);
+                  }
+                  
+                  if (keywordItems.length > 0) {
+                    if (!result.keywords) result.keywords = [];
+                    result.keywords = [...result.keywords, ...keywordItems];
+                    console.log(`parseContent: Filtered keywords from "${sectionKey}" -> "${objectKey}" to keywords:`, keywordItems.length);
+                  }
+                }
               } else if (sectionKey.toLowerCase().includes('note')) {
                 if (!result.notes) result.notes = [];
                 result.notes = [...result.notes, ...items];
@@ -199,6 +261,7 @@ export const parseContent = (
       'competitors': ['competitors', 'competition', 'competitive analysis'],
       'target_audience': ['target audience', 'audience', 'demographics'],
       'keywords': ['keywords', 'seo keywords', 'search terms'],
+      'internal_links': ['internal links', 'internal linking', 'links'],
       'ctas': ['call to actions', 'cta', 'calls to action', 'call-to-actions'],
       'notes': ['notes', 'additional notes', 'comments']
     };
@@ -240,10 +303,37 @@ export const parseContent = (
       ...possibleTitles
     ].filter((title, index, arr) => arr.indexOf(title) === index); // Remove duplicates
     
+    // Merge internal_links carefully - preserve any URLs we've already separated from keywords
+    const existingInternalLinks = result.internal_links || [];
+    const parsedInternalLinks = ensureArray(parsed.internal_links);
     result.internal_links = [
-      ...ensureArray(parsed.internal_links),
+      ...existingInternalLinks,
+      ...parsedInternalLinks,
       ...additionalLinks
     ].filter((link, index, arr) => arr.indexOf(link) === index); // Remove duplicates
+    
+    // Final cleanup: Move any remaining URLs from keywords to internal_links
+    if (result.keywords && result.keywords.length > 0) {
+      const cleanedKeywords: string[] = [];
+      const foundUrls: string[] = [];
+      
+      result.keywords.forEach(keyword => {
+        if (isUrl(keyword)) {
+          foundUrls.push(keyword);
+        } else {
+          cleanedKeywords.push(keyword);
+        }
+      });
+      
+      if (foundUrls.length > 0) {
+        console.log(`parseContent: Final cleanup - moved ${foundUrls.length} URLs from keywords to internal_links`);
+        result.keywords = cleanedKeywords;
+        result.internal_links = [
+          ...result.internal_links,
+          ...foundUrls
+        ].filter((link, index, arr) => arr.indexOf(link) === index); // Remove duplicates
+      }
+    }
     
     console.log('parseContent: Final result:', {
       resultKeys: Object.keys(result),

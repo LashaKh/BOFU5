@@ -54,11 +54,68 @@ export async function createBriefApprovalNotification({
     }
 
     console.log('✅ Edge Function response:', data);
+    
+    // If Edge Function didn't create notifications, create them as fallback
+    if (data && data.notifications === 0) {
+      console.log('🔄 Edge Function created 0 notifications, creating fallback notifications...');
+      await createFallbackNotifications({ briefId, briefTitle, userId });
+    }
+    
     return data;
 
   } catch (error) {
     console.error('Error creating brief approval notification:', error);
     throw error;
+  }
+}
+
+/**
+ * Create fallback notifications when Edge Function fails
+ */
+async function createFallbackNotifications({
+  briefId,
+  briefTitle,
+  userId
+}: {
+  briefId: string;
+  briefTitle: string;
+  userId: string;
+}) {
+  try {
+    // Get user profile information
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('email, company_name')
+      .eq('id', userId)
+      .single();
+
+    if (!userProfile) {
+      console.error('User profile not found for fallback notifications');
+      return;
+    }
+
+    // Get target admin IDs
+    const adminIds = await getTargetAdminIds(userId);
+    
+    let createdCount = 0;
+    for (const adminId of adminIds) {
+      const notification = await createInAppNotification({
+        adminId,
+        briefId,
+        briefTitle,
+        userEmail: userProfile.email,
+        userCompany: userProfile.company_name || 'Unknown Company'
+      });
+      
+      if (notification) {
+        createdCount++;
+        console.log('✅ Fallback notification created:', notification.id);
+      }
+    }
+    
+    console.log(`🔄 Created ${createdCount} fallback notifications`);
+  } catch (error) {
+    console.error('Error creating fallback notifications:', error);
   }
 }
 
@@ -99,6 +156,8 @@ async function createInAppNotification({
         user_email: userEmail,
         user_company: userCompany,
         message,
+        notification_type: 'brief_approved',
+        title: `Content Brief Approved: ${briefTitle}`,
         is_read: false
       })
       .select()

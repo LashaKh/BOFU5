@@ -15,6 +15,7 @@ import { CommentMarker } from './CommentMarker';
 import { CommentPopover } from './CommentPopover';
 import { CommentThread } from './CommentThread';
 import { CommentResolutionPanel } from './CommentResolutionPanel';
+import { InlineCommentingExtension } from './InlineCommentingExtension';
 import { supabase } from '../../lib/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -34,6 +35,7 @@ interface CommentingSystemProps {
     email: string;
     company_name?: string;
   } | null;
+  inlineMode?: boolean; // Enable inline commenting instead of modal
 }
 
 interface TextSelection {
@@ -75,6 +77,7 @@ const CommentingSystemComponent = React.memo(({
   adminMode = false,
   showResolutionPanel = false,
   adminUser = null,
+  inlineMode = false,
 }: CommentingSystemProps) => {
   // Use a more specific console log that includes render timestamp
   const renderTimestamp = Date.now();
@@ -810,15 +813,29 @@ const CommentingSystemComponent = React.memo(({
           )}
         </AnimatePresence>
 
-        {/* Enhanced Selection button */}
-        {selectedText && !showPopover && ReactDOM.createPortal(
-          <motion.div key="comment-selection-button">
-            <CommentSelectionButton
-              selection={selectedText}
-              onCreateComment={handleCreateComment}
-            />
-          </motion.div>,
-          document.body
+        {/* Enhanced Selection button or Inline Comments */}
+        {inlineMode ? (
+          <InlineCommentingExtension
+            articleId={articleId}
+            editorRef={editorRef}
+            selectedText={selectedText}
+            comments={comments}
+            onCommentsChange={onCommentsChange}
+            getMarkerPosition={(start, end, ref) => getMarkerPosition(start, end, ref, setContentDriftDetected)}
+            onCommentClick={handleCommentClick}
+            onCommentStatusChange={handleStatusChange}
+            inlineMode={true}
+          />
+        ) : (
+          selectedText && !showPopover && ReactDOM.createPortal(
+            <motion.div key="comment-selection-button">
+              <CommentSelectionButton
+                selection={selectedText}
+                onCreateComment={handleCreateComment}
+              />
+            </motion.div>,
+            document.body
+          )
         )}
 
         {/* Comment popover */}
@@ -1005,6 +1022,7 @@ const CommentingSystemMemoized = React.memo(CommentingSystemComponent, (prevProp
   if (prevProps.highlightedCommentId !== nextProps.highlightedCommentId) changes.push('highlightedCommentId');
   if (prevProps.comments.length !== nextProps.comments.length) changes.push('comments.length');
   if (!!prevProps.editorRef?.current !== !!nextProps.editorRef?.current) changes.push('editorRef');
+  if (prevProps.inlineMode !== nextProps.inlineMode) changes.push('inlineMode');
   
   // Deep comparison of comment IDs to detect actual comment changes
   const prevCommentIds = prevProps.comments.map(c => c.id).sort().join(',');

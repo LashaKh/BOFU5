@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { sendToAirOps } from '../../lib/airops';
 import { toast } from 'react-hot-toast';
-import { ContentGenerationNotification } from '../ui/ContentGenerationNotification';
+import { ContentGenerationSuccessModal } from '../ui/ContentGenerationSuccessModal';
 
 interface ProductCardActionsProps {
   product: ProductAnalysis;
@@ -556,11 +556,16 @@ export function ProductCardActions({
       )}
     </motion.div>
 
-    {/* Content Generation Notification */}
-    <ContentGenerationNotification
+    {/* Content Generation Success Modal */}
+    <ContentGenerationSuccessModal
       isOpen={showContentNotification}
       onClose={() => setShowContentNotification(false)}
       trackingId={trackingId}
+      title="Content Brief Generation Initiated!"
+      description="Your product analysis has been sent to AirOps for content brief creation"
+      processingLocation="AirOps AI Engine"
+      estimatedTime="3-4 minutes"
+      additionalInfo="You'll receive a notification when your content brief is ready"
     />
     </>
   );

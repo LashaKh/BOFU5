@@ -566,17 +566,32 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
     // Start with database setup check
     checkAndSetupDatabase();
     
-    // Set up a refresh interval (every 30 seconds)
-    const refreshInterval = setInterval(() => {
-      if (mounted) {
-        console.log('[AdminDashboard] Auto-refreshing data...');
-        fetchUsers();
-      }
-    }, 30000);
+    // Set up real-time subscription for content_briefs table
+    console.log('🔄 Setting up real-time subscription for admin dashboard...');
+    
+    const subscription = supabase
+      .channel('admin_dashboard_content_briefs')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'content_briefs'
+        },
+        (payload) => {
+          if (mounted) {
+            console.log('🔄 Real-time content brief change detected in admin dashboard:', payload);
+            // Refresh user data to update brief counts and statistics
+            fetchUsers();
+          }
+        }
+      )
+      .subscribe();
     
     return () => {
       mounted = false;
-      clearInterval(refreshInterval);
+      console.log('🔄 Cleaning up real-time subscription for admin dashboard');
+      subscription.unsubscribe();
     };
   }, [refreshCounter]);
 

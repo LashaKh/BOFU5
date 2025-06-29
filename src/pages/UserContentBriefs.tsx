@@ -95,11 +95,36 @@ export default function UserContentBriefs() {
     }
   }, [user, page, statusFilter]);
 
+  // Real-time subscription for content_briefs table
   useEffect(() => {
-    if (user) {
-      loadBriefs();
-    }
-  }, []);
+    if (!user) return;
+
+    console.log('🔄 Setting up real-time subscription for content briefs page...');
+    
+    const subscription = supabase
+      .channel(`content_briefs_page_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'content_briefs',
+          filter: `user_id=eq.${user.id}` // Only listen to current user's content briefs
+        },
+        (payload) => {
+          console.log('🔄 Real-time content brief change detected on content briefs page:', payload);
+          // Refresh briefs when content briefs change
+          loadBriefs();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount or user change
+    return () => {
+      console.log('🔄 Cleaning up real-time subscription for content briefs page');
+      subscription.unsubscribe();
+    };
+  }, [user]);
 
   const loadBriefs = async () => {
     if (!user) return;

@@ -203,7 +203,8 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
           const links = briefData.suggested_links.map((link: any) => {
             return typeof link === 'string' ? link : link.url;
           });
-          console.log('Setting internal links from suggested_links:', links);
+          console.log('[ContentBriefEditorSimple] Setting internal links from suggested_links:', links);
+          console.log('[ContentBriefEditorSimple] Raw suggested_links data:', briefData.suggested_links);
           setInternalLinks(links);
         }
         // Fall back to internal_links if available
@@ -486,6 +487,15 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
     internalLinks,
     suggestedTitlesLength: suggestedTitles?.length || 0,
     suggestedTitles
+  });
+  
+  // CRITICAL DEBUG: Log what we're about to pass to ContentBriefDisplay
+  console.log('[ContentBriefEditorSimple] About to pass to ContentBriefDisplay:', {
+    content: content ? content.substring(0, 100) + '...' : 'empty',
+    additionalLinks: internalLinks || [],
+    additionalLinksLength: (internalLinks || []).length,
+    possibleTitles: suggestedTitles || [],
+    possibleTitlesLength: (suggestedTitles || []).length
   });
 
   // Extract internal links from database strings if needed (as a fallback)

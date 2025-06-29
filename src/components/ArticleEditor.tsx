@@ -72,6 +72,7 @@ import { ExportButton } from './ui/ExportButton';
 import { ImageUpload } from './ui/ImageUpload';
 import { LinkTooltip } from './ui/LinkTooltip';
 import { CommentingSystem, ArticleComment } from './ui/CommentingSystem';
+import { InlineCommentingExtension } from './ui/InlineCommentingExtension';
 import { loadArticleContent, saveArticleContent, ArticleContent, autoSaveArticleContentAsAdmin, saveArticleContentAsAdmin } from '../lib/articleApi';
 import { adminArticlesApi } from '../lib/adminApi';
 import { getArticleComments } from '../lib/commentApi';
@@ -114,6 +115,50 @@ const useTheme = () => {
   }, [theme]);
 
   return { theme };
+};
+
+// Helper function for text node positioning
+const getTextNodeAtOffset = (container: HTMLElement, offset: number): { node: Text; offset: number } | null => {
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  let currentOffset = 0;
+  let currentNode = walker.nextNode() as Text;
+  
+  while (currentNode) {
+    const nodeLength = currentNode.textContent?.length || 0;
+    if (currentOffset + nodeLength >= offset) {
+      return { node: currentNode, offset: offset - currentOffset };
+    }
+    currentOffset += nodeLength;
+    currentNode = walker.nextNode() as Text;
+  }
+  return null;
+};
+
+// Helper function to get text offset within container
+const getTextOffset = (container: HTMLElement, targetNode: Node, targetOffset: number): number => {
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  let currentOffset = 0;
+  let currentNode = walker.nextNode();
+  
+  while (currentNode) {
+    if (currentNode === targetNode) {
+      return currentOffset + targetOffset;
+    }
+    currentOffset += currentNode.textContent?.length || 0;
+    currentNode = walker.nextNode();
+  }
+  
+  return currentOffset;
 };
 
 // Enhanced User Presence Component with Real-time Collaboration
@@ -946,6 +991,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   // Comments and Collaboration
   const [comments, setComments] = useState<ArticleComment[]>([]);
   const [selectedText, setSelectedText] = useState('');
+  const [textSelection, setTextSelection] = useState<{ start: number; end: number; text: string; range?: Range } | null>(null);
   const [linkData, setLinkData] = useState<any>(null);
   
   // Word count and stats
@@ -987,6 +1033,54 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  // Text selection tracking for inline comments
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        setTextSelection(null);
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const selectedTextContent = selection.toString().trim();
+
+      if (!selectedTextContent || selectedTextContent.length < 3) {
+        setTextSelection(null);
+        return;
+      }
+
+      // Check if selection is within the editor
+      if (!editorRef.current || !editorRef.current.contains(range.commonAncestorContainer)) {
+        setTextSelection(null);
+        return;
+      }
+
+      // Calculate text offsets
+      const editorTextContent = editorRef.current.textContent || '';
+      const startNode = getTextNodeAtOffset(editorRef.current, 0);
+      
+      if (startNode) {
+        const startOffset = getTextOffset(editorRef.current, range.startContainer, range.startOffset);
+        const endOffset = startOffset + selectedTextContent.length;
+
+        setTextSelection({
+          start: startOffset,
+          end: endOffset,
+          text: selectedTextContent,
+          range: range.cloneRange()
+        });
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [editorRef]);
 
   // Load article content when articleId is provided
   useEffect(() => {
@@ -2033,6 +2127,64 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
           </div>
         </div>
 
+        {/* Inline Comments - Always rendered for seamless UX */}
+        {articleId && (
+          <InlineCommentingExtension
+            articleId={articleId}
+            editorRef={editorRef}
+            selectedText={textSelection}
+            comments={comments}
+            onCommentsChange={setComments}
+            getMarkerPosition={(start, end, ref) => {
+              // Import the positioning logic from CommentingSystem
+              if (!ref.current) return null;
+              
+              try {
+                const editorTextContent = ref.current.textContent || '';
+                const startNode = getTextNodeAtOffset(ref.current, start);
+                const endNode = getTextNodeAtOffset(ref.current, end);
+                
+                if (!startNode || !endNode) return null;
+                
+                const range = document.createRange();
+                range.setStart(startNode.node, startNode.offset);
+                range.setEnd(endNode.node, endNode.offset);
+                
+                const rect = range.getBoundingClientRect();
+                const editorRect = ref.current.getBoundingClientRect();
+                
+                return {
+                  top: rect.top - editorRect.top,
+                  left: rect.left - editorRect.left,
+                  width: rect.width,
+                  height: rect.height
+                };
+              } catch (error) {
+                console.warn('Failed to calculate marker position:', error);
+                return null;
+              }
+            }}
+            onCommentClick={(comment) => {
+              setHighlightedCommentId(comment.id);
+              if (!showComments) {
+                setShowComments(true); // Auto-open sidebar when clicking a comment
+              }
+            }}
+            onCommentStatusChange={async (commentId, status) => {
+              try {
+                // Update comment status
+                const updatedComments = comments.map(c => 
+                  c.id === commentId ? { ...c, status } : c
+                );
+                setComments(updatedComments);
+              } catch (error) {
+                console.error('Failed to update comment status:', error);
+              }
+            }}
+            inlineMode={true}
+          />
+        )}
+
         {/* Comments area - wider and properly constrained for scrolling */}
         {showComments && articleId && (
           <div className="flex-shrink-0 border-l border-gray-200 bg-gray-50" style={{ width: '420px', maxWidth: '420px' }}>
@@ -2046,6 +2198,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               onHighlightComment={setHighlightedCommentId}
               adminMode={adminMode}
               adminUser={adminUser}
+              inlineMode={false}
             />
           </div>
         )}

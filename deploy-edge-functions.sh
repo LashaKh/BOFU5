@@ -26,9 +26,21 @@ if [[ $SUPABASE_LOGIN_STATUS == *"Error"* ]]; then
     exit 1
 fi
 
-# Deploy the edge functions
-echo -e "${GREEN}Deploying Edge Functions...${NC}"
-supabase functions deploy airops-proxy --no-verify-jwt
+echo "🚀 Setting environment variables for send-brief-approval-notification..."
+
+# Set environment variables for the project
+supabase secrets set RESEND_API_KEY=re_NVLwoaTM_PUxwR9fcMoD3jfdCzERYgQKb --project-ref nhxjashreguofalhaofj
+supabase secrets set FROM_EMAIL=noreply@resend.dev --project-ref nhxjashreguofalhaofj
+
+echo "✅ Environment variables set!"
+
+echo "🚀 Deploying Edge Function..."
+
+# Deploy the Edge Function
+supabase functions deploy send-brief-approval-notification --project-ref nhxjashreguofalhaofj
+
+echo "✅ Edge Function deployed!"
+echo "🧪 Test by approving a brief in your app!"
 
 echo -e "${GREEN}Deployment complete!${NC}"
 echo -e "${YELLOW}You can test your function using:${NC}"

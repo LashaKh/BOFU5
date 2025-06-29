@@ -30,6 +30,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import ArticleAICoPilot from '../components/admin/ArticleAICoPilot';
 import { useAdminCheck } from '../hooks/useAdminCheck';
+import { GoogleDocLink } from '../components/ui/GoogleDocLink';
 
 interface AdminArticleEditorPageProps {}
 
@@ -43,6 +44,7 @@ interface ArticleContent {
   editing_status?: string;
   article_version?: number;
   user_id: string;
+  google_doc_url?: string;
   [key: string]: any;
 }
 
@@ -437,6 +439,14 @@ export const AdminArticleEditorPage: React.FC<AdminArticleEditorPageProps> = () 
                         <Clock size={14} />
                         <span>Last saved {formattedLastSaved}</span>
                       </div>
+                      {article.google_doc_url && (
+                        <GoogleDocLink 
+                          url={article.google_doc_url}
+                          variant="dark"
+                          size="md"
+                          showCopyButton={true}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

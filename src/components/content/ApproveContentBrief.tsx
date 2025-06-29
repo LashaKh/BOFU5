@@ -4,6 +4,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { approveContentBrief } from '../../lib/airops';
 import { supabase } from '../../lib/supabase';
 import { createBriefApprovalNotification } from '../../lib/briefApprovalNotifications';
+import { ContentGenerationSuccessModal } from '../ui/ContentGenerationSuccessModal';
 
 interface ApproveContentBriefProps {
   contentBrief: string;
@@ -25,6 +26,7 @@ export function ApproveContentBrief({
   onError
 }: ApproveContentBriefProps) {
   const [isApproving, setIsApproving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleApprove = async () => {
     // Validate required fields
@@ -32,6 +34,12 @@ export function ApproveContentBrief({
       toast.error('Content brief and article title are required');
       return;
     }
+    
+    // Show success modal after 5 seconds regardless of AirOps completion
+    setTimeout(() => {
+      setShowSuccessModal(true);
+    }, 5000);
+    
     // Show initial loading toast
     const loadingToast = toast.loading(
       <div className="flex items-center gap-3">
@@ -99,7 +107,7 @@ export function ApproveContentBrief({
         <div className="flex items-center gap-3">
           <CheckCircle className="h-5 w-5 text-green-500" />
           <div>
-            <p className="font-medium">Content Brief Approved</p>
+            <p className="font-medium">Article Generation Started</p>
             <p className="text-sm text-gray-400">Your content brief has been successfully processed. Admins have been notified via email and in-app notifications.</p>
           </div>
         </div>
@@ -131,30 +139,43 @@ export function ApproveContentBrief({
   };
 
   return (
-    <button
-      onClick={handleApprove}
-      disabled={isApproving}
-      className={`
-        inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium
-        ${isApproving
-          ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-inner'
-          : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-md hover:shadow-lg'
-        }
-        transition-all duration-200 ease-in-out
-      `}
-      title="Send content brief to AirOps for content generation"
-    >
-      {isApproving ? (
-        <>
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Processing</span>
-        </>
-      ) : (
-        <>
-          <CheckCircle className="h-5 w-5" />
-          <span>Approve & Generate</span>
-        </>
-      )}
-    </button>
+    <>
+      <button
+        onClick={handleApprove}
+        disabled={isApproving}
+        className={`
+          inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium
+          ${isApproving
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-inner'
+            : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-md hover:shadow-lg'
+          }
+          transition-all duration-200 ease-in-out
+        `}
+        title="Send content brief to AirOps for content generation"
+      >
+        {isApproving ? (
+          <>
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Processing</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle className="h-5 w-5" />
+            <span>Approve & Generate</span>
+          </>
+        )}
+      </button>
+
+      <ContentGenerationSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        trackingId={briefId}
+        title="Article Generation Initiated!"
+        description="Your content brief has been sent to AirOps for article generation"
+        processingLocation="AirOps AI Engine"
+        estimatedTime="5-8 minutes"
+        additionalInfo="You'll receive a notification when your article is ready"
+      />
+    </>
   );
 }

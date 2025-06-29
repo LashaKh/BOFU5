@@ -16,7 +16,7 @@ export interface ArticleComment {
   created_at: string;
   updated_at: string;
   // Admin-specific fields
-  admin_comment_type?: 'admin_note' | 'approval_comment' | 'priority_comment' | 'review_comment' | 'system_notification';
+  admin_comment_type?: 'admin_note' | 'approval_comment' | 'priority_comment' | 'review_comment' | 'escalation_comment';
   priority?: 'low' | 'normal' | 'high' | 'urgent' | 'critical';
   admin_metadata?: any;
   // Extended fields for UI
@@ -47,7 +47,7 @@ export interface CreateCommentData {
   parent_comment_id?: string;
   image_url?: string; // For image comments
   // Admin-specific fields
-  admin_comment_type?: 'admin_note' | 'approval_comment' | 'priority_comment' | 'review_comment' | 'system_notification';
+  admin_comment_type?: 'admin_note' | 'approval_comment' | 'priority_comment' | 'review_comment' | 'escalation_comment';
   priority?: 'low' | 'normal' | 'high' | 'urgent' | 'critical';
   admin_metadata?: any;
 }

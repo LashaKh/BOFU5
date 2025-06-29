@@ -45,6 +45,37 @@ export default function UserDashboard() {
     }
   }, [user, authLoading, navigate]);
 
+  // Real-time subscription for content_briefs table
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('🔄 Setting up real-time subscription for user content briefs...');
+    
+    const subscription = supabase
+      .channel(`user_content_briefs_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'content_briefs',
+          filter: `user_id=eq.${user.id}` // Only listen to current user's content briefs
+        },
+        (payload) => {
+          console.log('🔄 Real-time content brief change detected for user:', payload);
+          // Refresh dashboard data when content briefs change
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount or user change
+    return () => {
+      console.log('🔄 Cleaning up real-time subscription for user content briefs');
+      subscription.unsubscribe();
+    };
+  }, [user?.id]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);

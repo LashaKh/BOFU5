@@ -6,7 +6,7 @@ export type AdminCommentType =
   | 'approval_comment' 
   | 'priority_comment'
   | 'review_comment'
-  | 'system_notification';
+  | 'escalation_comment';
 
 export type CommentPriority = 
   | 'low'
@@ -146,7 +146,7 @@ export interface AdminCommentAnalytics {
     approval_comment: number;
     priority_comment: number;
     review_comment: number;
-    system_notification: number;
+    escalation_comment: number;
   };
   date_range: {
     from: string;
@@ -278,12 +278,12 @@ export const ADMIN_COMMENT_TYPES: Record<AdminCommentType, {
     icon: '🔍',
     requiresApproval: false
   },
-  system_notification: {
-    label: 'System Notification',
-    description: 'Automated system notification',
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
-    icon: '🤖',
-    requiresApproval: false
+  escalation_comment: {
+    label: 'Escalation Comment',
+    description: 'Escalated comment requiring urgent attention',
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+    icon: '🚨',
+    requiresApproval: true
   }
 }; 

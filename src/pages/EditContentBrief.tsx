@@ -168,32 +168,19 @@ export default function EditContentBrief() {
           return;
         }
 
-        // Parse links and titles using extracted function
-        const { parsedInternalLinks, parsedArticleTitles } = parseLinksAndTitles(data);
-          
-        // Transform the data to match UI expectations
+        // getBriefById already handles parsing, so use the parsed data directly
+        console.log('Data received from getBriefById:', {
+          internal_links: data.internal_links,
+          suggested_links: data.suggested_links,
+          possible_article_titles: data.possible_article_titles,
+          suggested_titles: data.suggested_titles
+        });
+        
+        // Use the already-parsed and transformed data from getBriefById
         const transformedBrief = {
           ...data,
           product_name: data.product_name || 'Untitled Product',
-          status: data.status || 'pending',
-          internal_links: parsedInternalLinks,
-          possible_article_titles: parsedArticleTitles,
-          suggested_titles: parsedArticleTitles.map((title: string) => ({ title, score: 0 })),
-          suggested_links: parsedInternalLinks.map((url: string) => {
-            let displayTitle = url;
-            const lastSegment = url.substring(url.lastIndexOf('/') + 1).trim();
-
-            if (lastSegment) {
-              displayTitle = lastSegment;
-            } else if (url.includes('://')) {
-              try {
-                displayTitle = new URL(url).hostname;
-              } catch (e) {
-                console.warn(`Failed to parse URL for hostname: ${url}`);
-              }
-            }
-            return { title: displayTitle, url, relevance: 1 };
-          })
+          status: data.status || 'pending'
         };
         
         console.log('Brief loaded:', transformedBrief);

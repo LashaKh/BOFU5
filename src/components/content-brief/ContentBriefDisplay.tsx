@@ -455,6 +455,7 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
                       onUpdateItem={handleUpdateItem}
                       onRemoveItem={handleRemoveItem}
                       readOnly={readOnly}
+                      researchResultId={researchResultId}
                     />
                   </div>
                 )}

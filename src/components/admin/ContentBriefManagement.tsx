@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
-import { ArrowLeft, Loader2, Eye, Search, Filter, BookOpen, FileText, Edit, X, MessageSquare, Package, Building2, Users, Crown, UserCog, ChevronDown, ChevronRight, Badge, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, Search, Filter, BookOpen, FileText, Edit, X, MessageSquare, Package, Building2, Users, Crown, UserCog, ChevronDown, ChevronRight, Badge, CheckCircle, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ProductAnalysis } from '../../types/product/types';
 import { ContentBriefDisplay } from '../content-brief/ContentBriefDisplay';
@@ -408,6 +408,39 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
     }
   };
 
+  // Delete content brief function
+  const handleDeleteBrief = async (briefId: string, briefTitle?: string) => {
+    const confirmation = window.confirm(
+      `Are you sure you want to delete this content brief${briefTitle ? ` "${briefTitle}"` : ''}? This action cannot be undone.`
+    );
+    
+    if (!confirmation) return;
+
+    try {
+      const { error } = await supabase
+        .from('content_briefs')
+        .delete()
+        .eq('id', briefId);
+
+      if (error) throw error;
+
+      toast.success('Content brief deleted successfully');
+      
+      // Refresh the appropriate data based on current view
+      if (selectedUserForBriefs && !selectedUser) {
+        // Company view - refresh company content briefs
+        fetchCompanyContentBriefs(selectedUserForBriefs.companyGroup);
+      } else if (selectedUser) {
+        // User view - refresh user content briefs and user list
+        fetchUserContentBriefs(selectedUser.id);
+        fetchUsers(); // Refresh user counts
+      }
+    } catch (error) {
+      console.error('Error deleting content brief:', error);
+      toast.error('Failed to delete content brief');
+    }
+  };
+
   // 🛠️ BULK DATA REPAIR FUNCTION - Fix corrupted array data across all research results
   const repairAllCorruptedData = async () => {
     if (!selectedUser) {
@@ -465,6 +498,23 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                 delete sanitized[numKey];
               }
             });
+          }
+          
+          // Special handling for capabilities to preserve images
+          if (sanitized.capabilities && Array.isArray(sanitized.capabilities)) {
+            sanitized.capabilities = sanitized.capabilities.map((cap: any) => {
+              if (typeof cap === 'object' && cap !== null) {
+                // Ensure images array is preserved if it exists
+                return {
+                  title: cap.title || '',
+                  description: cap.description || '',
+                  content: cap.content || '',
+                  images: Array.isArray(cap.images) ? cap.images : []
+                };
+              }
+              return cap;
+            });
+            console.log(`🖼️ Preserved ${sanitized.capabilities.length} capabilities with images`);
           }
           
           // Ensure all array fields are properly formatted
@@ -933,6 +983,47 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
     fetchApprovedProductsData();
   }, []);
 
+  // Real-time subscription for content_briefs table
+  useEffect(() => {
+    console.log('🔄 Setting up real-time subscription for content_briefs...');
+    
+    const subscription = supabase
+      .channel('content_briefs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'content_briefs'
+        },
+        (payload) => {
+          console.log('🔄 Real-time content brief change detected:', payload);
+          
+          // Refresh data based on current view
+          if (selectedUserForBriefs && !selectedUser) {
+            // Company view - refresh company content briefs
+            console.log('🔄 Refreshing company content briefs due to real-time update');
+            fetchCompanyContentBriefs(selectedUserForBriefs.companyGroup);
+          } else if (selectedUser) {
+            // Individual user view - refresh user content briefs
+            console.log('🔄 Refreshing user content briefs due to real-time update');
+            fetchUserContentBriefs(selectedUser.id);
+          } else {
+            // Main view - refresh all users to update counts
+            console.log('🔄 Refreshing all users due to real-time update');
+            fetchUsers();
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🔄 Cleaning up real-time subscription for content_briefs');
+      subscription.unsubscribe();
+    };
+  }, [selectedUserForBriefs, selectedUser]); // Re-subscribe when view changes
+
   // Debug current view state
   console.log('🔍 Current view state:', {
     selectedUser: selectedUser?.email,
@@ -1252,14 +1343,24 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                         <div className="flex items-center space-x-2">
                           <BookOpen className="w-4 h-4 text-green-400" />
                           <span className="text-sm text-green-400 font-medium">Content Brief</span>
-                          <ResponsiveApprovalButton 
-                            brief={brief}
-                            briefId={brief.id}
-                            onSuccess={() => {
-                              // Refresh company briefs after action
-                              fetchCompanyContentBriefs(companyGroup);
-                            }}
-                          />
+                          <div className="flex items-center space-x-2">
+                            <ResponsiveApprovalButton 
+                              brief={brief}
+                              briefId={brief.id}
+                              onSuccess={() => {
+                                // Refresh company briefs after action
+                                fetchCompanyContentBriefs(companyGroup);
+                              }}
+                            />
+                            <button
+                              onClick={() => handleDeleteBrief(brief.id, brief.title || brief.product_name)}
+                              className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 hover:border-red-500/30 transition-colors"
+                              title="Delete content brief"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span className="text-sm font-medium">Delete</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1276,6 +1377,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                             <ContentBriefDisplay 
                               content={JSON.stringify(brief.brief_content)}
                               readOnly={false}
+                              researchResultId={brief.research_result_id}
                               onContentChange={(updatedContent: string) => {
                                 try {
                                   const parsedContent = JSON.parse(updatedContent);
@@ -1616,11 +1718,21 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                       <div className="flex items-center space-x-2">
                         <BookOpen className="w-4 h-4 text-green-400" />
                         <span className="text-sm text-green-400 font-medium">Content Brief</span>
-                        <ResponsiveApprovalButton 
-                          brief={brief}
-                          briefId={brief.id}
-                          onSuccess={handleGenerateArticleSuccess}
-                        />
+                        <div className="flex items-center space-x-2">
+                          <ResponsiveApprovalButton 
+                            brief={brief}
+                            briefId={brief.id}
+                            onSuccess={handleGenerateArticleSuccess}
+                          />
+                          <button
+                            onClick={() => handleDeleteBrief(brief.id, brief.title)}
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 hover:border-red-500/30 transition-colors"
+                            title="Delete content brief"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="text-sm font-medium">Delete</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1668,6 +1780,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                           <ContentBriefDisplay 
                             content={JSON.stringify(brief.brief_content)}
                             readOnly={false}
+                            researchResultId={brief.research_result_id}
                             onContentChange={(updatedContent: string) => {
                               try {
                                 const parsedContent = JSON.parse(updatedContent);

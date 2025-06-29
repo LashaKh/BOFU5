@@ -63,17 +63,57 @@ export async function getBriefById(briefId: string) {
 
   console.log('Fetched brief:', data);
   if (!data) throw new Error('Brief not found');
+  // Helper function to parse string or array fields into arrays
+  const parseFieldToArray = (field: any): string[] => {
+    if (Array.isArray(field)) {
+      return field;
+    } else if (typeof field === 'string' && field.trim()) {
+      try {
+        // Try to parse as JSON array first
+        const parsed = JSON.parse(field);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => {
+            if (typeof item === 'string') {
+              try {
+                const parsedItem = JSON.parse(item);
+                if (Array.isArray(parsedItem)) {
+                  return parsedItem;
+                }
+                return item;
+              } catch {
+                return item;
+              }
+            }
+            return item;
+          }).flat();
+        } else {
+          return [field];
+        }
+      } catch {
+        // Not JSON, treat as newline-separated string
+        return field.split('\n').filter((item: string) => item.trim().length > 0);
+      }
+    }
+    return [];
+  };
+
+  const parsedInternalLinks = parseFieldToArray(data.internal_links);
+  const parsedArticleTitles = parseFieldToArray(data.possible_article_titles);
+
+  console.log('[getBriefById] Parsed internal links:', parsedInternalLinks);
+  console.log('[getBriefById] Parsed article titles:', parsedArticleTitles);
+
   const transformedData: ContentBrief = {
     ...data,
     status: 'draft',
     title: data.product_name || 'Untitled Brief',
     framework: Array.isArray(data.suggested_content_frameworks) ? data.suggested_content_frameworks.join('\n') : '',
-    suggested_links: Array.isArray(data.internal_links) ? data.internal_links.map((url: string) => ({
+    suggested_links: parsedInternalLinks.map((url: string) => ({
       url,
       title: url.split('/').pop() || new URL(url).hostname,
       relevance: 1
-    })) : [],
-    suggested_titles: Array.isArray(data.possible_article_titles) ? data.possible_article_titles.map((title: string) => ({ title })) : [],
+    })),
+    suggested_titles: parsedArticleTitles.map((title: string) => ({ title })),
     research_result_id: data.research_result_id || undefined // Include research_result_id in the returned data
   };
   return transformedData;
@@ -100,6 +140,13 @@ export async function updateBrief(id: string, updates: { brief_content?: string;
     console.error('Error fetching current brief for preservation:', fetchError);
     // DEBUG: Log fetch error for current brief
     console.error('[updateBrief] Error fetching current brief:', fetchError);
+    
+    // If the brief doesn't exist (PGRST116), don't throw error for status-only updates
+    if (fetchError.code === 'PGRST116' && Object.keys(updates).length === 1 && updates.status) {
+      console.log('[updateBrief] Brief not found, but this is a status-only update. Skipping update.');
+      throw new Error(`Content brief with ID ${id} not found. It may have been deleted.`);
+    }
+    
     throw fetchError;
   }
   
@@ -229,9 +276,9 @@ export async function fetchPainPoints(researchResultId?: string) {
       .from('approved_products')
       .select('product_data, research_result_id');
     
-    // If a research_result_id is provided, filter by it
+    // If a research_result_id is provided, try both id and research_result_id fields
     if (researchResultId) {
-      query = query.eq('research_result_id', researchResultId);
+      query = query.or(`id.eq.${researchResultId},research_result_id.eq.${researchResultId}`);
     }
     
     const { data, error } = await query;
@@ -394,9 +441,9 @@ export async function fetchUSPs(researchResultId?: string) {
       .from('approved_products')
       .select('product_data, research_result_id');
     
-    // If a research_result_id is provided, filter by it
+    // If a research_result_id is provided, try both id and research_result_id fields
     if (researchResultId) {
-      query = query.eq('research_result_id', researchResultId);
+      query = query.or(`id.eq.${researchResultId},research_result_id.eq.${researchResultId}`);
     }
     
     const { data, error } = await query;
@@ -440,6 +487,162 @@ export async function fetchUSPs(researchResultId?: string) {
     return Array.from(new Set(allUSPs));
   } catch (err) {
     console.error('Unexpected error fetching USPs:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetches competitors from the approved_products table
+ * This function can be used without a specific research_result_id to get all available competitors
+ */
+export async function fetchCompetitors(researchResultId?: string) {
+  try {
+    console.log('=== FETCHCOMPETITORS DEBUG START ===');
+    console.log('fetchCompetitors called with researchResultId:', researchResultId);
+    
+    let query = supabase
+      .from('approved_products')
+      .select('product_data, research_result_id, id');
+    
+    // If a research_result_id is provided, try both id and research_result_id fields
+    if (researchResultId) {
+      console.log('Adding query filter for researchResultId:', researchResultId);
+      // First try by id field, then by research_result_id field
+      query = query.or(`id.eq.${researchResultId},research_result_id.eq.${researchResultId}`);
+    }
+    
+    const { data, error } = await query;
+    
+    console.log('Database query result:', { data, error, dataLength: data?.length });
+    
+    if (error) {
+      console.error('Error fetching competitors:', error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('No data found in approved_products table');
+      return [];
+    }
+    
+    // Process all product data to extract competitors
+    let allCompetitors: string[] = [];
+    
+    data.forEach((item, index) => {
+      console.log(`=== Processing item ${index} ===`);
+      console.log('Item ID:', item.id);
+      console.log('Item research_result_id:', item.research_result_id);
+      console.log('Item product_data type:', typeof item.product_data);
+      
+      if (item.product_data) {
+        try {
+          const productData = typeof item.product_data === 'string'
+            ? JSON.parse(item.product_data)
+            : item.product_data;
+          
+          console.log('Product data keys:', Object.keys(productData));
+          console.log('Competitors field exists:', 'competitors' in productData);
+          console.log('Competitors field value:', productData.competitors);
+          console.log('Competitors field type:', typeof productData.competitors);
+          
+          // Look for competitors in different possible structures
+          let competitors: string[] = [];
+          
+          // Method 1: Simple array structure
+          if (productData.competitors && Array.isArray(productData.competitors)) {
+            console.log('Found competitors as array:', productData.competitors);
+            competitors = [...competitors, ...productData.competitors];
+          }
+          
+          // Method 2: Structured object with categories (Direct, Niche, Broader)
+          else if (productData.competitors && typeof productData.competitors === 'object') {
+            console.log('Found competitors as object, processing categories...');
+            const competitorObj = productData.competitors;
+            console.log('Competitor object keys:', Object.keys(competitorObj));
+            
+            // Extract from different categories - include underscore versions
+            ['direct', 'niche', 'broader', 'primary', 'secondary', 'indirect', 'Direct', 'Niche', 'Broader', 'direct_competitors', 'niche_competitors', 'broader_competitors'].forEach(category => {
+              const categoryData = competitorObj[category];
+              console.log(`Category '${category}':`, categoryData);
+              
+              if (Array.isArray(categoryData)) {
+                console.log(`Processing ${categoryData.length} competitors in category '${category}'`);
+                // Each competitor might be an object with name and description
+                categoryData.forEach((comp: any, compIndex: number) => {
+                  console.log(`  Competitor ${compIndex}:`, comp, typeof comp);
+                  
+                  if (typeof comp === 'string') {
+                    competitors.push(comp);
+                    console.log(`    Added string competitor: ${comp}`);
+                  } else if (comp && typeof comp === 'object') {
+                    // Extract name from object structure like {company_name: "Company", product_name: "Platform", category: "Type"}
+                    const companyName = comp.company_name || comp.name || comp.company || comp.competitor || comp.title;
+                    const productName = comp.product_name || comp.product || comp.platform;
+                    const category = comp.category || comp.description;
+                    
+                    console.log(`    Extracted company_name: ${companyName}`);
+                    console.log(`    Extracted product_name: ${productName}`);
+                    console.log(`    Extracted category: ${category}`);
+                    
+                    if (companyName) {
+                      // Build the competitor string based on available data
+                      let competitorString = companyName;
+                      
+                      if (productName) {
+                        competitorString += ` (${productName})`;
+                      }
+                      
+                      if (category && !productName) {
+                        competitorString += ` (${category})`;
+                      }
+                      
+                      competitors.push(competitorString);
+                      console.log(`    Added competitor: ${competitorString}`);
+                    }
+                  }
+                });
+              }
+            });
+          }
+          
+          // Method 3: Look in alternative field names
+          ['competition', 'competitive_landscape', 'rivals', 'competitive_analysis'].forEach(field => {
+            if (productData[field]) {
+              console.log(`Found alternative field '${field}':`, productData[field]);
+              if (Array.isArray(productData[field])) {
+                competitors = [...competitors, ...productData[field]];
+              } else if (typeof productData[field] === 'object') {
+                // Handle nested object structure
+                Object.values(productData[field]).forEach((value: any) => {
+                  if (Array.isArray(value)) {
+                    competitors = [...competitors, ...value];
+                  }
+                });
+              }
+            }
+          });
+          
+          console.log(`Extracted ${competitors.length} competitors from item ${index}:`, competitors);
+          
+          if (competitors.length > 0) {
+            allCompetitors = [...allCompetitors, ...competitors];
+          }
+        } catch (parseError) {
+          console.error('Error parsing product data for competitors:', parseError);
+        }
+      }
+    });
+    
+    console.log('=== FINAL RESULT ===');
+    console.log('All competitors before deduplication:', allCompetitors);
+    const uniqueCompetitors = Array.from(new Set(allCompetitors));
+    console.log('Final unique competitors list:', uniqueCompetitors);
+    console.log('=== FETCHCOMPETITORS DEBUG END ===');
+    
+    // Return unique competitors
+    return uniqueCompetitors;
+  } catch (err) {
+    console.error('Unexpected error fetching competitors:', err);
     return [];
   }
 }

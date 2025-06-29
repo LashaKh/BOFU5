@@ -132,6 +132,52 @@ export function CapabilityEditor({ capability, onUpdate, onDelete }: CapabilityE
         <div className="relative">
           <p className="text-gray-300">{capability.description}</p>
           
+          {/* Display images if they exist */}
+          {capability.images && capability.images.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm text-primary-400 font-medium mb-2">
+                📷 Images ({capability.images.length})
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {capability.images.map((imageUrl, index) => (
+                  <div key={index} className="group relative">
+                    <img 
+                      src={imageUrl} 
+                      alt={`${capability.title} - Image ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg border border-primary-500/20 group-hover:border-primary-500/40 transition-colors"
+                      onError={(e) => {
+                        // Fallback to link if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                    <div className="hidden bg-secondary-700 p-3 rounded-lg border border-primary-500/20">
+                      <a 
+                        href={imageUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary-400 hover:text-primary-300 text-sm break-all"
+                      >
+                        🖼️ Image {index + 1}: {imageUrl.split('/').pop()?.substring(0, 30)}...
+                      </a>
+                    </div>
+                    {/* Image overlay with link */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <a 
+                        href={imageUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bg-primary-500/80 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-primary-500"
+                      >
+                        View Full Size
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <AnimatePresence>
             {isExpanded && (
               <motion.div
