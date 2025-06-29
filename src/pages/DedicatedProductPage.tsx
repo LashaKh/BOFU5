@@ -678,7 +678,7 @@ const DedicatedProductPage: React.FC = () => {
               const { data: newResearchResult, error: createError } = await supabase
                 .from('research_results')
                 .insert({
-                  title: `Product Analysis - ${prod.productDetails?.name || prod.companyName}`,
+                  title: `Product Analysis - ${prod.productDetails?.name || prod.productDetails?.name || prod.companyName}`,
                   data: [prod],
                   is_draft: false,
                   is_approved: true,
@@ -728,21 +728,22 @@ const DedicatedProductPage: React.FC = () => {
             return;
           }
           
-          // Send notification to admins about product approval
-          try {
-            const { createProductApprovalNotification } = await import('../lib/productApprovalNotifications');
-            await createProductApprovalNotification({
-              productId: product.id,
-              productName: prod.productDetails?.name || 'Unnamed Product',
-              userId: session.user.id
-            });
-            console.log('✅ Product approval notification sent');
-          } catch (notificationError) {
-            console.error('❌ Error sending product approval notification:', notificationError);
-            // Don't fail the approval process if notification fails
-          }
-          
           toast.success('Product approved successfully!');
+        }
+
+        // Send notification to admins about product approval (for both new and updated approvals)
+        try {
+          console.log('🔄 Sending product approval notification...');
+          const { createProductApprovalNotification } = await import('../lib/productApprovalNotifications');
+          await createProductApprovalNotification({
+            productId: product.id,
+            productName: prod.productDetails?.name || 'Unnamed Product',
+            userId: session.user.id
+          });
+          console.log('✅ Product approval notification sent successfully');
+        } catch (notificationError) {
+          console.error('❌ Error sending product approval notification:', notificationError);
+          // Don't fail the approval process if notification fails
         }
       } else { // Product is being un-approved
         const { error: deleteError } = await supabase
