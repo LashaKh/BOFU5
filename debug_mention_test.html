@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Mention System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Debug Mention System for devoteai@gmail.com</h1>
+    <div id="output"></div>
+    
+    <script>
+        // Replace with your actual Supabase URL and anon key
+        const supabaseUrl = 'https://nhxjashreguofalhaofj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oeGphc2hyZWd1b2ZhbGhhb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTQzMzk3MDIsImV4cCI6MjAyOTkxNTcwMn0.1JOmZhE3Ds59YHIIAmf8FbDfvVS_1W5nLrPPQJJq63Q';
+        
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testMentionSystem() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>Testing...</h2>';
+            
+            try {
+                // Test current auth state
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                console.log('Auth user:', user);
+                
+                if (authError || !user) {
+                    output.innerHTML = '<h2>❌ Not authenticated</h2><p>Please log in as devoteai@gmail.com first</p>';
+                    return;
+                }
+                
+                output.innerHTML += `<p>✅ Authenticated as: ${user.email}</p>`;
+                
+                // Test the RPC function directly
+                const { data, error } = await supabase.rpc('get_mentionable_users', {
+                    article_id_param: null,
+                    search_term: ''
+                });
+                
+                if (error) {
+                    console.error('RPC Error:', error);
+                    output.innerHTML += `<h2>❌ RPC Error</h2><pre>${JSON.stringify(error, null, 2)}</pre>`;
+                    return;
+                }
+                
+                console.log('RPC Result:', data);
+                output.innerHTML += `<h2>✅ Results (${data?.length || 0} users)</h2>`;
+                
+                if (data && data.length > 0) {
+                    output.innerHTML += '<ul>';
+                    data.forEach(user => {
+                        output.innerHTML += `<li>
+                            <strong>${user.email}</strong> 
+                            (${user.is_admin ? 'Admin' : 'User'}) 
+                            - ${user.mention_text}
+                        </li>`;
+                    });
+                    output.innerHTML += '</ul>';
+                } else {
+                    output.innerHTML += '<p>⚠️ No users returned</p>';
+                }
+                
+            } catch (error) {
+                console.error('Test error:', error);
+                output.innerHTML += `<h2>❌ Error</h2><pre>${error.message}</pre>`;
+            }
+        }
+        
+        // Run test when page loads
+        window.onload = testMentionSystem;
+    </script>
+</body>
+</html>

@@ -146,7 +146,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       }
       
       // Generate notifications based on recent activities, mentions, and brief approvals
-      generateNotificationsFromActivities(activities, mentions, briefApprovals);
+      await generateNotificationsFromActivities(activities, mentions, briefApprovals);
 
     } catch (error) {
       console.error('Error loading recent activities:', error);
@@ -156,7 +156,19 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
   };
 
   // Generate notifications from activities, mentions, and brief approvals
-  const generateNotificationsFromActivities = (activities: AssignmentActivity[], mentions: MentionNotification[] = [], briefApprovals: BriefApprovalNotification[] = []) => {
+  const generateNotificationsFromActivities = async (activities: AssignmentActivity[], mentions: MentionNotification[] = [], briefApprovals: BriefApprovalNotification[] = []) => {
+    try {
+      // Get current admin ID from authentication
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return;
+
+      // Get deleted notifications for this admin
+      const { data: deletedNotifications } = await supabase
+        .from('deleted_notifications')
+        .select('notification_id')
+        .eq('admin_id', user.id);
+
+      const deletedIds = new Set(deletedNotifications?.map(d => d.notification_id) || []);
     const generatedNotifications: NotificationItem[] = activities.map((activity, index) => ({
       id: `activity-${activity.id}`,
       type: 'assignment' as const,
@@ -233,9 +245,13 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
 
     // Combine all notifications and sort by timestamp
     const allNotifications = [...systemNotifications, ...mentionNotificationItems, ...briefApprovalNotificationItems, ...generatedNotifications.slice(0, 20)]
+      .filter(notification => !deletedIds.has(notification.id))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     setNotifications(allNotifications);
+    } catch (error) {
+      console.error('Error generating notifications:', error);
+    }
   };
 
   // Filter notifications
@@ -346,6 +362,97 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     );
     setSelectedNotifications(new Set());
     toast.success(`Deleted ${selectedNotifications.size} notifications`);
+  };
+
+  // Delete individual notification
+  const deleteNotification = async (notificationId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the parent click handler
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
+
+      // Handle different types of notifications for database cleanup
+      if (notificationId.startsWith('brief-')) {
+        const briefNotificationId = notificationId.replace('brief-', '');
+        // Delete from brief_approval_notifications table
+        const { error } = await supabase
+          .from('brief_approval_notifications')
+          .delete()
+          .eq('id', briefNotificationId)
+          .eq('admin_id', user.id);
+        
+        if (error) {
+          console.error('Error deleting brief notification:', error);
+          toast.error('Failed to delete notification');
+          return;
+        }
+      } else if (notificationId.startsWith('mention-')) {
+        const mentionNotificationId = notificationId.replace('mention-', '');
+        // Delete from comment_mentions table
+        const { error } = await supabase
+          .from('comment_mentions')
+          .delete()
+          .eq('id', mentionNotificationId);
+        
+        if (error) {
+          console.error('Error deleting mention notification:', error);
+          toast.error('Failed to delete notification');
+          return;
+        }
+      } else if (notificationId.startsWith('activity-')) {
+        // For activity notifications, just mark as deleted in our tracking table
+        // since we don't want to delete actual assignment records
+        const { error } = await supabase
+          .from('deleted_notifications')
+          .insert({
+            admin_id: user.id,
+            notification_id: notificationId,
+            notification_type: 'activity'
+          });
+        
+        if (error) {
+          console.error('Error marking activity notification as deleted:', error);
+          toast.error('Failed to delete notification');
+          return;
+        }
+      } else if (notificationId.startsWith('system-')) {
+        // For system notifications, mark as deleted in tracking table
+        const { error } = await supabase
+          .from('deleted_notifications')
+          .insert({
+            admin_id: user.id,
+            notification_id: notificationId,
+            notification_type: 'system'
+          });
+        
+        if (error) {
+          console.error('Error marking system notification as deleted:', error);
+          toast.error('Failed to delete notification');
+          return;
+        }
+      }
+      
+      // Remove from local state
+      setNotifications(prev => 
+        prev.filter(notification => notification.id !== notificationId)
+      );
+      
+      // Remove from selected notifications if it was selected
+      setSelectedNotifications(prev => {
+        const newSelected = new Set(prev);
+        newSelected.delete(notificationId);
+        return newSelected;
+      });
+      
+      toast.success('Notification deleted');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
+    }
   };
 
   // Get notification icon
@@ -502,7 +609,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
                         key={notification.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`p-4 rounded-lg border transition-all cursor-pointer ${
+                        className={`group p-4 rounded-lg border transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-blue-500/20 border-blue-500/50'
                             : notification.isRead
@@ -552,6 +659,13 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
                             }`}>
                               {notification.priority}
                             </span>
+                            <button
+                              onClick={(e) => deleteNotification(notification.id, e)}
+                              className="p-1 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                              title="Delete notification"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                       </motion.div>

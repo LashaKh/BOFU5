@@ -441,6 +441,42 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
     }
   };
 
+  // Delete approved product function
+  const handleDeleteApprovedProduct = async (approvedProductId: string, productName?: string) => {
+    const confirmation = window.confirm(
+      `Are you sure you want to delete this approved product${productName ? ` "${productName}"` : ''}? This will only remove it from the admin dashboard and will not affect the original product data. This action cannot be undone.`
+    );
+    
+    if (!confirmation) return;
+
+    try {
+      const { error } = await supabaseAdmin
+        .from('approved_products')
+        .delete()
+        .eq('id', approvedProductId);
+
+      if (error) throw error;
+
+      toast.success('Approved product deleted successfully');
+      
+      // Refresh approved products data
+      await fetchApprovedProductsData();
+      
+      // Refresh the appropriate data based on current view
+      if (selectedUserForBriefs && !selectedUser) {
+        // Company view - refresh company content briefs
+        fetchCompanyContentBriefs(selectedUserForBriefs.companyGroup);
+      } else if (selectedUser) {
+        // User view - refresh user data
+        fetchUserResearchResults(selectedUser.id);
+        fetchUsers(); // Refresh user counts
+      }
+    } catch (error) {
+      console.error('Error deleting approved product:', error);
+      toast.error('Failed to delete approved product');
+    }
+  };
+
   // 🛠️ BULK DATA REPAIR FUNCTION - Fix corrupted array data across all research results
   const repairAllCorruptedData = async () => {
     if (!selectedUser) {
@@ -1173,11 +1209,27 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                               <span>Source: {approvedProduct.research_result_id ? `Research ${approvedProduct.research_result_id.slice(0, 8)}...` : `Product Page`}</span>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2 text-green-400">
-                            <Eye className="w-4 h-4" />
-                            <span className="text-sm font-medium">
-                              {isExpanded ? 'Hide Details' : 'View Full Card'}
-                            </span>
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2 text-green-400">
+                              <Eye className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {isExpanded ? 'Hide Details' : 'View Full Card'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteApprovedProduct(
+                                  approvedProduct.id, 
+                                  product?.productDetails?.name || product?.companyName || approvedProduct.product_name
+                                );
+                              }}
+                              className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 hover:border-red-500/30 transition-colors"
+                              title="Delete approved product"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span className="text-sm font-medium">Delete</span>
+                            </button>
                           </div>
                         </div>
                         

@@ -758,27 +758,137 @@ export const EnhancedCommentDashboard: React.FC<EnhancedCommentDashboardProps> =
               transition={{ duration: 0.3 }}
               className="space-y-6"
             >
-              {/* Search and Filters */}
-              <div className="bg-gray-800/60 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search comments..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                      className="w-full pl-10 pr-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-                    />
+              {/* Advanced Search Header */}
+              <div className="bg-gradient-to-r from-gray-800/80 via-gray-800/60 to-gray-800/80 backdrop-blur-xl rounded-3xl p-8 border border-gray-700/50 shadow-2xl">
+                <div className="flex flex-col space-y-6">
+                  {/* Title and Stats */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                      <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-blue-500/20">
+                          <MessageSquare className="h-7 w-7 text-blue-400" />
+                        </div>
+                        Comment Management
+                      </h2>
+                      <p className="text-gray-400 text-lg">Monitor, moderate, and manage all platform comments</p>
+                    </div>
+                    
+                    {/* Live Stats Bar */}
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-3 px-4 py-2 bg-green-500/20 rounded-xl border border-green-500/30">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-green-400 font-medium">{comments.length} Active</span>
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-2 bg-blue-500/20 rounded-xl border border-blue-500/30">
+                        <Eye className="h-4 w-4 text-blue-400" />
+                        <span className="text-blue-400 font-medium">Live View</span>
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleSearch}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Search className="h-4 w-4" />
-                    Search
-                  </button>
+
+                  {/* Advanced Search Interface */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    {/* Main Search Bar */}
+                    <div className="lg:col-span-6 relative group">
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 z-10" />
+                        <input
+                          type="text"
+                          placeholder="Search comments, users, content..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                          className="w-full pl-12 pr-4 py-4 bg-gray-700/70 backdrop-blur-sm border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Filter Buttons */}
+                    <div className="lg:col-span-4 flex flex-wrap gap-2">
+                      {[
+                        { label: 'All', count: comments.length, active: !filters.status },
+                        { label: 'Active', count: comments.filter(c => c.status === 'active').length, active: filters.status === 'active' },
+                        { label: 'Pending', count: comments.filter(c => c.admin_comment_type === 'user_question').length, active: false },
+                        { label: 'Urgent', count: comments.filter(c => c.priority === 'urgent').length, active: filters.priority === 'urgent' }
+                      ].map((filter, index) => (
+                        <motion.button
+                          key={filter.label}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            if (filter.label === 'All') handleFilterChange({ status: undefined, priority: undefined });
+                            else if (filter.label === 'Active') handleFilterChange({ status: 'active' });
+                            else if (filter.label === 'Urgent') handleFilterChange({ priority: 'urgent' });
+                          }}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            filter.active
+                              ? 'bg-blue-500/30 text-blue-300 border border-blue-400/50'
+                              : 'bg-gray-700/50 text-gray-300 border border-gray-600/30 hover:bg-gray-600/50'
+                          }`}
+                        >
+                          <span className="text-sm">{filter.label}</span>
+                          {filter.count > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-white/20 text-xs rounded-full">
+                              {filter.count}
+                            </span>
+                          )}
+                        </motion.button>
+                      ))}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="lg:col-span-2 flex gap-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSearch}
+                        className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                      >
+                        <Search className="h-4 w-4" />
+                        <span className="hidden sm:inline">Search</span>
+                      </motion.button>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowFilters(true)}
+                        className="px-4 py-3 bg-gray-700/70 hover:bg-gray-600/70 text-gray-300 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 border border-gray-600/50"
+                      >
+                        <Filter className="h-4 w-4" />
+                        {Object.keys(filters).length > 0 && (
+                          <span className="px-1.5 py-0.5 bg-blue-500 text-xs rounded-full">
+                            {Object.keys(filters).length}
+                          </span>
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  {/* Smart Suggestions */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs text-gray-500 font-medium">Quick filters:</span>
+                    {[
+                      'High priority comments',
+                      'Unresolved issues',
+                      'Admin responses needed',
+                      'Recent activity'
+                    ].map((suggestion, index) => (
+                      <motion.button
+                        key={suggestion}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 + index * 0.1 }}
+                        whileHover={{ scale: 1.05 }}
+                        className="px-3 py-1 bg-gray-700/40 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 rounded-lg text-xs transition-all duration-200 border border-gray-600/30"
+                      >
+                        {suggestion}
+                      </motion.button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -813,24 +923,78 @@ export const EnhancedCommentDashboard: React.FC<EnhancedCommentDashboardProps> =
                 </motion.div>
               )}
 
-              {/* Comments List */}
-              <div className="space-y-4">
-                {comments.map((comment, index) => (
-                  <motion.div
-                    key={comment.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <AdminCommentCard
-                      comment={comment}
-                      onUpdate={refreshData}
-                      showArticleInfo={!articleId}
-                      isSelected={selectedCommentIds.includes(comment.id)}
-                      onSelect={handleCommentSelection}
-                    />
-                  </motion.div>
-                ))}
+              {/* Advanced Comments Grid */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Comments Header with Sorting */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-2">
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                      <Hash className="h-5 w-5 text-blue-400" />
+                      Comments ({comments.length})
+                    </h3>
+                    {selectedCommentIds.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-lg border border-blue-500/30"
+                      >
+                        <CheckCircle className="h-4 w-4 text-blue-400" />
+                        <span className="text-blue-400 text-sm font-medium">{selectedCommentIds.length} selected</span>
+                      </motion.div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-400">Sort by:</span>
+                    <select className="px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                      <option>Latest first</option>
+                      <option>Priority level</option>
+                      <option>Status</option>
+                      <option>User activity</option>
+                    </select>
+                    
+                    <div className="flex items-center gap-1 px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg">
+                      <button className="p-1 hover:bg-gray-600/50 rounded transition-colors">
+                        <Layers className="h-4 w-4 text-gray-400" />
+                      </button>
+                      <button className="p-1 hover:bg-gray-600/50 rounded transition-colors">
+                        <Command className="h-4 w-4 text-gray-400" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Comments Masonry Layout */}
+                <div className="space-y-4">
+                  {comments.map((comment, index) => (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: index * 0.08,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                      }}
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      className="group relative"
+                    >
+                      {/* Glowing border effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                      
+                      <div className="relative bg-gradient-to-br from-gray-800/90 via-gray-800/70 to-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700/50 group-hover:border-gray-600/60 transition-all duration-300 shadow-lg group-hover:shadow-2xl">
+                        <AdminCommentCard
+                          comment={comment}
+                          onUpdate={refreshData}
+                          showArticleInfo={!articleId}
+                          isSelected={selectedCommentIds.includes(comment.id)}
+                          onSelect={handleCommentSelection}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
 
               {comments.length === 0 && (

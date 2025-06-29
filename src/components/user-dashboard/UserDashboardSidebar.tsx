@@ -266,31 +266,10 @@ const UserDashboardSidebar = () => {
                       <div className="progress-bar-value" style={{ width: '40%' }}></div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <button className="primary-button w-full py-1 flex items-center justify-center text-xs">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      New Content Brief
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Collapsed new brief button */}
-            {collapsed && (
-              <div className="px-2 mt-6">
-                <button 
-                  className="w-full flex items-center justify-center h-10 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
-                  title="New Brief"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

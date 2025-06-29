@@ -13,7 +13,7 @@ import type { ScrapedBlog } from '../utils/blogScraper';
 import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'; 
 import { MainHeader } from '../components/MainHeader'; 
 import ChatWindow from '../components/ChatWindow'; 
-import { createBriefApprovalNotification } from '../lib/briefApprovalNotifications';
+
 
 // Define a local composite type for the product state on this page
 interface PageProductData extends Product { 
@@ -730,15 +730,16 @@ const DedicatedProductPage: React.FC = () => {
           
           // Send notification to admins about product approval
           try {
-            await createBriefApprovalNotification({
-              briefId: product.id, // Use product ID as brief ID
-              briefTitle: prod.productDetails?.name || 'Product Approval',
+            const { createProductApprovalNotification } = await import('../lib/productApprovalNotifications');
+            await createProductApprovalNotification({
+              productId: product.id,
+              productName: prod.productDetails?.name || 'Unnamed Product',
               userId: session.user.id
             });
-            console.log('Admin notifications sent for product approval');
+            console.log('✅ Product approval notification sent');
           } catch (notificationError) {
-            console.error('Failed to send admin notifications:', notificationError);
-            // Don't fail the approval process if notifications fail
+            console.error('❌ Error sending product approval notification:', notificationError);
+            // Don't fail the approval process if notification fails
           }
           
           toast.success('Product approved successfully!');
