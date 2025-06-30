@@ -26,13 +26,23 @@ import {
   Star,
   TrendingUp,
   Target,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  Archive,
+  Trash2,
+  Bot,
+  User,
+  Circle,
+  MessageCircle,
+  ChevronRight,
+  RefreshCw,
+  MoreHorizontal
 } from 'lucide-react';
 import { Product, Message, ChatStatus } from '../../types/chat';
 import { Product as ProductType } from '../../types';
-import { chatService, ChatConversation } from '../../services/chatService';
+import { chatService, ChatConversation, ChatMessage } from '../../services/chatService';
 import { supabase } from '../../lib/supabase';
-import OpenAI from 'openai'; // Keep for fallback when no productId
+import OpenAI from 'openai';
 
 interface ArticleAICoPilotProps {
   isVisible: boolean;
@@ -105,6 +115,14 @@ const suggestionTemplates: SuggestionTemplate[] = [
   }
 ];
 
+// Initialize OpenAI client exactly like ChatWindow does
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
+
+const VITE_UNIVERSAL_ASSISTANT_ID = import.meta.env.VITE_UNIVERSAL_ASSISTANT_ID;
+
 const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
   isVisible,
   onToggle,
@@ -127,6 +145,9 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [assistantThreadId, setAssistantThreadId] = useState<string | null>(null);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isRefreshingHistory, setIsRefreshingHistory] = useState(false);
+  const [view, setView] = useState<'chat' | 'history' | 'templates'>('templates');
   
   // Product selection state
   const [availableProducts, setAvailableProducts] = useState<ProductType[]>([]);
@@ -199,12 +220,76 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
 
   const loadConversations = async () => {
     try {
+      setIsRefreshingHistory(true);
       const loadedConversations = await chatService.getConversations();
       setConversations(loadedConversations.filter(conv => 
         conv.title.includes('Article Assistant') || conv.title.includes(articleTitle)
       ));
     } catch (error) {
       console.error('Failed to load conversations:', error);
+    } finally {
+      setIsRefreshingHistory(false);
+    }
+  };
+
+  const loadConversationMessages = async (conversationId: string) => {
+    if (conversationId === currentConversationId || isLoadingConversation) return;
+    
+    try {
+      setIsLoadingConversation(true);
+      setView('chat');
+      setShowTemplates(false);
+      
+      const chatMessages = await chatService.getMessages(conversationId);
+      const uiMessages: Message[] = chatMessages.map(msg => ({
+        id: msg.id,
+        text: msg.content,
+        sender: msg.role,
+        timestamp: new Date(msg.created_at),
+        type: 'text'
+      }));
+      
+      setMessages(uiMessages);
+      setCurrentConversationId(conversationId);
+      
+      // Reset assistant thread for the new conversation
+      setAssistantThreadId(null);
+    } catch (error) {
+      console.error('Failed to load conversation messages:', error);
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setCurrentConversationId(null);
+    setAssistantThreadId(null);
+    setView('templates');
+    setShowTemplates(true);
+  };
+
+  const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await chatService.archiveConversation(conversationId);
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      
+      if (conversationId === currentConversationId) {
+        handleNewConversation();
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
+  const handleClearAllHistory = async () => {
+    try {
+      await chatService.clearAllConversations();
+      setConversations([]);
+      handleNewConversation();
+    } catch (error) {
+      console.error('Failed to clear all conversations:', error);
     }
   };
 
@@ -242,21 +327,24 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
 
       if (error) throw error;
 
-      // Filter products that have vector store IDs (knowledge bases)
-      const productsWithKB = (products || []).filter(p => p.openai_vector_store_id);
-      console.log(`🧠 Found ${productsWithKB.length} products with knowledge bases${authorCompanyName ? ` for company "${authorCompanyName}"` : ''}`);
-      
-      if (productsWithKB.length > 0) {
-        console.log('🧠 Products with KB:', productsWithKB.map(p => ({ name: p.name, id: p.id })));
-      }
-      
-      setAvailableProducts(productsWithKB);
+      // Load ALL products just like ChatWindow does
+      setAvailableProducts(products || []);
+      console.log(`📦 Loaded ${(products || []).length} products:`, 
+        (products || []).map(p => ({ 
+          name: p.name, 
+          id: p.id, 
+          hasVectorStore: !!p.openai_vector_store_id 
+        }))
+      );
       
       // Auto-select provided productId if it exists
-      if (productId && productsWithKB.length > 0) {
-        const matchingProduct = productsWithKB.find(p => p.id === productId);
+      if (productId && products && products.length > 0) {
+        const matchingProduct = products.find(p => p.id === productId);
         if (matchingProduct) {
+          console.log(`✅ Auto-selected product: ${matchingProduct.name}`);
           setSelectedProduct(matchingProduct);
+        } else {
+          console.log(`❌ Product with ID ${productId} not found`);
         }
       }
     } catch (error) {
@@ -267,21 +355,32 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
   };
 
   const handleProductSelect = (product: ProductType | null) => {
+    console.log('🎯 Product selected in copilot:', product ? {
+      id: product.id,
+      name: product.name,
+      vectorStoreId: product.openai_vector_store_id
+    } : 'No product (Basic AI mode)');
+    
     setSelectedProduct(product);
     setShowProductDropdown(false);
     
     // Reset thread when switching products to start fresh conversation
     if (product?.id !== selectedProduct?.id) {
+      console.log('🔄 Resetting thread due to product change');
       setAssistantThreadId(null);
       setMessages([]);
     }
   };
 
-  const createNewConversation = async () => {
+  const createNewConversation = async (firstMessage?: string) => {
     try {
+      const title = firstMessage 
+        ? chatService.generateConversationTitle(firstMessage, 'Article Assistant')
+        : `Article Assistant: ${articleTitle.substring(0, 30)}...`;
+        
       const conversation = await chatService.createConversation({
-        title: `Article Assistant: ${articleTitle}`,
-        product_id: undefined
+        title,
+        product_id: selectedProduct?.id
       });
       
       if (conversation) {
@@ -318,7 +417,7 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
       // Create conversation if needed
       let conversationId = currentConversationId;
       if (!conversationId) {
-        const conversation = await createNewConversation();
+        const conversation = await createNewConversation(text);
         conversationId = conversation?.id || null;
       }
 
@@ -328,7 +427,12 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
           conversation_id: conversationId,
           role: 'user',
           content: text,
-          metadata: { articleTitle, context: 'article-editing' }
+          metadata: { 
+            articleTitle, 
+            context: 'article-editing',
+            productId: selectedProduct?.id,
+            timestamp: new Date().toISOString()
+          }
         });
       }
 
@@ -350,7 +454,12 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
           conversation_id: conversationId,
           role: 'assistant',
           content: aiResponse,
-          metadata: { articleTitle, context: 'article-editing' }
+          metadata: { 
+            articleTitle, 
+            context: 'article-editing',
+            productId: selectedProduct?.id,
+            timestamp: new Date().toISOString()
+          }
         });
       }
 
@@ -371,105 +480,110 @@ const ArticleAICoPilot: React.FC<ArticleAICoPilotProps> = ({
 
   const generateAIResponse = async (userInput: string, content: string): Promise<string> => {
     try {
-      // Use selected product from dropdown, fallback to prop productId
-      const activeProductId = selectedProduct?.id || productId;
+      // Use selected product, just like ChatWindow does
+      if (!selectedProduct) {
+        return "Please select a product with a knowledge base to get AI assistance.";
+      }
+
+      console.log('🧠 Using product:', selectedProduct.name, 'with vector store:', selectedProduct.openai_vector_store_id);
       
-      // If we have a product selected, use your templated assistant with knowledge base
-      if (activeProductId) {
-        console.log('🧠 Using templated assistant with knowledge base for product:', activeProductId, 
-                   selectedProduct ? '(from dropdown)' : '(from prop)');
+      // Use direct OpenAI calls exactly like ChatWindow
+      let threadIdToUse = assistantThreadId;
+      if (!threadIdToUse) {
+        console.log('Creating new thread with vector store...');
         
-        // Enhance the user input with article context for better responses
-        const enhancedMessage = `As a content writing assistant, please help with this article:
-
-Title: "${articleTitle}"
-Content Length: ${content.split(' ').length} words
-Content Preview: ${content.substring(0, 500)}...
-
-User Request: ${userInput}
-
-Please provide specific, actionable advice that can be immediately implemented for improving this business content. Be concise but thorough.`;
-
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            productId: activeProductId,
-            message: enhancedMessage,
-            threadId: assistantThreadId // Maintain conversation context
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
+        // Configure thread with vector store exactly like ChatWindow
+        const threadConfig: any = {};
+        if (selectedProduct.openai_vector_store_id) {
+          threadConfig.tool_resources = {
+            file_search: {
+              vector_store_ids: [selectedProduct.openai_vector_store_id],
+            },
+          };
+          console.log('Creating thread with vector store:', selectedProduct.openai_vector_store_id);
         }
-
-        const data = await response.json();
         
-        // Update thread ID for future requests in this session
-        if (data.threadId && data.threadId !== assistantThreadId) {
-          setAssistantThreadId(data.threadId);
-        }
+        const threadResponse = await openai.beta.threads.create(threadConfig);
+        threadIdToUse = threadResponse.id;
+        setAssistantThreadId(threadIdToUse);
+        console.log('Thread created:', threadIdToUse);
+      }
 
-        return data.response || "I'm unable to provide suggestions at the moment. Please try again.";
-      } 
-      
-      // Fallback to basic OpenAI API if no productId (same as before but simplified)
-      else {
-        console.log('🤖 Using fallback OpenAI API (no product context)');
+      console.log('Adding message to thread...');
+      await openai.beta.threads.messages.create(threadIdToUse, {
+        role: 'user',
+        content: userInput.trim(),
+      });
+
+      console.log('Creating run...');
+      const runConfig: any = {
+        assistant_id: VITE_UNIVERSAL_ASSISTANT_ID,
+      };
+
+      const run = await openai.beta.threads.runs.create(threadIdToUse, runConfig);
+
+      console.log('Waiting for run completion...');
+      const maxAttempts = 60;
+      let attempts = 0;
+      let runStatus = run.status;
+
+      while (runStatus === 'in_progress' || runStatus === 'queued') {
+        if (attempts >= maxAttempts) {
+          console.error('Run timeout');
+          return 'The request timed out. Please try again.';
+        }
         
-        const openai = new OpenAI({
-          apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-          dangerouslyAllowBrowser: true
-        });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const runCheck = await openai.beta.threads.runs.retrieve(threadIdToUse, run.id);
+        runStatus = runCheck.status;
+        attempts++;
+        console.log(`Run status: ${runStatus} (attempt ${attempts})`);
+      }
 
-        if (!import.meta.env.VITE_OPENAI_API_KEY) {
-          throw new Error('OpenAI API key not configured');
+      if (runStatus === 'completed') {
+        console.log('Run completed, fetching messages...');
+        const messages = await openai.beta.threads.messages.list(threadIdToUse);
+        
+        if (messages.data.length > 0) {
+          const assistantMessage = messages.data.find(
+            (msg) => msg.role === 'assistant' && msg.run_id === run.id
+          );
+
+          if (assistantMessage && assistantMessage.content.length > 0) {
+            const textContent = assistantMessage.content.find(
+              (content) => content.type === 'text'
+            );
+
+            if (textContent && 'text' in textContent) {
+              const assistantText = textContent.text.value;
+              console.log('Assistant response:', assistantText);
+              return assistantText;
+            } else {
+              console.error('Assistant response is not text content');
+              return 'The assistant returned an unexpected response format.';
+            }
+          } else {
+            console.error('Assistant message has no content');
+            return 'The assistant response was empty.';
+          }
+        } else {
+          console.error('No assistant messages found');
+          return 'No response received from the assistant.';
         }
-
-        const systemPrompt = `You are an expert content writing assistant for business articles. Provide specific, actionable advice for:
-
-Article: "${articleTitle}"
-Context: ${content.substring(0, 300)}...
-
-Focus on practical improvements that can be implemented immediately.`;
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userInput }
-          ],
-          max_tokens: 500,
-          temperature: 0.7
-        });
-
-        return completion.choices[0]?.message?.content || "I'm unable to provide suggestions at the moment. Please try again.";
+      } else {
+        console.error(`Run failed with status: ${runStatus}`);
+        return 'The assistant encountered an error while processing your request.';
       }
     } catch (error) {
       console.error('AI Response Error:', error);
-      
-      // Enhanced fallback responses based on input analysis
-      if (userInput.toLowerCase().includes('seo')) {
-        return "For SEO optimization, consider:\n\n• Adding relevant keywords naturally throughout the content\n• Improving your meta description and title tags\n• Creating clear headings (H1, H2, H3) for better structure\n• Including internal and external links to authoritative sources\n• Optimizing content length for your target keywords";
-      }
-      
-      if (userInput.toLowerCase().includes('engagement') || userInput.toLowerCase().includes('hook')) {
-        return "To improve engagement:\n\n• Start with a compelling hook or statistic\n• Use storytelling elements to connect with readers\n• Add interactive elements like questions or calls-to-action\n• Break up text with bullet points and subheadings\n• Include real examples and case studies";
-      }
-      
-      if (userInput.toLowerCase().includes('structure') || userInput.toLowerCase().includes('flow')) {
-        return "For better content structure:\n\n• Create a clear introduction-body-conclusion flow\n• Use transitional phrases between sections\n• Ensure each paragraph focuses on one main idea\n• Add a table of contents for longer articles\n• Include a compelling conclusion with next steps";
-      }
-      
-      return "I'm currently experiencing connectivity issues. Here are some general tips:\n\n• Focus on clear, actionable content\n• Use compelling headlines and subheadings\n• Include specific examples and data\n• Ensure your content addresses reader pain points\n• End with a strong call-to-action";
+      return "I'm currently experiencing connectivity issues. Please try again.";
     }
   };
 
   const handleTemplateClick = (template: SuggestionTemplate) => {
     const contextualPrompt = `${template.prompt}\n\nArticle Title: "${articleTitle}"\n\nCurrent Content: ${articleContent.substring(0, 500)}...`;
+    setView('chat');
+    setShowTemplates(false);
     handleSendMessage(contextualPrompt);
   };
 

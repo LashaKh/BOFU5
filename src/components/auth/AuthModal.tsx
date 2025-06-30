@@ -74,6 +74,19 @@ export function AuthModal({ isOpen, onClose, onShowAdminLogin }: AuthModalProps)
         // Navigate to dashboard after successful registration and sign in
         navigate('/', { replace: true });
       } else {
+        // Check if the user is a sub-admin before signing in
+        const { data: adminProfile, error: adminError } = await supabase
+          .from('admin_profiles')
+          .select('id')
+          .eq('email', formData.email)
+          .single();
+
+        if (adminProfile) {
+          toast.error('Admins must log in through the admin portal.');
+          setIsLoading(false);
+          return;
+        }
+
         // Use our signIn function for login
         const signInResult = await signIn(formData.email, formData.password);
         

@@ -29,6 +29,8 @@ import {
 } from '../../lib/commentApi';
 import {
   getBriefApprovalNotifications,
+  getBriefOnlyNotifications,
+  getProductOnlyNotifications,
   markBriefApprovalNotificationsAsRead,
   BriefApprovalNotification
 } from '../../lib/briefApprovalNotifications';
@@ -40,7 +42,7 @@ interface AssignmentNotificationCenterProps {
 
 interface NotificationItem {
   id: string;
-  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation' | 'mention' | 'comment' | 'brief_approved';
+  type: 'assignment' | 'unassignment' | 'transfer' | 'account_created' | 'account_deleted' | 'bulk_operation' | 'mention' | 'comment' | 'brief_approved' | 'product_approved';
   message: string;
   details?: string;
   timestamp: string;
@@ -67,6 +69,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     adminRole, 
     allAdmins, 
     assignedClients,
+    assignedClientIds,
     refreshAdminData
   } = useAdminContext();
 
@@ -75,11 +78,11 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
   const [mentionNotifications, setMentionNotifications] = useState<MentionNotification[]>([]);
   const [briefApprovalNotifications, setBriefApprovalNotifications] = useState<BriefApprovalNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts' | 'mentions' | 'briefs'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'assignments' | 'accounts' | 'mentions' | 'briefs' | 'products'>('all');
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
 
-  // Only super-admins can access this component
-  if (adminRole !== 'super_admin') {
+  // Only admin users can access this component
+  if (!adminRole || (adminRole !== 'super_admin' && adminRole !== 'sub_admin')) {
     return null;
   }
 
@@ -88,8 +91,12 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     try {
       setIsLoading(true);
       
-      // Load assignment activities
-      const { data, error } = await supabase
+      // Get current admin ID for filtering
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return;
+      
+      // Load assignment activities - filter based on admin role
+      let assignmentQuery = supabase
         .from('admin_client_assignments')
         .select(`
           id,
@@ -102,6 +109,27 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         `)
         .order('assigned_at', { ascending: false })
         .limit(50);
+      
+      // Filter by assigned clients for sub-admins
+      if (adminRole === 'sub_admin' && assignedClientIds.length > 0) {
+        assignmentQuery = assignmentQuery.in('client_user_id', assignedClientIds);
+        console.log(`🔍 [SUB-ADMIN] Filtering assignment activities for ${assignedClientIds.length} assigned clients`);
+      } else if (adminRole === 'sub_admin' && assignedClientIds.length === 0) {
+        // Sub-admin with no assigned clients should see no assignment activities
+        console.log('🔍 [SUB-ADMIN] No assigned clients, showing no assignment activities');
+        setRecentActivities([]);
+      }
+      
+      let data, error;
+      if (adminRole === 'sub_admin' && assignedClientIds.length === 0) {
+        // Skip query if sub-admin has no clients
+        data = [];
+        error = null;
+      } else {
+        const result = await assignmentQuery;
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('Error loading recent activities:', error);
@@ -121,23 +149,25 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
 
       setRecentActivities(activities);
       
-      // Load mention notifications for admin
+      // Load mention notifications for admin (with client filtering for sub-admins)
       let mentions: MentionNotification[] = [];
       try {
-        mentions = await getMentionNotifications();
+        const clientIdsForFiltering = adminRole === 'sub_admin' ? assignedClientIds : undefined;
+        mentions = await getMentionNotifications(undefined, clientIdsForFiltering);
         setMentionNotifications(mentions);
         console.log('📥 Loaded mention notifications for admin:', mentions.length);
       } catch (mentionError) {
         console.error('Error loading mention notifications:', mentionError);
       }
       
-      // Load brief approval notifications for admin
+      // Load brief approval notifications for admin (with client filtering for sub-admins)
       let briefApprovals: BriefApprovalNotification[] = [];
       try {
         // Get current admin ID from authentication
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id) {
-          briefApprovals = await getBriefApprovalNotifications(user.id);
+          const clientIdsForFiltering = adminRole === 'sub_admin' ? assignedClientIds : undefined;
+          briefApprovals = await getBriefApprovalNotifications(user.id, clientIdsForFiltering);
           setBriefApprovalNotifications(briefApprovals);
           console.log('📄 Loaded brief approval notifications for admin:', briefApprovals.length);
         }
@@ -203,21 +233,34 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     }));
 
     // Convert brief approval notifications to notification items
-    const briefApprovalNotificationItems: NotificationItem[] = briefApprovals.map((brief) => ({
-      id: `brief-${brief.id}`,
-      type: 'brief_approved' as const,
-      message: 'Content Brief Approved',
-      details: `${brief.user_email} from ${brief.user_company} approved: "${brief.brief_title}"`,
-      timestamp: brief.created_at,
-      isRead: brief.is_read,
-      priority: 'medium' as const,
-      metadata: {
-        briefId: brief.brief_id,
-        userEmail: brief.user_email,
-        userCompany: brief.user_company,
-        briefTitle: brief.brief_title
-      }
-    }));
+    const briefApprovalNotificationItems: NotificationItem[] = briefApprovals.map((brief) => {
+      const isProductApproval = brief.notification_type === 'product_approved';
+      
+      // Use the pre-constructed message if individual fields are null/missing
+      const hasIndividualFields = brief.user_email && brief.user_company && brief.brief_title;
+      const details = hasIndividualFields 
+        ? (isProductApproval 
+          ? `${brief.user_email} from ${brief.user_company} approved a product card: "${brief.brief_title}"`
+          : `${brief.user_email} from ${brief.user_company} approved: "${brief.brief_title}"`)
+        : brief.message || (isProductApproval ? 'Product card approved' : 'Content brief approved');
+      
+      return {
+        id: `${isProductApproval ? 'product' : 'brief'}-${brief.id}`,
+        type: isProductApproval ? 'product_approved' as const : 'brief_approved' as const,
+        message: isProductApproval ? 'Product Card Approved' : 'Content Brief Approved',
+        details,
+        timestamp: brief.created_at,
+        isRead: brief.is_read,
+        priority: 'medium' as const,
+        metadata: {
+          briefId: brief.brief_id,
+          userEmail: brief.user_email,
+          userCompany: brief.user_company,
+          briefTitle: brief.brief_title,
+          notificationType: brief.notification_type
+        }
+      };
+    });
 
     // Add some system notifications
     const systemNotifications: NotificationItem[] = [
@@ -267,6 +310,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return ['mention', 'comment'].includes(notification.type);
       case 'briefs':
         return notification.type === 'brief_approved';
+      case 'products':
+        return notification.type === 'product_approved';
       default:
         return true;
     }
@@ -285,8 +330,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     }
     
     // Handle brief approval notifications separately
-    if (notificationId.startsWith('brief-')) {
-      const briefNotificationId = notificationId.replace('brief-', '');
+    if (notificationId.startsWith('brief-') || notificationId.startsWith('product-')) {
+      const briefNotificationId = notificationId.replace(/^(brief-|product-)/, '');
       try {
         // Get current admin ID from authentication
         const { data: { user } } = await supabase.auth.getUser();
@@ -294,7 +339,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
           await markBriefApprovalNotificationsAsRead(user.id, [briefNotificationId]);
         }
       } catch (error) {
-        console.error('Error marking brief notification as read:', error);
+        console.error('Error marking brief/product notification as read:', error);
       }
     }
     
@@ -324,8 +369,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     
     // Mark brief approval notifications as read
     const briefIds = notifications
-      .filter(n => n.id.startsWith('brief-') && !n.isRead)
-      .map(n => n.id.replace('brief-', ''));
+      .filter(n => (n.id.startsWith('brief-') || n.id.startsWith('product-')) && !n.isRead)
+      .map(n => n.id.replace(/^(brief-|product-)/, ''));
     
     if (briefIds.length > 0) {
       try {
@@ -335,7 +380,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
           await markBriefApprovalNotificationsAsRead(user.id, briefIds);
         }
       } catch (error) {
-        console.error('Error marking brief notifications as read:', error);
+        console.error('Error marking brief/product notifications as read:', error);
       }
     }
     
@@ -376,9 +421,9 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
       }
 
       // Handle different types of notifications for database cleanup
-      if (notificationId.startsWith('brief-')) {
-        const briefNotificationId = notificationId.replace('brief-', '');
-        // Delete from brief_approval_notifications table
+      if (notificationId.startsWith('brief-') || notificationId.startsWith('product-')) {
+        const briefNotificationId = notificationId.replace(/^(brief-|product-)/, '');
+        // Delete from brief_approval_notifications table (used for both brief and product notifications)
         const { error } = await supabase
           .from('brief_approval_notifications')
           .delete()
@@ -386,7 +431,7 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
           .eq('admin_id', user.id);
         
         if (error) {
-          console.error('Error deleting brief notification:', error);
+          console.error('Error deleting brief/product notification:', error);
           toast.error('Failed to delete notification');
           return;
         }
@@ -476,6 +521,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
         return MessageSquare;
       case 'brief_approved':
         return CheckCircle;
+      case 'product_approved':
+        return CheckCircle;
       default:
         return Bell;
     }
@@ -497,12 +544,12 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
     }
   };
 
-  // Load data on component mount
+  // Load data on component mount and when assignments change
   useEffect(() => {
     if (isVisible) {
       loadRecentActivities();
     }
-  }, [isVisible]);
+  }, [isVisible, assignedClientIds, adminRole]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -575,7 +622,8 @@ export function AssignmentNotificationCenter({ isVisible, onClose }: AssignmentN
                   { key: 'assignments', label: 'Assignments', count: notifications.filter(n => ['assignment', 'unassignment', 'transfer', 'bulk_operation'].includes(n.type)).length },
                   { key: 'accounts', label: 'Accounts', count: notifications.filter(n => ['account_created', 'account_deleted'].includes(n.type)).length },
                   { key: 'mentions', label: 'Mentions', count: notifications.filter(n => ['mention', 'comment'].includes(n.type)).length },
-                  { key: 'briefs', label: 'Brief Approvals', count: notifications.filter(n => n.type === 'brief_approved').length }
+                  { key: 'briefs', label: 'Brief Approvals', count: notifications.filter(n => n.type === 'brief_approved').length },
+                  { key: 'products', label: 'Product Approvals', count: notifications.filter(n => n.type === 'product_approved').length }
                 ].map((tab) => (
                   <button
                     key={tab.key}

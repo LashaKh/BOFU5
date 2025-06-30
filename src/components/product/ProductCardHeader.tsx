@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useAdaptiveStyles, useProductCardTheme } from '../../contexts/ProductCardThemeContext';
+import { useAdminContext } from '../../contexts/AdminContext';
 import { ProductAnalysis } from '../../types/product/types';
 
 interface ProductCardHeaderProps {
@@ -87,8 +88,68 @@ const StatusBadge = ({ isApproved, theme }: { isApproved?: boolean; theme: any }
   );
 };
 
+// Admin info badge component for displaying user context
+const AdminInfoBadge = ({ product, isAdmin }: { product: ProductAnalysis; isAdmin: boolean }) => {
+  if (!isAdmin) return null;
+
+  // Check what admin data we have available for this product
+
+  // Show admin info if we have any relevant data
+  const hasAnyAdminInfo = product.userEmail || product.userCompanyName || product.userUUID || 
+                          product.research_result_id || product.approvedBy;
+
+  if (!hasAnyAdminInfo) {
+    // Still show something for admins to indicate this is admin-only info
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        className="bg-gradient-to-r from-amber-50 to-orange-100 border border-amber-200 rounded-lg px-3 py-2 text-xs space-y-1"
+      >
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+          <span className="text-amber-900 font-semibold">Admin View</span>
+        </div>
+        <div className="text-amber-800 text-[10px]">No submission details available</div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3, duration: 0.5 }}
+      className="bg-gradient-to-r from-blue-50 to-indigo-100 border border-blue-200 rounded-lg px-3 py-2 text-xs space-y-1"
+    >
+      <div className="flex items-center space-x-2">
+        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+        <span className="text-blue-900 font-semibold">Submission Details</span>
+      </div>
+      {product.userEmail && (
+        <div className="text-blue-800 font-medium">📧 {product.userEmail}</div>
+      )}
+      {product.userCompanyName && (
+        <div className="text-blue-700">🏢 {product.userCompanyName}</div>
+      )}
+      {product.userUUID && !product.userEmail && (
+        <div className="text-blue-700 text-[10px]">User ID: {product.userUUID.slice(0, 8)}...</div>
+      )}
+      {product.approvedBy && (
+        <div className="text-green-700 text-[10px]">✅ Approved by: {product.approvedBy.slice(0, 8)}...</div>
+      )}
+      {product.research_result_id && (
+        <div className="text-blue-600 text-[10px] opacity-75">
+          🔬 Research: {product.research_result_id.slice(0, 8)}...
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 // Premium company branding section with enhanced typography and visual hierarchy
-const CompanyBranding = ({ product, styles }: { product: ProductAnalysis; styles: any }) => {
+const CompanyBranding = ({ product, styles, isAdmin }: { product: ProductAnalysis; styles: any; isAdmin: boolean }) => {
   return (
     <div className="flex-1 min-w-0 space-y-3">
       {/* Company Name with premium styling */}
@@ -153,6 +214,9 @@ const CompanyBranding = ({ product, styles }: { product: ProductAnalysis; styles
           {product.productDetails.name}
         </motion.h3>
       )}
+
+      {/* Admin Information Badge */}
+      <AdminInfoBadge product={product} isAdmin={isAdmin} />
 
       {/* Premium document link with enhanced styling */}
       {(product.competitorAnalysisUrl || product.google_doc) && (
@@ -295,6 +359,7 @@ export function ProductCardHeader({
 }: ProductCardHeaderProps) {
   const { theme, isReducedMotion } = useProductCardTheme();
   const styles = useAdaptiveStyles();
+  const { isAdmin } = useAdminContext();
 
   return (
     <div 
@@ -336,7 +401,7 @@ export function ProductCardHeader({
       
       <div className="relative z-10 flex items-start justify-between space-x-6">
         {/* Left side: Enhanced Company branding */}
-        <CompanyBranding product={product} styles={styles} />
+        <CompanyBranding product={product} styles={styles} isAdmin={isAdmin} />
 
         {/* Right side: Enhanced Status and actions */}
         <div className="flex items-center space-x-4 flex-shrink-0">

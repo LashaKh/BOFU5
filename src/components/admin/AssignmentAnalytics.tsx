@@ -115,7 +115,8 @@ export function AssignmentAnalytics({ className = '' }: AssignmentAnalyticsProps
     100 - (Math.max(...analytics.distribution.map(d => d.clientCount)) - Math.min(...analytics.distribution.map(d => d.clientCount))) * 10 : 100;
 
   return (
-    <div className={`${className} h-full flex flex-col space-y-6`}>
+    <div className={`${className} h-full overflow-y-auto custom-scrollbar pr-2`}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="mb-2">
         <div className="flex items-center gap-3 mb-2">
@@ -271,7 +272,7 @@ export function AssignmentAnalytics({ className = '' }: AssignmentAnalyticsProps
             Admin Distribution
           </h3>
           
-          <div className="space-y-3 max-h-64 overflow-y-auto">
+          <div className="space-y-3">
             {analytics.distribution.map((admin, index) => (
               <motion.div
                 key={admin.adminEmail}
@@ -383,6 +384,7 @@ export function AssignmentAnalytics({ className = '' }: AssignmentAnalyticsProps
           </div>
         </div>
       </motion.div>
+      </div>
     </div>
   );
 } 

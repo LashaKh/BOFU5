@@ -645,7 +645,11 @@ export const AdminArticleEditorPage: React.FC<AdminArticleEditorPageProps> = () 
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
           className={`h-full ${showSettings ? 'pt-48' : 'pt-24'}`}
-          style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937)' }}
+          style={{ 
+            background: 'linear-gradient(to bottom right, #111827, #1f2937)',
+            width: showAICoPilot ? 'calc(100% - 420px)' : '100%',
+            transition: 'width 0.3s ease'
+          }}
         >
           <ArticleEditor
             articleId={articleId}
@@ -658,6 +662,7 @@ export const AdminArticleEditorPage: React.FC<AdminArticleEditorPageProps> = () 
             onStatusChange={handleStatusChange}
             onOwnershipTransfer={(newOwnerId: string) => console.log('Ownership transfer:', newOwnerId)}
             onAdminNote={(note: string) => console.log('Admin note:', note)}
+            isAiCopilotOpen={showAICoPilot}
           />
         </motion.main>
 

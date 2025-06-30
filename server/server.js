@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 
 // Load environment variables
 dotenv.config();
@@ -20,6 +21,17 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 const supabase = supabaseUrl && supabaseServiceRoleKey 
   ? createClient(supabaseUrl, supabaseServiceRoleKey)
   : null;
+
+// Initialize OpenAI client for chat functionality
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY
+});
+
+// Initialize anon Supabase client for chat queries
+const supabaseAnonUrl = process.env.VITE_SUPABASE_URL || 'https://nhxjashreguofalhaofj.supabase.co';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oeGphc2hyZWd1b2ZhbGhhb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1MDg4NDQsImV4cCI6MjA1OTA4NDg0NH0.yECqdVt448XiKOZZovyFHfYLsIcwDRhPyPUIUpvy_to';
+const supabaseAnon = createClient(supabaseAnonUrl, supabaseAnonKey);
+console.log('Supabase initialized with URL:', supabaseAnonUrl);
 
 // Middleware
 app.use(cors());
@@ -222,6 +234,266 @@ app.get('/api/admin/articles', asyncHandler(async (req, res) => {
     limit: limitNum,
     totalPages,
   });
+}));
+
+// Fetch product details from Supabase
+const getProductDetails = async (productId) => {
+  console.log(`Backend: Fetching details for product ${productId}`);
+  
+  try {
+    // First try to get from products table
+    console.log('Querying products table...');
+    const { data: products, error } = await supabaseAnon
+      .from('products')
+      .select('id, name, description, openai_vector_store_id')
+      .eq('id', productId);
+    
+    console.log('Products query result:', { products, error });
+    
+    if (!error && products && products.length > 0) {
+      const product = products[0];
+      console.log('Found product in products table:', product.name, 'with vector store:', product.openai_vector_store_id);
+      return product;
+    }
+    
+    if (error) {
+      console.log('Error fetching from products table:', error.message);
+    }
+    
+    // If not found, try approved_products table
+    const { data: approvedProducts, error: approvedError } = await supabaseAnon
+      .from('approved_products')
+      .select('id, product_name, product_description')
+      .eq('id', productId);
+    
+    if (!approvedError && approvedProducts && approvedProducts.length > 0) {
+      const approvedProduct = approvedProducts[0];
+      console.log('Found product in approved_products table:', approvedProduct.product_name);
+      return {
+        id: approvedProduct.id,
+        name: approvedProduct.product_name,
+        description: approvedProduct.product_description,
+        openai_vector_store_id: undefined
+      };
+    }
+    
+    console.log('Product not found in either table');
+    return null;
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    return null;
+  }
+};
+
+// Chat API endpoint with dynamic KB appending
+app.post('/api/chat', asyncHandler(async (req, res) => {
+  const { message, productId, threadId, articleTitle, articleContent } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required.' });
+  }
+
+  const assistantId = process.env.VITE_UNIVERSAL_ASSISTANT_ID || process.env.UNIVERSAL_ASSISTANT_ID;
+  
+  if (!assistantId) {
+    return res.status(500).json({ error: 'Universal Assistant ID not configured' });
+  }
+
+  // Handle no product selected - use your assistant without KB
+  if (!productId) {
+    console.log(`Backend: No product selected - using assistant without KB: "${message}"`);
+    
+    try {
+      // Clear any vector stores from assistant when no product is selected
+      await openai.beta.assistants.update(assistantId, {
+        tool_resources: {
+          file_search: {
+            vector_store_ids: []
+          }
+        }
+        // DO NOT update instructions - keep user's existing assistant prompt
+      });
+      console.log('Cleared all vector stores - assistant running without KB');
+
+      // Create or retrieve thread
+      let activeThreadId = threadId;
+      if (!activeThreadId) {
+        const thread = await openai.beta.threads.create();
+        activeThreadId = thread.id;
+        console.log('Created new thread:', activeThreadId);
+      }
+
+      // Add message to thread
+      await openai.beta.threads.messages.create(activeThreadId, {
+        role: "user",
+        content: message
+      });
+
+      // Run the assistant
+      console.log('Running assistant without KB...');
+      const run = await openai.beta.threads.runs.create(activeThreadId, {
+        assistant_id: assistantId
+      });
+
+      // Poll for completion
+      let runStatus = await openai.beta.threads.runs.retrieve(activeThreadId, run.id);
+      let attempts = 0;
+      const maxAttempts = 60;
+      
+      while (runStatus.status !== 'completed' && runStatus.status !== 'failed' && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        runStatus = await openai.beta.threads.runs.retrieve(activeThreadId, run.id);
+        console.log(`Run status: ${runStatus.status} (attempt ${attempts + 1}/${maxAttempts})`);
+        attempts++;
+      }
+
+      if (runStatus.status === 'failed') {
+        throw new Error('Assistant run failed: ' + (runStatus.last_error?.message || 'Unknown error'));
+      }
+
+      if (runStatus.status !== 'completed') {
+        throw new Error('Assistant run timed out');
+      }
+
+      // Get the assistant's response
+      const messages = await openai.beta.threads.messages.list(activeThreadId);
+      const lastMessage = messages.data[0];
+      
+      let responseText = '';
+      if (lastMessage && lastMessage.content[0].type === 'text') {
+        responseText = lastMessage.content[0].text.value;
+      }
+
+      if (!responseText) {
+        throw new Error('No response from assistant');
+      }
+
+      const assistantResponse = {
+        response: responseText,
+        threadId: activeThreadId
+      };
+      
+      console.log('Backend: Sending assistant response (no KB)');
+      return res.json(assistantResponse);
+      
+    } catch (error) {
+      console.error('Assistant API Error (no KB):', error);
+      return res.status(500).json({ 
+        error: 'Failed to generate AI response',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  // KB Assistant path - requires productId for dynamic KB appending
+  console.log(`Backend: Received message for product ${productId}: "${message}" (Thread: ${threadId || 'new'})`);
+
+  const productDetails = await getProductDetails(productId);
+
+  if (!productDetails) {
+    return res.status(404).json({ error: 'Product not found.' });
+  }
+
+  try {
+    console.log('Using OpenAI Assistant API with ID:', assistantId);
+
+    // Create or retrieve thread
+    let activeThreadId = threadId;
+    if (!activeThreadId) {
+      const thread = await openai.beta.threads.create();
+      activeThreadId = thread.id;
+      console.log('Created new thread:', activeThreadId);
+    }
+
+    // Dynamically append only the product's KB - DO NOT change system prompt
+    try {
+      if (productDetails.openai_vector_store_id) {
+        // First check if vector store exists before updating
+        try {
+          await openai.beta.vectorStores.retrieve(productDetails.openai_vector_store_id);
+          
+          // Vector store exists, append it to assistant
+          await openai.beta.assistants.update(assistantId, {
+            tool_resources: {
+              file_search: {
+                vector_store_ids: [productDetails.openai_vector_store_id]
+              }
+            }
+            // DO NOT update instructions - keep user's existing assistant prompt
+          });
+          console.log('Appended product KB vector store:', productDetails.openai_vector_store_id);
+        } catch (vectorStoreError) {
+          console.warn('Vector store not found:', productDetails.openai_vector_store_id, 'Skipping KB attachment');
+          // Continue without vector store - assistant will work with its existing configuration
+        }
+      } else {
+        console.log('No vector store ID available for this product');
+      }
+    } catch (updateError) {
+      console.warn('Failed to update assistant, continuing with existing configuration:', updateError);
+      // Continue anyway - the assistant will still work with its existing configuration
+    }
+
+    // Add message to thread
+    await openai.beta.threads.messages.create(activeThreadId, {
+      role: "user",
+      content: message
+    });
+
+    // Run the assistant
+    console.log('Running assistant...');
+    const run = await openai.beta.threads.runs.create(activeThreadId, {
+      assistant_id: assistantId
+    });
+
+    // Poll for completion
+    let runStatus = await openai.beta.threads.runs.retrieve(activeThreadId, run.id);
+    let attempts = 0;
+    const maxAttempts = 60; // 60 seconds timeout
+    
+    while (runStatus.status !== 'completed' && runStatus.status !== 'failed' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      runStatus = await openai.beta.threads.runs.retrieve(activeThreadId, run.id);
+      console.log(`Run status: ${runStatus.status} (attempt ${attempts + 1}/${maxAttempts})`);
+      attempts++;
+    }
+
+    if (runStatus.status === 'failed') {
+      throw new Error('Assistant run failed: ' + (runStatus.last_error?.message || 'Unknown error'));
+    }
+
+    if (runStatus.status !== 'completed') {
+      throw new Error('Assistant run timed out');
+    }
+
+    // Get the assistant's response
+    const messages = await openai.beta.threads.messages.list(activeThreadId);
+    const lastMessage = messages.data[0];
+    
+    let responseText = '';
+    if (lastMessage && lastMessage.content[0].type === 'text') {
+      responseText = lastMessage.content[0].text.value;
+    }
+
+    if (!responseText) {
+      throw new Error('No response from assistant');
+    }
+
+    const assistantResponse = {
+      response: responseText,
+      threadId: activeThreadId
+    };
+    
+    console.log('Backend: Sending AI assistant response');
+    return res.json(assistantResponse);
+    
+  } catch (error) {
+    console.error('OpenAI Assistant API Error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to generate AI response',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }));
 
 // Error handling middleware

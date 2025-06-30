@@ -154,7 +154,7 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
             Sub-Admin Editors
           </h3>
           
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
             {subAdmins.map((admin) => (
               <motion.button
                 key={admin.id}
@@ -213,7 +213,7 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
                     Assigned Clients ({assignments.length})
                   </h4>
                   
-                  <div className="space-y-2 overflow-y-auto flex-1">
+                  <div className="space-y-2 overflow-y-auto flex-1 pr-2 custom-scrollbar max-h-[400px]">
                     {isLoadingAssignments ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
@@ -276,7 +276,7 @@ export function ClientAssignmentPanel({ className = '' }: ClientAssignmentPanelP
                     />
                   </div>
                   
-                  <div className="space-y-2 overflow-y-auto flex-1">
+                  <div className="space-y-2 overflow-y-auto flex-1 pr-2 custom-scrollbar max-h-[400px]">
                     {filteredUnassignedClients.length > 0 ? (
                       filteredUnassignedClients.map((client) => (
                         <div

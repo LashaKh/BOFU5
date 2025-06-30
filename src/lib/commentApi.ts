@@ -1529,9 +1529,10 @@ export const createMentionNotifications = async (
   }
 };
 
-// Get mention notifications for a user
+// Get mention notifications for a user with client filtering for sub-admins
 export const getMentionNotifications = async (
-  userId?: string
+  userId?: string,
+  assignedClientIds?: string[]
 ): Promise<MentionNotification[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -1606,6 +1607,20 @@ export const getMentionNotifications = async (
         } : undefined
       };
     });
+
+    // Apply client filtering for sub-admins
+    if (assignedClientIds && assignedClientIds.length > 0) {
+      const filteredResult = result.filter(notification => {
+        // Only include notifications where the comment was made by an assigned client
+        return notification.comment && assignedClientIds.includes(notification.comment.user_id);
+      });
+      console.log(`🔍 [SUB-ADMIN] Filtered ${result.length} mention notifications down to ${filteredResult.length} for assigned clients`);
+      return filteredResult;
+    } else if (assignedClientIds && assignedClientIds.length === 0) {
+      // Sub-admin with no assigned clients should see no mentions
+      console.log('🔍 [SUB-ADMIN] No assigned clients, showing no mention notifications');
+      return [];
+    }
 
     return result;
   } catch (error) {

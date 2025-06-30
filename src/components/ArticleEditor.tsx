@@ -764,6 +764,7 @@ interface ArticleEditorProps {
   onStatusChange?: (status: 'draft' | 'editing' | 'review' | 'final' | 'published') => void;
   onOwnershipTransfer?: (newOwnerId: string) => void;
   onAdminNote?: (note: string) => void;
+  isAiCopilotOpen?: boolean;
 }
 
 type ViewMode = 'editor' | 'preview' | 'split';
@@ -959,7 +960,8 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   originalAuthor,
   onStatusChange,
   onOwnershipTransfer,
-  onAdminNote
+  onAdminNote,
+  isAiCopilotOpen = false
 }) => {
   // Enhanced theme management
   const { theme } = useTheme();
@@ -1627,18 +1629,22 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
 
   // Render main toolbar
   const renderMainToolbar = () => (
-    <motion.div 
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className={`
-        ${focusMode === 'zen' ? 'hidden' : 'block'}
-        bg-white/95 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4
-        ${theme === 'dark' ? 'bg-gray-900/95 border-gray-700/50 dark' : ''}
-        fixed top-20 z-40 w-full shadow-sm
-      `}
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className={`
+          ${focusMode === 'zen' ? 'hidden' : 'block'}
+          bg-white/95 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4
+          ${theme === 'dark' ? 'bg-gray-900/95 border-gray-700/50 dark' : ''}
+          fixed top-20 z-40 shadow-sm
+        `}
+        style={{
+          width: isAiCopilotOpen ? 'calc(100% - 420px)' : '100%',
+          transition: 'width 0.3s ease'
+        }}
     >
       {/* Top toolbar row */}
-      <div className="flex items-center justify-between mb-4">
+      <div className={`${isAiCopilotOpen ? 'flex flex-wrap items-center gap-2 justify-between' : 'flex items-center justify-between'} mb-4`}>
         {/* Left: File operations */}
         <div className="flex items-center gap-3">
           <ToolbarButton
@@ -1706,7 +1712,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       </div>
 
       {/* Main formatting toolbar */}
-      <div className="flex items-center justify-between">
+      <div className={`${isAiCopilotOpen ? 'flex flex-wrap items-center gap-2 justify-between' : 'flex items-center justify-between'}`}>
         {/* Left: Primary formatting tools */}
         <div className="flex items-center gap-3">
           {/* Undo/Redo */}
@@ -2037,7 +2043,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       </div>
 
       {/* Main content area with proper layout - Make wider overall */}
-      <div className="flex-1 flex overflow-hidden pt-28" style={{ maxWidth: '100vw' }}>
+      <div className="flex-1 flex overflow-hidden pt-28" style={{ maxWidth: '100%' }}>
         {/* Editor area - takes most space */}
         <div className={`flex-1 flex flex-col min-w-0 ${focusMode === 'zen' ? 'overflow-y-auto' : 'overflow-hidden'}`} style={{ minWidth: '60%' }}>
           {/* Editor container - properly contained with overflow handling */}

@@ -1289,16 +1289,21 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                             </button>
                           </div>
                           {(() => {
-                            // Ensure product data is properly formatted
-                            const cleanProduct = product || {};
-                            console.log('🚨 APPROVED PRODUCT CARD RENDER:', {
-                              approvedProductId: approvedProduct.id,
-                              approvedProductIdString: approvedProduct.id?.toString(),
-                              researchResultId: approvedProduct.research_result_id,
-                              companyName: cleanProduct.companyName || 'Unknown',
-                              productName: cleanProduct.productDetails?.name || 'Unknown',
-                              approvedProductKeys: Object.keys(approvedProduct),
-                              fullApprovedProduct: approvedProduct
+                            // Ensure product data is properly formatted and includes user information for admin context
+                            const cleanProduct = {
+                              ...(product || {}),
+                              // Add user information for admin context
+                              userEmail: companyGroup.main_account.email,
+                              userCompanyName: companyGroup.company_name,
+                              userUUID: companyGroup.main_account.id,
+                              research_result_id: approvedProduct.research_result_id,
+                              approvedBy: approvedProduct.approved_by
+                            };
+                            // Log enhanced product for debugging
+                            console.log('Admin product card with user context:', {
+                              productName: cleanProduct.productDetails?.name,
+                              userEmail: cleanProduct.userEmail,
+                              userCompany: cleanProduct.userCompanyName
                             });
                             
                             return (

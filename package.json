@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev:server": "nodemon --exec \"node --loader ts-node/esm server/index.ts\""
+    "dev:server": "node server/server.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -71,7 +71,7 @@
     "mammoth": "^1.7.0",
     "markdown-it": "^14.1.0",
     "marked": "^15.0.11",
-    "openai": "^4.28.0",
+    "openai": "^4.104.0",
     "pdfjs-dist": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -111,6 +111,24 @@ export async function getCurrentUser() {
 // Sign in
 export async function signIn(email: string, password: string) {
   try {
+    // First, check if the user is in admin_profiles
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (adminError && adminError.code !== 'PGRST116') {
+      // PGRST116 means no rows found, which is fine. Any other error is a problem.
+      throw new Error(`Database error checking admin status: ${adminError.message}`);
+    }
+
+    if (adminProfile) {
+      // User is an admin, so they should use the admin login.
+      throw new Error('Admins must log in through the admin portal.');
+    }
+
+    // If not an admin, proceed with regular sign-in
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password

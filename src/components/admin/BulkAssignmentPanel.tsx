@@ -280,7 +280,7 @@ export function BulkAssignmentPanel({ className = '' }: BulkAssignmentPanelProps
   const availableClients = getAvailableClients();
 
   return (
-    <div className={`${className} h-full flex flex-col`}>
+    <div className={`${className} h-full overflow-y-auto custom-scrollbar pr-2`}>
       {/* Panel Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -294,7 +294,7 @@ export function BulkAssignmentPanel({ className = '' }: BulkAssignmentPanelProps
         </div>
       </div>
 
-      <div className="flex-1 space-y-6">
+      <div className="space-y-6">
         {/* Operation Controls */}
         <div className="p-4 rounded-lg bg-gray-800/60 border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Operation Configuration</h3>
@@ -408,7 +408,7 @@ export function BulkAssignmentPanel({ className = '' }: BulkAssignmentPanelProps
               <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
             </div>
           ) : availableClients.length > 0 ? (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
               {availableClients.map((client) => {
                 const clientId = selectedOperation === 'assign' ? client.id : client.client_user_id;
                 const isSelected = selectedClients.has(clientId);

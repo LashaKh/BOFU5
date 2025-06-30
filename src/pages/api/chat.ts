@@ -21,9 +21,11 @@ const supabase = supabaseUrl && supabaseServiceRoleKey ? createClient(supabaseUr
 const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 
 interface ChatRequestBody {
-  productId: string;
+  productId?: string; // Made optional to support basic AI mode
   message: string;
   threadId?: string;
+  articleTitle?: string; // For context in basic AI mode
+  articleContent?: string; // For context in basic AI mode
 }
 
 // Define potential structured error responses
@@ -66,65 +68,86 @@ export default async function handler(
     });
   }
 
-  const { productId, message, threadId: clientThreadId } = req.body as ChatRequestBody;
+  const { productId, message, threadId: clientThreadId, articleTitle, articleContent } = req.body as ChatRequestBody;
 
-  // 1. Rigorous Input Validation
-  if (!productId || typeof productId !== 'string' || productId.trim() === '') {
-    return res.status(400).json({ error: 'Missing or invalid productId', errorCode: ErrorTypes.INVALID_INPUT });
-  }
+  // 1. Input Validation
   if (!message || typeof message !== 'string' || message.trim() === '') {
     return res.status(400).json({ error: 'Missing or invalid message', errorCode: ErrorTypes.INVALID_INPUT });
+  }
+  if (productId && typeof productId !== 'string') {
+    return res.status(400).json({ error: 'Invalid productId format', errorCode: ErrorTypes.INVALID_INPUT });
   }
   if (clientThreadId && typeof clientThreadId !== 'string') {
     return res.status(400).json({ error: 'Invalid threadId format', errorCode: ErrorTypes.INVALID_INPUT });
   }
 
   try {
-    // 2. Fetch Product Details from Supabase
-    const { data: productData, error: productError } = await supabase
-      .from('products') // Assuming your table is named 'products'
-      .select('name, description, openai_vector_store_id')
-      .eq('id', productId)
-      .single();
+    // 2. Handle Enhanced Mode (with product) vs Basic Mode (without product)
+    let productData = null;
+    let productName = null;
+    let productDescription = null;
+    let vectorStoreId = null;
 
-    if (productError) {
-      console.error('Supabase error fetching product:', productError);
-      return res.status(500).json({
-        error: 'Failed to fetch product details from Supabase.',
-        errorCode: ErrorTypes.SUPABASE_ERROR,
-        details: productError.message,
-      });
-    }
+    if (productId) {
+      // Enhanced mode: Fetch Product Details from Supabase
+      const { data: fetchedProductData, error: productError } = await supabase
+        .from('products')
+        .select('name, description, openai_vector_store_id')
+        .eq('id', productId)
+        .single();
 
-    if (!productData) {
-      return res.status(404).json({
-        error: `Product with ID '${productId}' not found.`,
-        errorCode: ErrorTypes.PRODUCT_NOT_FOUND,
-      });
-    }
+      if (productError) {
+        console.error('Supabase error fetching product:', productError);
+        return res.status(500).json({
+          error: 'Failed to fetch product details from Supabase.',
+          errorCode: ErrorTypes.SUPABASE_ERROR,
+          details: productError.message,
+        });
+      }
 
-    const { name: productName, description: productDescription, openai_vector_store_id: vectorStoreId } = productData;
+      if (!fetchedProductData) {
+        return res.status(404).json({
+          error: `Product with ID '${productId}' not found.`,
+          errorCode: ErrorTypes.PRODUCT_NOT_FOUND,
+        });
+      }
 
-    if (!vectorStoreId) {
-      console.error(`Product ${productId} (${productName}) is missing an openai_vector_store_id.`);
-      return res.status(500).json({
-        error: `Configuration error: Product '${productName}' does not have an associated vector store ID.`,
-        errorCode: ErrorTypes.VECTOR_STORE_NOT_FOUND,
-      });
+      productData = fetchedProductData;
+      productName = productData.name;
+      productDescription = productData.description;
+      vectorStoreId = productData.openai_vector_store_id;
+
+      if (!vectorStoreId) {
+        console.error(`Product ${productId} (${productName}) is missing an openai_vector_store_id.`);
+        return res.status(500).json({
+          error: `Configuration error: Product '${productName}' does not have an associated vector store ID.`,
+          errorCode: ErrorTypes.VECTOR_STORE_NOT_FOUND,
+        });
+      }
+
+      console.log(`🧠 Enhanced mode: Using vector store ${vectorStoreId} for product "${productName}"`);
+    } else {
+      console.log('🤖 Basic mode: No product context, using general AI assistant');
     }
 
     // 3. Manage OpenAI Thread
     let currentThreadId = clientThreadId;
     if (!currentThreadId) {
       try {
-        const thread = await openai.beta.threads.create({
-          tool_resources: {
+        const threadOptions: any = {};
+        
+        // Only add vector store for enhanced mode
+        if (vectorStoreId) {
+          threadOptions.tool_resources = {
             file_search: {
-              vector_store_ids: [vectorStoreId] // Associate vector store at thread creation if possible, or per-run
+              vector_store_ids: [vectorStoreId]
             }
-          }
-        });
+          };
+        }
+        
+        const thread = await openai.beta.threads.create(threadOptions);
         currentThreadId = thread.id;
+        console.log(`🧵 Created thread ${currentThreadId} with options:`, JSON.stringify(threadOptions, null, 2));
       } catch (e: any) {
         console.error('OpenAI error creating thread:', e);
         return res.status(500).json({
@@ -133,9 +156,6 @@ export default async function handler(
           details: e.message,
         });
       }
-    } else {
-      // Optionally, verify if the existing threadId is valid or update its tool_resources if needed
-      // For now, we'll assume a provided threadId is valid and its resources are managed per-run
     }
 
     // 4. Add User Message to Thread
@@ -154,36 +174,37 @@ export default async function handler(
     }
 
     // 5. Create and Stream Run (or poll)
-    // Inject product description and dynamically associate vector store per run
-    const runInstructions = `You are a helpful assistant for the product: ${productName}. 
-    Product Description: ${productDescription || 'No description available.'} 
-    Please use the provided documents in the vector store to answer questions about this product. 
-    If the information is not in the documents, say that you do not have that information.`;
+    const runOptions: any = {
+      assistant_id: universalAssistantId!,
+    };
+
+    // Don't add vector store to run - it should already be on the thread
+    console.log(productId && productName && vectorStoreId 
+      ? `🔍 Using pre-configured assistant ${universalAssistantId} with vector store ${vectorStoreId} for product: ${productName}`
+      : '🤖 Using pre-configured assistant in basic mode (no vector store)');
     
     try {
-      const run = await openai.beta.threads.runs.createAndPoll(currentThreadId!, {
-        assistant_id: universalAssistantId!,
-        instructions: runInstructions,
-        tool_resources: {
-          file_search: {
-            vector_store_ids: [vectorStoreId]
-          }
-        },
-        // stream: true, // if you want to handle streaming on the backend later
-      });
+      console.log(`🚀 Creating OpenAI run with pre-configured assistant`);
+      console.log(`🔧 Run options:`, JSON.stringify(runOptions, null, 2));
+      
+      const run = await openai.beta.threads.runs.createAndPoll(currentThreadId!, runOptions);
+      console.log(`✅ Run completed with status: ${run.status}`);
 
       if (run.status === 'completed') {
         const messages = await openai.beta.threads.messages.list(run.thread_id);
         const assistantMessages = messages.data.filter(m => m.role === 'assistant');
-        // Return the latest assistant message, or all if preferred
         const lastAssistantMessage = assistantMessages[0]; 
         
         if (lastAssistantMessage && lastAssistantMessage.content[0]?.type === 'text') {
+          const response = lastAssistantMessage.content[0].text.value;
+          console.log(`📝 Assistant response: ${response.substring(0, 200)}...`);
+          
           return res.status(200).json({
-            response: lastAssistantMessage.content[0].text.value,
-            threadId: run.thread_id, // Send back the threadId (new or existing)
+            response: response,
+            threadId: run.thread_id,
           });
         } else {
+          console.log(`⚠️ Unexpected message format:`, lastAssistantMessage);
           return res.status(200).json({
             response: 'Assistant responded, but the message format is unexpected.',
             threadId: run.thread_id,

@@ -1335,8 +1335,8 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                 <RefreshCw size={18} className="text-gray-300 hover:text-white transition-colors" />
               </motion.button>
               
-              {/* Notification Bell - Super Admin Only */}
-              {adminRole === 'super_admin' && (
+              {/* Notification Bell - Admin Users */}
+              {(adminRole === 'super_admin' || adminRole === 'sub_admin') && (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}

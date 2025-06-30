@@ -38,3 +38,7 @@ node_modules/
 # Task files
 tasks.json
 tasks/ 
+# Secret files
+.mcp.json
+.gemini/settings.json
+.cursor/mcp.json

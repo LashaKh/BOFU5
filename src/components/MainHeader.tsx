@@ -8,8 +8,10 @@ import { UserCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { ProfileManager } from '../components/profile/ProfileManager';
 import { NotificationCenter } from './user-dashboard/NotificationCenter';
+import { AssignmentNotificationCenter } from './admin/AssignmentNotificationCenter';
 import { getMentionNotifications } from '../lib/commentApi';
 import { getBriefApprovalNotifications } from '../lib/briefApprovalNotifications';
+import { useAdminContext } from '../contexts/AdminContext';
 
 
 // Logo SVG component
@@ -38,6 +40,7 @@ export function MainHeader({
   const [user, setUser] = React.useState(propUser);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const { isAdmin, adminRole, assignedClientIds } = useAdminContext();
 
   const navigate = useNavigate();
 
@@ -61,8 +64,9 @@ export function MainHeader({
       try {
         console.log('🔔 Loading notifications for user:', user.email);
         
-        // Get mention notifications
-        const notifications = await getMentionNotifications();
+        // Get mention notifications (with client filtering for sub-admins)
+        const clientIdsForFiltering = adminRole === 'sub_admin' ? assignedClientIds : undefined;
+        const notifications = await getMentionNotifications(undefined, clientIdsForFiltering);
         let unreadCount = notifications.filter(n => !n.notification_sent).length;
         
         // Check if user is admin and get brief approval notifications
@@ -75,7 +79,10 @@ export function MainHeader({
             
           if (adminProfile) {
             console.log('🔔 Admin user detected, loading brief approval notifications');
-            const briefNotifications = await getBriefApprovalNotifications(adminProfile.id);
+            const briefNotifications = await getBriefApprovalNotifications(
+              adminProfile.id, 
+              clientIdsForFiltering
+            );
             const unreadBriefCount = briefNotifications.filter(n => !n.is_read).length;
             unreadCount += unreadBriefCount;
             console.log('🔔 Brief notifications loaded:', { total: briefNotifications.length, unread: unreadBriefCount });
@@ -119,7 +126,7 @@ export function MainHeader({
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load notifications when user changes
+  // Load notifications when user changes or admin assignments change
   React.useEffect(() => {
     if (user) {
       loadNotificationCount();
@@ -128,7 +135,7 @@ export function MainHeader({
       const interval = setInterval(loadNotificationCount, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, assignedClientIds, adminRole]);
 
   const handleSignOut = async () => {
     try {
@@ -382,14 +389,25 @@ export function MainHeader({
       </nav>
       
       {/* Notification Center Modal */}
-      <NotificationCenter
-        isVisible={showNotificationCenter}
-        onClose={() => {
-          setShowNotificationCenter(false);
-          // Refresh notification count when closing
-          loadNotificationCount();
-        }}
-      />
+      {isAdmin && (adminRole === 'super_admin' || adminRole === 'sub_admin') ? (
+        <AssignmentNotificationCenter
+          isVisible={showNotificationCenter}
+          onClose={() => {
+            setShowNotificationCenter(false);
+            // Refresh notification count when closing
+            loadNotificationCount();
+          }}
+        />
+      ) : (
+        <NotificationCenter
+          isVisible={showNotificationCenter}
+          onClose={() => {
+            setShowNotificationCenter(false);
+            // Refresh notification count when closing
+            loadNotificationCount();
+          }}
+        />
+      )}
       
 
     </header>

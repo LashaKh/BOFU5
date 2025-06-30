@@ -11,6 +11,8 @@ export interface BriefApprovalNotification {
   message: string;
   is_read: boolean;
   created_at: string;
+  notification_type?: string; // Add notification_type to distinguish between brief and product approvals
+  title?: string; // Add title field
 }
 
 /**
@@ -219,11 +221,21 @@ async function getTargetAdminIds(userId: string): Promise<string[]> {
 }
 
 /**
- * Get brief approval notifications for an admin
+ * Get brief approval notifications for an admin with client filtering for sub-admins
  */
-export async function getBriefApprovalNotifications(adminId: string) {
+export async function getBriefApprovalNotifications(
+  adminId: string, 
+  assignedClientIds?: string[]
+) {
   try {
-    const { data, error } = await supabase
+    // If sub-admin with no assigned clients, return empty
+    if (assignedClientIds && assignedClientIds.length === 0) {
+      console.log('🔍 [SUB-ADMIN] No assigned clients, showing no brief approval notifications');
+      return [];
+    }
+
+    // First get all notifications for this admin
+    const { data: notifications, error } = await supabase
       .from('brief_approval_notifications')
       .select('*')
       .eq('admin_id', adminId)
@@ -234,9 +246,90 @@ export async function getBriefApprovalNotifications(adminId: string) {
       return [];
     }
 
-    return data || [];
+    if (!notifications || notifications.length === 0) {
+      return [];
+    }
+
+    // If this is a sub-admin with assigned clients, filter by client emails
+    if (assignedClientIds && assignedClientIds.length > 0) {
+      // Get email addresses of assigned clients
+      const { data: clientProfiles, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, email')
+        .in('id', assignedClientIds);
+
+      if (profileError) {
+        console.error('Error fetching client profiles for filtering:', profileError);
+        return notifications; // Fallback: return all notifications if filtering fails
+      }
+
+      if (!clientProfiles || clientProfiles.length === 0) {
+        console.log('🔍 [SUB-ADMIN] No client profiles found, showing no notifications');
+        return [];
+      }
+
+      const assignedClientEmails = clientProfiles.map(profile => profile.email);
+      console.log(`🔍 [SUB-ADMIN] Filtering brief approval notifications for ${assignedClientEmails.length} assigned client emails`);
+
+      // Filter notifications to only include those from assigned clients
+      const filteredNotifications = notifications.filter(notification => 
+        assignedClientEmails.includes(notification.user_email)
+      );
+
+      console.log(`🔍 [SUB-ADMIN] Filtered ${notifications.length} notifications down to ${filteredNotifications.length} for assigned clients`);
+      return filteredNotifications;
+    }
+
+    // Super admin sees all notifications
+    return notifications;
   } catch (error) {
     console.error('Error in getBriefApprovalNotifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Get only brief approval notifications (excluding product approvals)
+ */
+export async function getBriefOnlyNotifications(
+  adminId: string, 
+  assignedClientIds?: string[]
+) {
+  try {
+    // Get all brief approval notifications first
+    const allNotifications = await getBriefApprovalNotifications(adminId, assignedClientIds);
+    
+    // Filter to only brief approvals
+    const briefNotifications = allNotifications.filter(
+      notification => notification.notification_type === 'brief_approved'
+    );
+
+    return briefNotifications;
+  } catch (error) {
+    console.error('Error in getBriefOnlyNotifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Get only product approval notifications (excluding brief approvals)
+ */
+export async function getProductOnlyNotifications(
+  adminId: string, 
+  assignedClientIds?: string[]
+) {
+  try {
+    // Get all brief approval notifications first
+    const allNotifications = await getBriefApprovalNotifications(adminId, assignedClientIds);
+    
+    // Filter to only product approvals
+    const productNotifications = allNotifications.filter(
+      notification => notification.notification_type === 'product_approved'
+    );
+
+    return productNotifications;
+  } catch (error) {
+    console.error('Error in getProductOnlyNotifications:', error);
     return [];
   }
 }

@@ -10,10 +10,51 @@ export interface ResearchResult {
   is_draft: boolean;
 }
 
+// Helper function to enrich products with user information
+async function enrichProductsWithUserInfo(products: ProductAnalysis[]): Promise<ProductAnalysis[]> {
+  try {
+    // Get current user
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    
+    if (!user) {
+      console.log('[research] No authenticated user, skipping user info enrichment');
+      return products;
+    }
+
+    // Get user profile information
+    const { data: profileData } = await supabase
+      .from('user_profiles')
+      .select('company_name, email')
+      .eq('id', user.id)
+      .single();
+
+    console.log('[research] Enriching products with user info:', {
+      userEmail: user.email,
+      userUUID: user.id,
+      userCompanyName: profileData?.company_name || profileData?.email?.split('@')[1] || 'Unknown'
+    });
+
+    // Enrich each product with user information
+    return products.map(product => ({
+      ...product,
+      userEmail: user.email || undefined,
+      userUUID: user.id,
+      userCompanyName: profileData?.company_name || profileData?.email?.split('@')[1] || undefined,
+    }));
+  } catch (error) {
+    console.error('[research] Error enriching products with user info:', error);
+    return products; // Return original products if enrichment fails
+  }
+}
+
 export async function saveResearchResults(results: ProductAnalysis[], title: string, isDraft = false): Promise<string> {
   try {
     // If results is an array with one item, use it directly, otherwise wrap single result in array
-    const dataToSave = Array.isArray(results) ? results : [results];
+    const rawDataToSave = Array.isArray(results) ? results : [results];
+    
+    // Enrich products with user information
+    const dataToSave = await enrichProductsWithUserInfo(rawDataToSave);
     
     // Generate a unique fingerprint of this data for logging and duplicate detection
     const firstProduct = dataToSave[0] || {};
@@ -71,11 +112,14 @@ export async function saveResearchResults(results: ProductAnalysis[], title: str
 
 export async function updateResearchResults(id: string, results: ProductAnalysis[], title: string, isDraft = false): Promise<void> {
   try {
+    // Enrich products with user information before updating
+    const enrichedResults = await enrichProductsWithUserInfo(results);
+    
     const { error } = await supabase
       .from('research_results')
       .update({
         title,
-        data: results,
+        data: enrichedResults,
         is_draft: isDraft
       })
       .eq('id', id);
@@ -101,17 +145,25 @@ export async function saveApprovedProduct(
       approvedBy
     });
 
+    // Ensure the product data includes user information (enrich if missing)
+    let enrichedProduct = product;
+    if (!product.userEmail || !product.userUUID) {
+      console.log('[research] Product missing user info, enriching...');
+      const enrichedProducts = await enrichProductsWithUserInfo([product]);
+      enrichedProduct = enrichedProducts[0] || product;
+    }
+
     // Insert the approved product into the approved_products table
     const { data, error } = await supabase
       .from('approved_products')
       .insert({
         research_result_id: researchResultId,
         product_index: productIndex,
-        product_name: product.productDetails?.name || 'Unnamed Product',
-        product_description: product.productDetails?.description || '',
-        company_name: product.companyName || '',
+        product_name: enrichedProduct.productDetails?.name || 'Unnamed Product',
+        product_description: enrichedProduct.productDetails?.description || '',
+        company_name: enrichedProduct.companyName || '',
         approved_by: approvedBy,
-        product_data: product,
+        product_data: enrichedProduct,
         reviewed_status: 'pending'
       })
       .select('id')
@@ -135,23 +187,62 @@ export async function getApprovedProducts(): Promise<any[]> {
   try {
     const { data, error } = await supabase
       .from('approved_products')
-      .select('*')
+      .select(`
+        *,
+        research_results!inner(
+          user_id,
+          user_profiles!inner(
+            email,
+            company_name
+          )
+        )
+      `)
       .order('approved_at', { ascending: false });
 
     if (error) throw error;
     
-    // Add source ID (either research_result_id or product_id) to each product's data
-    return (data || []).map(item => ({
-      ...item,
-      product_data: {
-        ...item.product_data,
-        research_result_id: item.research_result_id,
-        product_id: item.product_id
-      }
-    }));
+    // Enrich product data with user information and source IDs
+    return (data || []).map(item => {
+      const userProfile = item.research_results?.user_profiles;
+      
+      return {
+        ...item,
+        product_data: {
+          ...item.product_data,
+          research_result_id: item.research_result_id,
+          product_id: item.product_id,
+          // Add user information to the product data
+          userEmail: userProfile?.email,
+          userCompanyName: userProfile?.company_name,
+          userUUID: item.research_results?.user_id,
+        }
+      };
+    });
   } catch (error) {
     console.error('[research] Error fetching approved products:', error);
-    throw error;
+    
+    // Fallback to simple query if join fails
+    try {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('approved_products')
+        .select('*')
+        .order('approved_at', { ascending: false });
+
+      if (fallbackError) throw fallbackError;
+      
+      console.log('[research] Using fallback query without user info');
+      return (fallbackData || []).map(item => ({
+        ...item,
+        product_data: {
+          ...item.product_data,
+          research_result_id: item.research_result_id,
+          product_id: item.product_id
+        }
+      }));
+    } catch (fallbackError) {
+      console.error('[research] Fallback query also failed:', fallbackError);
+      throw fallbackError;
+    }
   }
 }
 

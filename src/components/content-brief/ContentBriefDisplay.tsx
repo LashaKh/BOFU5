@@ -7,13 +7,16 @@ import {
   Link as LinkIcon, 
   Award,
   Target,
-  ChevronDown
+  ChevronDown,
+  User,
+  Building
 } from 'lucide-react';
 import { SectionItem } from './SectionItem';
 import { ListSection } from './ListSection';
 import TextAreaSection from './TextAreaSection';
 import { ContentBriefData } from '../../types/contentBrief';
 import { parseContent, stringifyContent } from '../../utils/contentProcessing';
+import { useAdminContext } from '../../contexts/AdminContext';
 
 interface ContentBriefDisplayProps {
   content: string;
@@ -24,6 +27,12 @@ interface ContentBriefDisplayProps {
   possibleTitles?: string[];
   additionalLinks?: string[];
   researchResultId?: string;
+  // Admin-specific props for showing submission context
+  userEmail?: string;
+  userCompanyName?: string;
+  companyName?: string;
+  productName?: string;
+  submissionDate?: string;
 }
 
 export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({ 
@@ -34,10 +43,16 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
   readOnly = false,
   possibleTitles,
   additionalLinks,
-  researchResultId
+  researchResultId,
+  userEmail,
+  userCompanyName,
+  companyName,
+  productName,
+  submissionDate
 }) => {
   const [sections, setSections] = useState<ContentBriefData>({});
   const [hasInitialized, setHasInitialized] = useState(false);
+  const { isAdmin } = useAdminContext();
   
   // Stabilize array references to prevent infinite re-renders
   const stablePossibleTitles = useMemo(() => possibleTitles || [], [possibleTitles]);
@@ -45,6 +60,7 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
   
   // State for collapsible sections - all collapsed by default
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    admin_info: false, // Keep admin info expanded by default for easy access
     notes: true,
     pain_points: true,
     usps: true,
@@ -208,6 +224,95 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="space-y-6"
       >
+        {/* Admin Information Section - Only visible to admins */}
+        {isAdmin && (userEmail || userCompanyName || companyName || productName) && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-50 via-blue-50 to-indigo-50 rounded-2xl opacity-60"></div>
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-purple-200/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-purple-900">Submission Details</h3>
+                    <p className="text-sm text-purple-700">Admin-only information about this content brief</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleSection('admin_info')}
+                  className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+                >
+                  <ChevronDown 
+                    className={`w-5 h-5 text-purple-600 transition-transform ${
+                      collapsedSections.admin_info ? '' : 'rotate-180'
+                    }`}
+                  />
+                </button>
+              </div>
+              {!collapsedSections.admin_info && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userEmail && (
+                    <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <User className="w-4 h-4 text-purple-600" />
+                      <div>
+                        <div className="text-xs text-purple-600 font-medium">Submitted by</div>
+                        <div className="text-sm text-purple-900 font-semibold">{userEmail}</div>
+                      </div>
+                    </div>
+                  )}
+                  {userCompanyName && (
+                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <Building className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <div className="text-xs text-blue-600 font-medium">User's Company</div>
+                        <div className="text-sm text-blue-900 font-semibold">{userCompanyName}</div>
+                      </div>
+                    </div>
+                  )}
+                  {companyName && (
+                    <div className="flex items-center space-x-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                      <Building className="w-4 h-4 text-indigo-600" />
+                      <div>
+                        <div className="text-xs text-indigo-600 font-medium">Target Company</div>
+                        <div className="text-sm text-indigo-900 font-semibold">{companyName}</div>
+                      </div>
+                    </div>
+                  )}
+                  {productName && (
+                    <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <Award className="w-4 h-4 text-green-600" />
+                      <div>
+                        <div className="text-xs text-green-600 font-medium">Product</div>
+                        <div className="text-sm text-green-900 font-semibold">{productName}</div>
+                      </div>
+                    </div>
+                  )}
+                  {submissionDate && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <AlertCircle className="w-4 h-4 text-gray-600" />
+                      <div>
+                        <div className="text-xs text-gray-600 font-medium">Submitted</div>
+                        <div className="text-sm text-gray-900 font-semibold">
+                          {new Date(submissionDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {researchResultId && (
+                    <div className="flex items-center space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <LinkIcon className="w-4 h-4 text-yellow-600" />
+                      <div>
+                        <div className="text-xs text-yellow-600 font-medium">Research ID</div>
+                        <div className="text-sm text-yellow-900 font-mono">{researchResultId.slice(0, 8)}...</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {/* Professional Header with Notes Section - Priority Position */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl opacity-60"></div>

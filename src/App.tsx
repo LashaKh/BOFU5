@@ -241,36 +241,15 @@ function App() {
       
       if (session) {
         setUser(session.user ?? null);
+        setIsAuthLoading(false);
         
-        // Special handling for admin user lashay@bofu.ai
-        if (session.user.email === 'lashay@bofu.ai') {
-          console.log('[INITIAL] Admin user detected on page load');
-          
-          // Simple fallback: Just set admin auth for known admin user
-          console.log('[INITIAL] Setting admin authentication for lashay@bofu.ai (bypassing database checks)');
-          setIsAuthLoading(false);
-          
-          // Allow admin users to access admin-related routes
-          if (!location.pathname.startsWith('/admin')) {
-            console.log('[INITIAL] Redirecting admin from', location.pathname, 'to /admin');
-            navigate('/admin', { replace: true });
-          } else {
-            console.log('[INITIAL] Admin already on admin-related page:', location.pathname);
-          }
-          
-          // Run database setup in background without blocking UI
-          populateUserProfiles().catch(err => {
-            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
-          });
-        } else {
-          // For regular users, just set the user and finish loading
-          console.log('[INITIAL] Regular user detected:', session.user.email);
-          setIsAuthLoading(false);
-          
-          // Run database setup in background without blocking UI
-          populateUserProfiles().catch(err => {
-            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
-          });
+        // Run database setup in background without blocking UI
+        populateUserProfiles().catch(err => {
+          console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
+        });
+
+        if (session.user.email === 'lashay@bofu.ai' && !location.pathname.startsWith('/admin')) {
+          navigate('/admin', { replace: true });
         }
       } else {
         console.log('[INITIAL] No session found');
@@ -319,18 +298,22 @@ function App() {
         setShowAuthModal(false);
         setShowAdminAuthModal(false);
         
-        // Always navigate to landing page after logout, regardless of current path
-        console.log('[AUTH] Navigating to landing page from:', location.pathname);
-        
-        // Add a small delay to ensure state updates are processed
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 50);
+        // The actual navigation will be handled by the useEffect below
+        console.log('[AUTH] State cleared, navigation will be triggered by user state change.');
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate, autoSetupAdmin, location.pathname]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      if (location.pathname !== '/' && !location.pathname.startsWith('/reset-password')) {
+        console.log(`[USER_EFFECT] User is null and not on landing/reset page. Redirecting from ${location.pathname} to /`);
+        navigate('/', { replace: true });
+      }
+    }
+  }, [user, isAuthLoading, location.pathname, navigate]);
   
   // This effect runs when the user state changes or loadResearchHistory callback changes
   useEffect(() => {
@@ -1081,7 +1064,10 @@ function App() {
           <AuthModal 
             isOpen={showAuthModal} 
             onClose={() => setShowAuthModal(false)} 
-            onShowAdminLogin={() => setShowAdminAuthModal(true)}
+            onShowAdminLogin={() => {
+              setShowAuthModal(false);
+              setShowAdminAuthModal(true);
+            }}
           />
           
           {/* Admin Auth Modal */}
@@ -1089,6 +1075,7 @@ function App() {
             isOpen={showAdminAuthModal}
             onClose={() => setShowAdminAuthModal(false)}
             onAdminAuthenticated={() => {
+              setShowAdminAuthModal(false);
               notify('success', 'Admin login successful');
               navigate('/admin', { replace: true });
             }}

@@ -50,26 +50,24 @@ export async function createProductApprovalNotification({
 
     if (error) {
       console.error('Error calling product notification Edge Function:', error);
-      // Create fallback notifications if Edge Function fails
-      console.log('🔄 Edge Function failed, creating fallback notifications...');
-      await createFallbackProductNotifications({ productId, productName, userId });
+      // Fallback disabled to prevent duplicate emails
+      console.log('❌ Edge Function failed, but fallback disabled to prevent duplicates');
       return;
     }
 
     console.log('✅ Product notification Edge Function response:', data);
     
-    // If Edge Function didn't create notifications, create them as fallback
+    // Fallback disabled to prevent duplicate emails
     if (data && data.notifications === 0) {
-      console.log('🔄 Edge Function created 0 notifications, creating fallback notifications...');
-      await createFallbackProductNotifications({ productId, productName, userId });
+      console.log('⚠️ Edge Function created 0 notifications, but fallback disabled to prevent duplicates');
     }
     
     return data;
 
   } catch (error) {
     console.error('Error creating product approval notification:', error);
-    // Create fallback notifications
-    await createFallbackProductNotifications({ productId, productName, userId });
+    // Fallback disabled to prevent duplicate emails
+    console.log('❌ Exception occurred, but fallback disabled to prevent duplicates');
   }
 }
 
@@ -86,89 +84,14 @@ async function createFallbackProductNotifications({
   userId: string;
 }) {
   try {
-    // Get user profile information
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('email, company_name')
-      .eq('id', userId)
-      .single();
-
-    if (!userProfile) {
-      console.error('User profile not found for fallback product notifications');
-      return;
-    }
-
-    // Get target admin IDs
-    const adminIds = await getTargetAdminIds(userId);
-    
-    let createdCount = 0;
-    for (const adminId of adminIds) {
-      const notification = await createInAppProductNotification({
-        adminId,
-        productId,
-        productName,
-        userEmail: userProfile.email,
-        userCompany: userProfile.company_name || 'Unknown Company'
-      });
-      
-      if (notification) {
-        createdCount++;
-        console.log('✅ Fallback product notification created:', notification.id);
-      }
-    }
-    
-    console.log(`🔄 Created ${createdCount} fallback product notifications`);
+    await createProductApprovalNotification({ productId, productName, userId });
+    console.log(`🔄 Retrying notification creation via Edge Function`);
   } catch (error) {
-    console.error('Error creating fallback product notifications:', error);
+    console.error('Error retrying product notification creation:', error);
   }
 }
 
-/**
- * Create in-app product notification record
- */
-async function createInAppProductNotification({
-  adminId,
-  productId,
-  productName,
-  userEmail,
-  userCompany
-}: {
-  adminId: string;
-  productId: string;
-  productName: string;
-  userEmail: string;
-  userCompany: string;
-}) {
-  try {
-    const message = `${userEmail} from ${userCompany} has approved a product card: "${productName}"`;
 
-    const { data, error } = await supabase
-      .from('brief_approval_notifications')
-      .insert({
-        admin_id: adminId,
-        brief_id: productId, // Using existing column for product ID
-        brief_title: productName, // Using existing column for product name
-        user_email: userEmail,
-        user_company: userCompany,
-        message,
-        notification_type: 'product_approved', // Different type for product approvals
-        title: `Product Card Approved: ${productName}`,
-        is_read: false
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating in-app product notification:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in createInAppProductNotification:', error);
-    return null;
-  }
-}
 
 /**
  * Get target admin IDs (main admin + assigned sub-admins)
