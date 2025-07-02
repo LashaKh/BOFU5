@@ -1,6 +1,32 @@
 # Active Context - Current Development Focus
 
-## Current Status: ✅ CONTENT BRIEF TITLE ENHANCEMENT COMPLETED - KEYWORD-BASED DISPLAY ACROSS ALL INTERFACES
+## Current Status: 🔍 DEBUGGING COMPT CONTENT BRIEF KEYWORD TITLE ISSUE
+
+### Current Investigation: Compt Content Brief Not Showing Keywords
+**Issue:** User requested content brief generation for "Compt Employee Stipend & Reimbursement Platform" but the content brief title is still showing the product name instead of the keyword "Forma alternatives"
+
+**Analysis Done:**
+- **Root Cause Understanding:** Content briefs generated from dedicated product page (not research results flow) don't have `research_result_id` linking
+- **Data Flow:** Dedicated Product Page → AirOps → Content Brief Creation (external) → Database Insert
+- **Missing Link:** Content briefs need to connect back to `approved_products` table to get keywords from original product analysis
+
+**Debugging Implementation Added:**
+- **Enhanced Admin Interface:** Added comprehensive debugging to `ContentBriefManagement.tsx`
+- **Specific Compt Detection:** Added targeted debugging for any content brief containing "Compt" in product_name
+- **Keyword Extraction Logic:** Enhanced title generation to search `approved_products` by product_name match as fallback
+- **Console Logging:** Added detailed console logs with 🔍 and 🎯 emojis for easy identification
+
+**Files Modified:**
+- ✅ `src/components/admin/ContentBriefManagement.tsx` - Enhanced with debugging and improved keyword extraction logic
+
+**Next Steps Required:**
+1. **User Testing:** User needs to refresh admin page and navigate to Compt content brief
+2. **Console Investigation:** Check browser console for debug messages starting with `🔍` and `🎯`
+3. **Data Analysis:** Debug logs will show:
+   - Whether approved product exists for "Compt"
+   - What keywords are stored in the product_data
+   - Why keyword-based title isn't being generated
+4. **Issue Resolution:** Based on debug results, implement proper fix
 
 ### Recently Completed
 **Content Brief Title Enhancement - Keyword-Based Display Implementation**
@@ -8,9 +34,33 @@
 - **Root Cause:** Title generation was using product_name field instead of utilizing available keywords from approved product analysis
 - **Solution:** 
   - **Enhanced Core Logic:** Modified `getBriefById` function in `contentBriefs.ts` to fetch and prioritize keywords from `approved_products` table
-  - **Display Consistency:** Updated both `UserContentBriefs.tsx` and `ApprovedContent.tsx` to use same keyword-based title generation
-  - **Data Integration:** Leveraged existing `research_result_id` relationships to connect content briefs with product analysis keywords
-  - **Fallback Strategy:** Maintained backward compatibility with graceful fallback to product names when keywords unavailable
+  - **Display Consistency:** Updated both `UserContentBriefs.tsx` and `ApprovedContent.tsx` to use keyword-based titles
+  - **Fallback Safety:** Maintained backward compatibility with product_name fallback when keywords unavailable
+- **Status:** ✅ Completed for user dashboard pages, debugging admin interface keyword issue
+
+### Technical Context
+**Content Brief Generation Flow:**
+```mermaid
+graph LR
+    A[Dedicated Product Page] --> B[Product Approval]
+    B --> C[approved_products table]
+    C --> D[AirOps Integration]
+    D --> E[Content Brief Creation]
+    E --> F[content_briefs table]
+    F --> G[Admin Interface Display]
+```
+
+**Current Problem:** Step F → G not properly linking back to step C for keyword extraction
+
+**Database Relationships:**
+- `content_briefs.research_result_id` → `approved_products.research_result_id` (works for research flow)
+- `content_briefs.product_name` → `approved_products.product_name` (needed for dedicated product flow)
+
+### Development Environment
+- **Local Server:** Running on http://localhost:5176/
+- **Current Branch:** main (ahead of origin by 5 commits)
+- **Last Change:** Enhanced debugging for Compt keyword investigation
+- **Build Status:** ✅ Successful with debugging enhancements
 
 ### Technical Implementation Details
 - **Keyword Extraction Logic:**

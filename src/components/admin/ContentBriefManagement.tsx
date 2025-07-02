@@ -379,7 +379,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                 const { data: approvedProduct, error: productError } = await supabase
                   .from('approved_products')
                   .select('product_data')
-                  .eq('research_result_id', brief.research_result_id)
+                  .eq('id', brief.research_result_id)
                   .single();
                 
                 console.log('🔍 COMPANY_TITLE_DEBUG: Query result - data:', approvedProduct, 'error:', productError);
@@ -1113,7 +1113,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                 const { data: approvedProduct, error: productError } = await supabase
                   .from('approved_products')
                   .select('product_data')
-                  .eq('research_result_id', brief.research_result_id)
+                  .eq('id', brief.research_result_id)
                   .single();
                 
                 console.log('🔍 COMPANY_TITLE_DEBUG: Query result - data:', approvedProduct, 'error:', productError);

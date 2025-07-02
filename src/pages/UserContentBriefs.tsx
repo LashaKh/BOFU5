@@ -150,7 +150,7 @@ export default function UserContentBriefs() {
                 const { data: approvedProduct, error: productError } = await supabase
                   .from('approved_products')
                   .select('product_data')
-                  .eq('research_result_id', brief.research_result_id)
+                  .eq('id', brief.research_result_id)
                   .single();
 
                 if (!productError && approvedProduct?.product_data) {
