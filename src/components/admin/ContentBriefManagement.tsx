@@ -337,7 +337,126 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
       }
 
       console.log('Content briefs fetched:', data);
-      setUserContentBriefs(data || []);
+      
+      // Process each brief to generate keyword-based titles
+      const briefsWithKeywordTitles = await Promise.all(
+        (data || []).map(async (brief) => {
+          // Helper function to generate title using keywords instead of product_name
+          const generateTitle = async () => {
+            console.log('🔍 COMPANY_TITLE_DEBUG: Starting title generation for brief:', brief.id, 'product_name:', brief.product_name, 'research_result_id:', brief.research_result_id);
+            
+            // Debug: Check if this is the Compt brief
+            if (brief.product_name?.includes('Compt')) {
+              console.log('🎯 COMPANY_COMPT_DEBUG: Found Compt brief, full brief data:', brief);
+              
+              // Try to find the approved product by product_name match
+              const { data: approvedProducts, error: searchError } = await supabase
+                .from('approved_products')
+                .select('*')
+                .ilike('product_name', '%Compt%');
+                
+              console.log('🎯 COMPANY_COMPT_DEBUG: Approved products matching Compt:', approvedProducts);
+              
+              if (approvedProducts && approvedProducts.length > 0) {
+                for (const product of approvedProducts) {
+                  console.log('🎯 COMPANY_COMPT_DEBUG: Product data for', product.product_name, ':', product.product_data);
+                  
+                  if (product.product_data) {
+                    const productData = typeof product.product_data === 'string' 
+                      ? JSON.parse(product.product_data) 
+                      : product.product_data;
+                    console.log('🎯 COMPANY_COMPT_DEBUG: Parsed product data keywords:', productData.keywords);
+                  }
+                }
+              }
+            }
+            
+            // First try to get keywords from approved product data if research_result_id exists
+            if (brief.research_result_id) {
+              try {
+                console.log('🔍 COMPANY_TITLE_DEBUG: Fetching approved product for research_result_id:', brief.research_result_id);
+                
+                const { data: approvedProduct, error: productError } = await supabase
+                  .from('approved_products')
+                  .select('product_data')
+                  .eq('research_result_id', brief.research_result_id)
+                  .single();
+                
+                console.log('🔍 COMPANY_TITLE_DEBUG: Query result - data:', approvedProduct, 'error:', productError);
+                
+                if (approvedProduct && !productError) {
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Found approved product data:', approvedProduct.product_data);
+                  
+                  // Parse the product_data JSON to extract keywords
+                  const productData = typeof approvedProduct.product_data === 'string' 
+                    ? JSON.parse(approvedProduct.product_data) 
+                    : approvedProduct.product_data;
+                  
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Parsed product data:', productData);
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Keywords found:', productData.keywords);
+                  
+                  if (productData.keywords && Array.isArray(productData.keywords) && productData.keywords.length > 0) {
+                    const keywordTitle = `${productData.keywords[0]} - Content Brief`;
+                    console.log('🔍 COMPANY_TITLE_DEBUG: Generated keyword-based title:', keywordTitle);
+                    return keywordTitle;
+                  }
+                } else {
+                  console.log('🔍 COMPANY_TITLE_DEBUG: No approved product found for research_result_id:', brief.research_result_id);
+                }
+              } catch (error) {
+                console.error('🔍 COMPANY_TITLE_DEBUG: Error fetching approved product:', error);
+              }
+            } else {
+              console.log('🔍 COMPANY_TITLE_DEBUG: No research_result_id found, checking for product_id link');
+              
+              // Try to find approved product by product_id (for dedicated product page flow)
+              // Since we don't have direct product_id in content_briefs, try to find by product_name match
+              try {
+                const { data: approvedProducts, error: searchError } = await supabase
+                  .from('approved_products')
+                  .select('product_data')
+                  .ilike('product_name', `%${brief.product_name}%`);
+                
+                console.log('🔍 COMPANY_TITLE_DEBUG: Search by product_name result:', approvedProducts, 'error:', searchError);
+                
+                if (approvedProducts && approvedProducts.length > 0) {
+                  const approvedProduct = approvedProducts[0]; // Take the first match
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Found approved product by name match:', approvedProduct.product_data);
+                  
+                  const productData = typeof approvedProduct.product_data === 'string' 
+                    ? JSON.parse(approvedProduct.product_data) 
+                    : approvedProduct.product_data;
+                  
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Parsed product data from name match:', productData);
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Keywords from name match:', productData.keywords);
+                  
+                  if (productData.keywords && Array.isArray(productData.keywords) && productData.keywords.length > 0) {
+                    const keywordTitle = `${productData.keywords[0]} - Content Brief`;
+                    console.log('🔍 COMPANY_TITLE_DEBUG: Generated keyword-based title from name match:', keywordTitle);
+                    return keywordTitle;
+                  }
+                }
+              } catch (error) {
+                console.error('🔍 COMPANY_TITLE_DEBUG: Error searching approved products by name:', error);
+              }
+            }
+            
+            // Fallback to product_name if no keywords found
+            const fallbackTitle = `${brief.product_name} - Content Brief`;
+            console.log('🔍 COMPANY_TITLE_DEBUG: Using fallback title:', fallbackTitle);
+            return fallbackTitle;
+          };
+
+          const title = await generateTitle();
+          
+          return {
+            ...brief,
+            title // Add the generated title to the brief object
+          };
+        })
+      );
+      
+      setUserContentBriefs(briefsWithKeywordTitles);
     } catch (error) {
       console.error('Error in fetchUserContentBriefs:', error);
       setUserContentBriefs([]);
@@ -953,7 +1072,125 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
         researchResults: researchResults?.length || 0
       });
       
-      setUserContentBriefs(contentBriefs || []);
+      // Process content briefs to generate keyword-based titles
+      const briefsWithKeywordTitles = await Promise.all(
+        (contentBriefs || []).map(async (brief) => {
+          // Helper function to generate title using keywords instead of product_name
+          const generateTitle = async () => {
+            console.log('🔍 COMPANY_TITLE_DEBUG: Starting title generation for brief:', brief.id, 'product_name:', brief.product_name, 'research_result_id:', brief.research_result_id);
+            
+            // Debug: Check if this is the Compt brief
+            if (brief.product_name?.includes('Compt')) {
+              console.log('🎯 COMPANY_COMPT_DEBUG: Found Compt brief, full brief data:', brief);
+              
+              // Try to find the approved product by product_name match
+              const { data: approvedProducts, error: searchError } = await supabase
+                .from('approved_products')
+                .select('*')
+                .ilike('product_name', '%Compt%');
+                
+              console.log('🎯 COMPANY_COMPT_DEBUG: Approved products matching Compt:', approvedProducts);
+              
+              if (approvedProducts && approvedProducts.length > 0) {
+                for (const product of approvedProducts) {
+                  console.log('🎯 COMPANY_COMPT_DEBUG: Product data for', product.product_name, ':', product.product_data);
+                  
+                  if (product.product_data) {
+                    const productData = typeof product.product_data === 'string' 
+                      ? JSON.parse(product.product_data) 
+                      : product.product_data;
+                    console.log('🎯 COMPANY_COMPT_DEBUG: Parsed product data keywords:', productData.keywords);
+                  }
+                }
+              }
+            }
+            
+            // First try to get keywords from approved product data if research_result_id exists
+            if (brief.research_result_id) {
+              try {
+                console.log('🔍 COMPANY_TITLE_DEBUG: Fetching approved product for research_result_id:', brief.research_result_id);
+                
+                const { data: approvedProduct, error: productError } = await supabase
+                  .from('approved_products')
+                  .select('product_data')
+                  .eq('research_result_id', brief.research_result_id)
+                  .single();
+                
+                console.log('🔍 COMPANY_TITLE_DEBUG: Query result - data:', approvedProduct, 'error:', productError);
+                
+                if (approvedProduct && !productError) {
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Found approved product data:', approvedProduct.product_data);
+                  
+                  // Parse the product_data JSON to extract keywords
+                  const productData = typeof approvedProduct.product_data === 'string' 
+                    ? JSON.parse(approvedProduct.product_data) 
+                    : approvedProduct.product_data;
+                  
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Parsed product data:', productData);
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Keywords found:', productData.keywords);
+                  
+                  if (productData.keywords && Array.isArray(productData.keywords) && productData.keywords.length > 0) {
+                    const keywordTitle = `${productData.keywords[0]} - Content Brief`;
+                    console.log('🔍 COMPANY_TITLE_DEBUG: Generated keyword-based title:', keywordTitle);
+                    return keywordTitle;
+                  }
+                } else {
+                  console.log('🔍 COMPANY_TITLE_DEBUG: No approved product found for research_result_id:', brief.research_result_id);
+                }
+              } catch (error) {
+                console.error('🔍 COMPANY_TITLE_DEBUG: Error fetching approved product:', error);
+              }
+            } else {
+              console.log('🔍 COMPANY_TITLE_DEBUG: No research_result_id found, checking for product_id link');
+              
+              // Try to find approved product by product_id (for dedicated product page flow)
+              // Since we don't have direct product_id in content_briefs, try to find by product_name match
+              try {
+                const { data: approvedProducts, error: searchError } = await supabase
+                  .from('approved_products')
+                  .select('product_data')
+                  .ilike('product_name', `%${brief.product_name}%`);
+                
+                console.log('🔍 COMPANY_TITLE_DEBUG: Search by product_name result:', approvedProducts, 'error:', searchError);
+                
+                if (approvedProducts && approvedProducts.length > 0) {
+                  const approvedProduct = approvedProducts[0]; // Take the first match
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Found approved product by name match:', approvedProduct.product_data);
+                  
+                  const productData = typeof approvedProduct.product_data === 'string' 
+                    ? JSON.parse(approvedProduct.product_data) 
+                    : approvedProduct.product_data;
+                  
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Parsed product data from name match:', productData);
+                  console.log('🔍 COMPANY_TITLE_DEBUG: Keywords from name match:', productData.keywords);
+                  
+                  if (productData.keywords && Array.isArray(productData.keywords) && productData.keywords.length > 0) {
+                    const keywordTitle = `${productData.keywords[0]} - Content Brief`;
+                    console.log('🔍 COMPANY_TITLE_DEBUG: Generated keyword-based title from name match:', keywordTitle);
+                    return keywordTitle;
+                  }
+                }
+              } catch (error) {
+                console.error('🔍 COMPANY_TITLE_DEBUG: Error searching approved products by name:', error);
+              }
+            }
+            
+            // Fallback to product_name if no keywords found
+            const fallbackTitle = `${brief.product_name} - Content Brief`;
+            console.log('🔍 COMPANY_TITLE_DEBUG: Using fallback title:', fallbackTitle);
+            return fallbackTitle;
+          };
+
+          const title = await generateTitle();
+          
+          return {
+            ...brief,
+            title // Add the generated title to the brief object
+          };
+        })
+      );
+      
+      setUserContentBriefs(briefsWithKeywordTitles);
       setUserResearchResults(researchResults || []);
     } catch (error) {
       console.error('❌ Error fetching company content:', error);
