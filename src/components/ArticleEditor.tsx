@@ -78,9 +78,8 @@ import { adminArticlesApi } from '../lib/adminApi';
 import { getArticleComments } from '../lib/commentApi';
 import { debounce } from 'lodash';
 import { Decoration, DecorationSet } from 'prosemirror-view';
-import { Node } from 'prosemirror-model';
+import { Node as ProseMirrorNode } from 'prosemirror-model';
 import { supabase } from '../lib/supabase';
-import { joinArticlePresence, leaveArticlePresence } from '../lib/presenceApi';
 
 // Import enhanced CSS styles
 import '../styles/article-editor-enhanced.css';
@@ -1026,7 +1025,12 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     if (!articleId) return;
     try {
       const fetchedComments = await getArticleComments(articleId);
-      setComments(fetchedComments);
+      // Ensure comment status types are correct
+      const typedComments = fetchedComments.map(comment => ({
+        ...comment,
+        status: comment.status as "active" | "resolved" | "archived"
+      }));
+      setComments(typedComments);
     } catch (error) {
       console.error('❌ Error loading comments in ArticleEditor:', error);
     }
@@ -1292,7 +1296,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     onBlur: () => {
       console.log('🎯 Editor lost focus');
     },
-  }, [getEditorExtensions, theme, content]); // Removed editorDecorations from dependencies
+  }, [getEditorExtensions, theme]); // ✅ FIXED: Removed 'content' from dependencies to prevent editor recreation
   
   // Update ref when highlightedCommentId changes and force decoration update
   useEffect(() => {
@@ -2176,7 +2180,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
                 setShowComments(true); // Auto-open sidebar when clicking a comment
               }
             }}
-            onCommentStatusChange={async (commentId, status) => {
+            onCommentStatusChange={async (commentId, status: "active" | "resolved" | "archived") => {
               try {
                 // Update comment status
                 const updatedComments = comments.map(c => 

@@ -63,6 +63,33 @@ export async function getBriefById(briefId: string) {
 
   console.log('Fetched brief:', data);
   if (!data) throw new Error('Brief not found');
+
+  // Fetch keywords from approved product data if research_result_id exists
+  let keywords: string[] = [];
+  if (data.research_result_id) {
+    try {
+      const { data: approvedProduct, error: productError } = await supabase
+        .from('approved_products')
+        .select('product_data')
+        .eq('research_result_id', data.research_result_id)
+        .single();
+
+      if (!productError && approvedProduct?.product_data) {
+        // Extract keywords from product_data
+        const productData = typeof approvedProduct.product_data === 'string' 
+          ? JSON.parse(approvedProduct.product_data) 
+          : approvedProduct.product_data;
+        
+        if (productData.keywords && Array.isArray(productData.keywords)) {
+          keywords = productData.keywords;
+          console.log('Found keywords for content brief:', keywords);
+        }
+      }
+    } catch (productError) {
+      console.warn('Could not fetch keywords from approved product:', productError);
+    }
+  }
+
   // Helper function to parse string or array fields into arrays
   const parseFieldToArray = (field: any): string[] => {
     if (Array.isArray(field)) {
@@ -103,10 +130,20 @@ export async function getBriefById(briefId: string) {
   console.log('[getBriefById] Parsed internal links:', parsedInternalLinks);
   console.log('[getBriefById] Parsed article titles:', parsedArticleTitles);
 
+  // Generate title using keywords instead of product_name
+  const generateTitle = () => {
+    if (keywords && keywords.length > 0) {
+      // Use the first keyword for the title
+      return `${keywords[0]} - Content Brief`;
+    }
+    // Fallback to product_name if no keywords available
+    return data.product_name || 'Untitled Brief';
+  };
+
   const transformedData: ContentBrief = {
     ...data,
     status: 'draft',
-    title: data.product_name || 'Untitled Brief',
+    title: generateTitle(),
     framework: Array.isArray(data.suggested_content_frameworks) ? data.suggested_content_frameworks.join('\n') : '',
     suggested_links: parsedInternalLinks.map((url: string) => ({
       url,

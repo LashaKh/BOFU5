@@ -17,7 +17,8 @@ export function AdminRoute({ user, onLogout }: AdminRouteProps) {
       <div className="min-h-screen bg-secondary-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-white">Checking admin authentication...</p>
+          <p className="text-white">Verifying admin access...</p>
+          <p className="text-gray-400 text-sm mt-2">Please wait while we check your permissions</p>
         </div>
       </div>
     );
@@ -43,13 +44,13 @@ export function AdminRoute({ user, onLogout }: AdminRouteProps) {
     );
   }
 
-  // Redirect if not admin
+  // Only redirect if loading is complete and user is definitively not admin
   if (!isAdmin || !adminRole) {
-    console.log('[AdminRoute] User is not admin, redirecting to home');
+    console.log('[AdminRoute] Admin check complete - user is not admin, redirecting to home');
     return <Navigate to="/" replace />;
   }
 
-  console.log('[AdminRoute] Admin authenticated with role:', adminRole);
+  console.log('[AdminRoute] Admin authenticated successfully with role:', adminRole);
 
   // Render admin dashboard with enhanced context
   return (

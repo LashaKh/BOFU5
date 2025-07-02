@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MainHeader } from '../components/MainHeader';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAdminContext } from '../contexts/AdminContext';
 import { 
   ArrowRight, 
   CheckCircle, 
@@ -157,6 +158,34 @@ const StatCard: React.FC<StatProps> = ({ value, label, icon: Icon }) => (
 
 const LandingPage: React.FC<LandingPageProps> = ({ user, onShowAuthModal, onSignOut }) => {
   console.log('[LandingPage] Rendering with user:', user?.email);
+  
+  const navigate = useNavigate();
+  const { isAdmin, adminRole, isLoading } = useAdminContext();
+
+  // Redirect admin users to admin dashboard
+  useEffect(() => {
+    if (user && !isLoading) {
+      if (isAdmin && adminRole) {
+        console.log('[LandingPage] User is admin with role:', adminRole, '- redirecting to /admin');
+        navigate('/admin', { replace: true });
+        return;
+      } else {
+        console.log('[LandingPage] User is not admin - showing landing page');
+      }
+    }
+  }, [user, isAdmin, adminRole, isLoading, navigate]);
+
+  // Show loading while checking admin status for authenticated users
+  if (user && isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1f2937' }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-white">Checking access permissions...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen text-white overflow-x-hidden" style={{ backgroundColor: '#1f2937' }}>

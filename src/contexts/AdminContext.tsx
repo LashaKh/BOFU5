@@ -73,6 +73,7 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
       // Only initialize if user has changed or hasn't been initialized
       if (!user) {
         // User signed out - reset all admin state
+        console.log('[AdminContext] User signed out, resetting admin state');
         setIsAdmin(false);
         setAdminRole(null);
         setAdminId(null);
@@ -82,16 +83,18 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
         setAllAdmins([]);
         setUnassignedClients([]);
         setIsLoading(false);
+        setError(null);
         setInitializedForUserId(null);
         return;
       }
 
       // Skip initialization if already done for this user
-      if (initializedForUserId === user.id && isAdmin !== undefined) {
+      if (initializedForUserId === user.id) {
         console.log('[AdminContext] Admin status already initialized for user:', user.email);
         return;
       }
 
+      console.log('[AdminContext] Initializing admin status for user:', user.email);
       setIsLoading(true);
       setError(null);
 
@@ -127,13 +130,16 @@ export function AdminContextProvider({ children, user }: AdminContextProviderPro
         setAdminRole(null);
         setAdminId(null);
         setAdminEmail(null);
+        
+        // Still mark as initialized to prevent retries
+        setInitializedForUserId(user.id);
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeAdminStatus();
-  }, [user, initializedForUserId, isAdmin]);
+  }, [user, initializedForUserId]); // Removed isAdmin from dependencies to prevent infinite loop
 
   // Load admin-specific data based on role
   const loadAdminData = async (role: 'super_admin' | 'sub_admin') => {

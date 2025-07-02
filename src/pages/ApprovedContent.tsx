@@ -70,15 +70,52 @@ export default function ApprovedContent() {
       
       if (error) throw error;
       
-      // Transform the data to match our EnhancedContentBrief interface
-      const transformedBriefs: EnhancedContentBrief[] = data.map(brief => ({
-        ...brief,
-        status: brief.status || 'approved',
-        title: brief.product_name || 'Untitled Brief',
-        date: new Date(brief.created_at),
-        keywords: [],
-        author: user.email || 'Anonymous'
-      }));
+      // Process each brief to generate keyword-based titles
+      const transformedBriefs: EnhancedContentBrief[] = await Promise.all(
+        data.map(async (brief) => {
+          // Helper function to generate title using keywords instead of product_name
+          const generateTitle = async () => {
+            // First try to get keywords from approved product data if research_result_id exists
+            if (brief.research_result_id) {
+              try {
+                const { data: approvedProduct, error: productError } = await supabase
+                  .from('approved_products')
+                  .select('product_data')
+                  .eq('research_result_id', brief.research_result_id)
+                  .single();
+
+                if (!productError && approvedProduct?.product_data) {
+                  // Extract keywords from product_data
+                  const productData = typeof approvedProduct.product_data === 'string' 
+                    ? JSON.parse(approvedProduct.product_data) 
+                    : approvedProduct.product_data;
+                  
+                  if (productData.keywords && Array.isArray(productData.keywords) && productData.keywords.length > 0) {
+                    // Use the first keyword for the title
+                    return `${productData.keywords[0]} - Content Brief`;
+                  }
+                }
+              } catch (productError) {
+                console.warn('Could not fetch keywords from approved product:', productError);
+              }
+            }
+            
+            // Fallback to product_name if no keywords available
+            return brief.product_name || 'Untitled Brief';
+          };
+
+          const title = await generateTitle();
+          
+          return {
+            ...brief,
+            status: brief.status || 'approved',
+            title,
+            date: new Date(brief.created_at),
+            keywords: [],
+            author: user.email || 'Anonymous'
+          };
+        })
+      );
       
       setBriefs(transformedBriefs);
       setTotalApproved(count || 0);

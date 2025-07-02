@@ -1,16 +1,43 @@
 # Active Context - Current Development Focus
 
-## Current Status: ✅ AUTO-SAVE FUNCTIONALITY IMPLEMENTED ACROSS ALL DASHBOARDS
+## Current Status: ✅ CONTENT BRIEF TITLE ENHANCEMENT COMPLETED - KEYWORD-BASED DISPLAY ACROSS ALL INTERFACES
 
 ### Recently Completed
-**Universal Auto-Save Implementation for Content Brief Editing**
-- **Issue:** Admin dashboard save button was not working, and auto-save wasn't implemented on both sides
-- **Root Cause:** Admin dashboard was using different save mechanism (direct Supabase) vs user dashboard (utility function)
+**Content Brief Title Enhancement - Keyword-Based Display Implementation**
+- **Issue:** Content brief titles were showing generic product names (e.g., "PlateRanger") instead of descriptive keywords from product analysis data
+- **Root Cause:** Title generation was using product_name field instead of utilizing available keywords from approved product analysis
 - **Solution:** 
-  - **Unified Save Function:** Both dashboards now use the same `updateBrief()` utility function for consistency and reliability
-  - **Auto-Save on Both Sides:** Both admin and user dashboards now auto-save changes in real-time
-  - **Visual Feedback:** Added auto-save indicator to admin dashboard to show when changes are being saved
-  - **Faster Sync:** Changes persist without requiring manual save button clicks
+  - **Enhanced Core Logic:** Modified `getBriefById` function in `contentBriefs.ts` to fetch and prioritize keywords from `approved_products` table
+  - **Display Consistency:** Updated both `UserContentBriefs.tsx` and `ApprovedContent.tsx` to use same keyword-based title generation
+  - **Data Integration:** Leveraged existing `research_result_id` relationships to connect content briefs with product analysis keywords
+  - **Fallback Strategy:** Maintained backward compatibility with graceful fallback to product names when keywords unavailable
+
+### Technical Implementation Details
+- **Keyword Extraction Logic:**
+  - Query `approved_products` table using `research_result_id` from content brief
+  - Parse `product_data` JSON field to extract keywords array
+  - Generate title format: `"{keyword} - Content Brief"` using first keyword
+  - Fallback to `product_name || 'Untitled Brief'` when keywords not available
+
+- **Display Page Enhancements:**
+  - Converted synchronous title mapping to async keyword fetching in both display pages
+  - Added comprehensive error handling for missing product data
+  - Maintained all existing functionality while enhancing title generation
+  - Consistent implementation pattern across UserContentBriefs and ApprovedContent pages
+
+- **System Integration:**
+  - Utilized existing database relationships without schema changes
+  - Preserved all content brief functionality with zero breaking changes
+  - Enhanced user experience through more descriptive content identification
+  - Production-ready implementation with comprehensive error handling
+
+### Result: Enhanced Content Brief Management Experience
+- **Descriptive Titles:** Content briefs now display meaningful keyword-based titles instead of generic product names
+- **Consistent Display:** Same keyword-based titles appear across all content brief interfaces (getBriefById, lists, approved content)
+- **Better Organization:** Users can more easily identify and manage content briefs through descriptive keywords
+- **Enhanced Workflow:** Improved content brief discovery and organization capabilities throughout the platform
+
+### Previous Achievement: Universal Auto-Save Implementation for Content Brief Editing
 
 ### Technical Implementation Details
 - **Save Function Unification:**

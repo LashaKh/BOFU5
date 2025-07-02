@@ -19,6 +19,28 @@ const UserDashboardSidebar = () => {
   const [approvedCount, setApprovedCount] = useState(0);
   const [generatedArticlesCount, setGeneratedArticlesCount] = useState<number>(0);
 
+  // Helper function to get company name for display
+  const getCompanyName = (userData: any) => {
+    // First check user_metadata.company_name
+    if (userData?.user_metadata?.company_name) {
+      return userData.user_metadata.company_name;
+    }
+    // If no company_name in user_metadata, check app_metadata.company_name
+    if (userData?.app_metadata?.company_name) {
+      return userData.app_metadata.company_name;
+    }
+    // Extract company name from email if available
+    if (userData?.email) {
+      const emailParts = userData.email.split('@');
+      if (emailParts.length > 1) {
+        const domain = emailParts[1].split('.')[0];
+        return domain.charAt(0).toUpperCase() + domain.slice(1);
+      }
+    }
+    // Fallback to a generic name
+    return 'Dashboard';
+  };
+
   useEffect(() => {
     const fetchSidebarData = async () => {
       if (!user) return;
@@ -129,20 +151,27 @@ const UserDashboardSidebar = () => {
           <div className="flex items-center justify-between flex-shrink-0 h-16 px-4 border-b border-gray-200">
             {!collapsed && (
               <div className="flex items-center">
-                <img
-                  className="h-8 w-auto"
-                  src="/your-logo.svg" // Placeholder, replace with actual logo path if available
-                  alt="Your Company"
-                />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur-sm opacity-15"></div>
+                  <div className="relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
+                    <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                      {getCompanyName(user)}
+                    </h1>
+                    <div className="text-xs text-blue-700 font-medium uppercase tracking-wide mt-0.5">
+                      Dashboard
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             {collapsed && (
               <div className="mx-auto">
-                <img
-                  className="h-8 w-auto"
-                  src="/logo-icon.svg" // Placeholder, replace with actual icon logo path
-                  alt="Your Logo"
-                />
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl blur opacity-25 group-hover:opacity-40 transition-opacity duration-200"></div>
+                  <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 flex items-center justify-center text-white font-bold text-lg shadow-lg border border-blue-400/30 hover:scale-105 transition-transform duration-200">
+                    {getCompanyName(user).charAt(0).toUpperCase()}
+                  </div>
+                </div>
               </div>
             )}
             <button
