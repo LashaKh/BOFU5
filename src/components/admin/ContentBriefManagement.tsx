@@ -4,7 +4,7 @@ import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { ArrowLeft, Loader2, Eye, Search, Filter, BookOpen, FileText, Edit, X, MessageSquare, Package, Building2, Users, Crown, UserCog, ChevronDown, ChevronRight, Badge, CheckCircle, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ProductAnalysis } from '../../types/product/types';
-import { ContentBriefDisplay } from '../content-brief/ContentBriefDisplay';
+import { ContentBriefEditorSimple } from '../content-brief/ContentBriefEditorSimple';
 import { ProductCard } from '../product/ProductCard';
 import { ResponsiveApprovalButton } from '../common/ResponsiveApprovalButton';
 import { ContentBrief } from '../../types/contentBrief';
@@ -450,6 +450,10 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
     if (!confirmation) return;
 
     try {
+      if (!supabaseAdmin) {
+        throw new Error('Admin client not available');
+      }
+      
       const { error } = await supabaseAdmin
         .from('approved_products')
         .delete()
@@ -1035,20 +1039,24 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
         (payload) => {
           console.log('🔄 Real-time content brief change detected:', payload);
           
-          // Refresh data based on current view
-          if (selectedUserForBriefs && !selectedUser) {
-            // Company view - refresh company content briefs
-            console.log('🔄 Refreshing company content briefs due to real-time update');
-            fetchCompanyContentBriefs(selectedUserForBriefs.companyGroup);
-          } else if (selectedUser) {
-            // Individual user view - refresh user content briefs
-            console.log('🔄 Refreshing user content briefs due to real-time update');
-            fetchUserContentBriefs(selectedUser.id);
-          } else {
-            // Main view - refresh all users to update counts
-            console.log('🔄 Refreshing all users due to real-time update');
-            fetchUsers();
-          }
+          // Add a small delay to ensure any pending saves from user dashboard complete first
+          // This prevents race conditions where admin refreshes before user saves finish
+          setTimeout(() => {
+            // Refresh data based on current view
+            if (selectedUserForBriefs && !selectedUser) {
+              // Company view - refresh company content briefs
+              console.log('🔄 Refreshing company content briefs due to real-time update (delayed)');
+              fetchCompanyContentBriefs(selectedUserForBriefs.companyGroup);
+            } else if (selectedUser) {
+              // Individual user view - refresh user content briefs
+              console.log('🔄 Refreshing user content briefs due to real-time update (delayed)');
+              fetchUserContentBriefs(selectedUser.id);
+            } else {
+              // Main view - refresh all users to update counts
+              console.log('🔄 Refreshing all users due to real-time update (delayed)');
+              fetchUsers();
+            }
+          }, 750); // 750ms delay to allow user dashboard auto-save to complete
         }
       )
       .subscribe();
@@ -1456,18 +1464,25 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                   <Edit className="w-4 h-4" />
                                   Edit Content Brief
                                 </h5>
-                                <ContentBriefDisplay 
-                                  content={contentToPass}
-                                  readOnly={false}
+                                <ContentBriefEditorSimple 
+                                  initialContent={contentToPass}
+                                  briefId={brief.id}
                                   researchResultId={brief.research_result_id}
-                                  onContentChange={(updatedContent: string) => {
-                                    try {
-                                      const parsedContent = JSON.parse(updatedContent);
-                                      handleContentBriefUpdate(brief.id, parsedContent);
-                                    } catch (error) {
-                                      console.error('Error parsing updated content:', error);
-                                      toast.error('Invalid content format');
-                                    }
+                                  onUpdate={(content: string, links: string[], titles: string[]) => {
+                                    // Update local state immediately for responsiveness
+                                    const updatedBrief = {
+                                      ...brief,
+                                      brief_content: content,
+                                      internal_links: links,
+                                      possible_article_titles: titles
+                                    };
+                                    
+                                    // Update in the current content briefs array
+                                    setUserContentBriefs(prev => 
+                                      prev.map(b => b.id === brief.id ? updatedBrief : b)
+                                    );
+                                    
+                                    // The ContentBriefEditorSimple component handles database saving automatically
                                   }}
                                 />
                               </div>
@@ -1863,18 +1878,25 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                             <Edit className="w-4 h-4" />
                             Edit Content Brief
                           </h5>
-                          <ContentBriefDisplay 
-                            content={JSON.stringify(brief.brief_content)}
-                            readOnly={false}
+                          <ContentBriefEditorSimple 
+                            initialContent={brief.brief_content}
+                            briefId={brief.id}
                             researchResultId={brief.research_result_id}
-                            onContentChange={(updatedContent: string) => {
-                              try {
-                                const parsedContent = JSON.parse(updatedContent);
-                                handleContentBriefUpdate(brief.id, parsedContent);
-                              } catch (error) {
-                                console.error('Error parsing updated content:', error);
-                                toast.error('Invalid content format');
-                              }
+                            onUpdate={(content: string, links: string[], titles: string[]) => {
+                              // Update local state immediately for responsiveness
+                              const updatedBrief = {
+                                ...brief,
+                                brief_content: content,
+                                internal_links: links,
+                                possible_article_titles: titles
+                              };
+                              
+                              // Update in the current content briefs array
+                              setUserContentBriefs(prev => 
+                                prev.map(b => b.id === brief.id ? updatedBrief : b)
+                              );
+                              
+                              // The ContentBriefEditorSimple component handles database saving automatically
                             }}
                           />
                         </div>

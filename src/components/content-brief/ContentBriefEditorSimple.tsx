@@ -450,7 +450,7 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
     debounce(() => {
       console.log('Debounced: User changed content, triggering API save');
       saveChanges();
-    }, 1500), 
+    }, 500), // Reduced from 1500ms to 500ms for faster sync
     [saveChanges] 
   );
 
