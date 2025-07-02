@@ -95,36 +95,39 @@ function App() {
 
   // Handle sign out and show auth modal
   const handleSignOut = async () => {
-    console.log('[DEBUG] ========== LOGOUT STARTED ==========');
-    console.log('[DEBUG] handleSignOut called from:', new Error().stack?.split('\n')[2]?.trim());
-    console.log('[DEBUG] Current state before sign out:', {
-      user: user?.email,
-      currentPath: location.pathname,
-      isAuthLoading,
-      showAuthModal,
-      showAdminAuthModal
-    });
-    
     try {
-      console.log('[DEBUG] Calling supabase.auth.signOut()...');
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[DEBUG] Supabase signOut error:', error);
-        throw error;
+      console.log('[LOGOUT] Starting sign out process...');
+      
+      // Add timeout to prevent hanging
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sign out timed out')), 5000)
+      );
+      
+      const result = await Promise.race([signOutPromise, timeoutPromise]) as { error: any };
+      
+      if (result?.error) {
+        console.error('[LOGOUT] Supabase signOut error:', result.error);
+        throw result.error;
       }
       
-      console.log('[DEBUG] Supabase sign out successful - waiting for auth state listener...');
+      console.log('[LOGOUT] Sign out successful');
       notify('success', 'Signed out successfully');
     } catch (error) {
-      console.error('[ERROR] Sign out failed:', error);
-      console.error('[DEBUG] Sign out error details:', {
-        name: (error as Error)?.name,
-        message: (error as Error)?.message,
-        stack: (error as Error)?.stack
-      });
-      notify('error', 'Failed to sign out');
+      console.error('[LOGOUT] Sign out error:', error);
+      
+      // Force logout even if Supabase signOut fails
+      console.log('[LOGOUT] Forcing logout due to error...');
+      setUser(null);
+      setIsAuthLoading(false);
+      setResearchResults([]);
+      setHistoryResults([]);
+      setCurrentHistoryId(undefined);
+      setShowAuthModal(false);
+      setShowAdminAuthModal(false);
+      
+      notify('error', 'Signed out (with errors)');
     }
-    console.log('[DEBUG] ========== LOGOUT HANDLER FINISHED ==========');
   };
 
   
@@ -234,57 +237,51 @@ function App() {
 
   // Load user on initial render
   useEffect(() => {
-    setIsAuthLoading(true); // Start loading
-    // Check for initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[INITIAL] Checking session on app load:', session?.user?.email);
-      
+    let timeoutId: NodeJS.Timeout;
+    
+    // Safety timeout to prevent infinite loading
+    timeoutId = setTimeout(() => {
+      console.log('[AUTH_TIMEOUT] Auth loading took too long, forcing completion');
+      setIsAuthLoading(false);
+    }, 10000); // 10 second timeout
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[INITIAL] Session check:', session?.user?.email);
       if (session) {
-        setUser(session.user ?? null);
+        setUser(session.user);
         setIsAuthLoading(false);
         
         // Run database setup in background without blocking UI
         populateUserProfiles().catch(err => {
           console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
         });
-
-        if (session.user.email === 'lashay@bofu.ai' && !location.pathname.startsWith('/admin')) {
-          navigate('/admin', { replace: true });
-        }
       } else {
         console.log('[INITIAL] No session found');
         setIsAuthLoading(false);
       }
+      
+      // Clear timeout since auth completed normally
+      clearTimeout(timeoutId);
+    }).catch(error => {
+      console.error('[INITIAL] Error getting session:', error);
+      setIsAuthLoading(false);
+      clearTimeout(timeoutId);
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[AUTH_STATE] Event: ${event}, Session:`, session?.user?.email, 'Current path:', location.pathname);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[AUTH_STATE] Event: ${event}, Session:`, session?.user?.email);
       
       if (event === 'SIGNED_IN' && session) {
         console.log('[AUTH_STATE] Processing SIGNED_IN event');
         setUser(session.user);
         setIsAuthLoading(false);
         
-        // Check if this is an admin user
-        if (session.user.email === 'lashay@bofu.ai') {
-          console.log('[AUTH] Admin user signed in');
-          // Navigate to admin if not already on admin-related routes
-          if (!location.pathname.startsWith('/admin')) {
-            navigate('/admin', { replace: true });
-          }
-          
-          // Run admin setup in background
-          autoSetupAdmin(session.user.id, session.user.email).catch(err => {
-            console.log('[BACKGROUND] Admin setup failed, but continuing:', err);
-          });
-        } else {
-          console.log('[AUTH] Regular user signed in');
-          // For regular users, run setup in background
-          populateUserProfiles().catch(err => {
-            console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
-          });
-        }
+        // For regular users, run setup in background
+        populateUserProfiles().catch(err => {
+          console.log('[BACKGROUND] User profiles population failed, but continuing:', err);
+        });
       } else if (event === 'SIGNED_OUT') {
         console.log('[AUTH_STATE] Processing SIGNED_OUT event');
         console.log('[AUTH] User signed out - clearing state and redirecting');
@@ -303,8 +300,11 @@ function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [navigate, autoSetupAdmin, location.pathname]);
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
+  }, []); // Empty dependency array - only run once
 
   useEffect(() => {
     if (!isAuthLoading && !user) {

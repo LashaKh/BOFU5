@@ -1,5 +1,6 @@
 import React, { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { signIn, isUserAdmin } from '../../lib/auth';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
     email: '',
     password: '',
   });
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,13 +33,11 @@ export function AdminAuthModal({ isOpen, onClose, onAdminAuthenticated }: AdminA
       if (adminStatus) {
         // User is an admin, authenticate them
         toast.success('Admin authenticated!');
-        // First close the modal, then call onAdminAuthenticated callback with a small delay
         onClose();
-        // Small timeout to ensure modal is fully closed before changing views
+        
+        // Small delay to ensure modal closes before navigation
         setTimeout(() => {
-          if (onAdminAuthenticated) {
-            onAdminAuthenticated();
-          }
+          navigate('/admin', { replace: true });
         }, 100);
       } else {
         // User is not an admin, sign them out and show error

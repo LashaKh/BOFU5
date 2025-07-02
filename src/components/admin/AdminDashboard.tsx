@@ -4,13 +4,14 @@ import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
-import { Eye, Loader2, RefreshCw, UserCircle, ArrowLeft, Users, FileText, Shield, MessageSquare, BarChart3, TrendingUp, Clock, AlertCircle, Plus, Search, Filter, Calendar, Bell, LogOut, Home, Zap, Activity, BookOpen, UserPlus, Crown, Building2, UserCog, ChevronRight, Badge, ChevronDown, Edit, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, RefreshCw, UserCircle, ArrowLeft, Users, FileText, Shield, MessageSquare, BarChart3, TrendingUp, Clock, AlertCircle, Plus, Search, Filter, Calendar, Bell, LogOut, Home, Zap, Activity, BookOpen, UserPlus, Crown, Building2, UserCog, ChevronRight, Badge, ChevronDown, Edit, X, Mail, KeyRound, AlertTriangle } from 'lucide-react';
 import { AuditLogViewer } from './AuditLogViewer';
 import { EnhancedCommentDashboard } from './EnhancedCommentDashboard';
 import { useAdminContext } from '../../contexts/AdminContext';
 import { AssignmentNotificationCenter } from './AssignmentNotificationCenter';
 import { ContentBriefManagement } from './ContentBriefManagement';
 import { AdminAssignmentHub } from './AdminAssignmentHub';
+import { sendPasswordResetEmail } from '../../lib/auth';
 
 // Dynamically import AdminArticleManagementPage for article editing functionality
 const AdminArticleManagementPage = lazy(() => import('../../pages/AdminArticleManagementPage'));
@@ -198,6 +199,9 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userSortBy, setUserSortBy] = useState<'company' | 'email' | 'date'>('company');
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const [passwordResetLoading, setPasswordResetLoading] = useState<Set<string>>(new Set());
+  const [directPasswordChangeUser, setDirectPasswordChangeUser] = useState<UserProfile | null>(null);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [dataInitialized, setDataInitialized] = useState(false);
@@ -605,6 +609,52 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
     setCurrentView(view);
   };
 
+  // Password management functions
+  const handleSendPasswordReset = async (user: UserProfile) => {
+    try {
+      setPasswordResetLoading(prev => new Set(prev).add(user.id));
+      
+      const result = await sendPasswordResetEmail(user.email);
+      toast.success(`Password reset email sent to ${user.email}`);
+    } catch (error) {
+      console.error('Error sending password reset:', error);
+      toast.error(`Failed to send password reset email to ${user.email}`);
+    } finally {
+      setPasswordResetLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(user.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDirectPasswordChange = async (user: UserProfile, newPassword: string) => {
+    try {
+      // Check if we have admin access to Supabase
+      if (!supabaseAdmin) {
+        toast.error('Admin password changes require service role configuration');
+        return false;
+      }
+
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        password: newPassword
+      });
+
+      if (error) {
+        console.error('Error changing password:', error);
+        toast.error(`Failed to change password for ${user.email}: ${error.message}`);
+        return false;
+      }
+
+      toast.success(`Password changed successfully for ${user.email}`);
+      return true;
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error(`Failed to change password for ${user.email}`);
+      return false;
+    }
+  };
+
   const renderMainContent = () => {
     switch (currentView) {
       case 'userManagement':
@@ -616,10 +666,40 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">User Management</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-white">User Management</h2>
+                <p className="text-gray-400 mt-1">Manage user accounts and reset passwords</p>
+              </div>
               <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-sm font-medium rounded-full border border-yellow-500/30">
                 {users.length} Users ({sortedCompanyGroups.length} Companies)
               </span>
+            </div>
+
+            {/* Password Management Features Info */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 mb-6">
+              <div className="flex items-start gap-4">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <KeyRound className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-2">Password Management Available</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-blue-400" />
+                      <span><strong>Email Reset:</strong> Send password reset emails to users</span>
+                    </div>
+                    {supabaseAdmin && (
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-orange-400" />
+                        <span><strong>Direct Change:</strong> Set new passwords immediately</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Click the mail icon to send reset emails, or the key icon for direct password changes.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Search and Filter Controls */}
@@ -760,7 +840,44 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                                       Joined: {new Date(companyGroup.main_account.created_at).toLocaleDateString()}
                                     </p>
                                   </div>
-                                  <UserCircle className="w-4 h-4 text-gray-400" />
+                                  <div className="flex items-center gap-2">
+                                    {/* Password Reset Button for Main Account */}
+                                    <motion.button
+                                      whileHover={{ scale: 1.05 }}
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSendPasswordReset(companyGroup.main_account);
+                                      }}
+                                      disabled={passwordResetLoading.has(companyGroup.main_account.id)}
+                                      className="p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 rounded-lg transition-colors border border-blue-500/30 hover:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      title="Send Password Reset Email"
+                                    >
+                                      {passwordResetLoading.has(companyGroup.main_account.id) ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Mail className="w-4 h-4" />
+                                      )}
+                                    </motion.button>
+                                    
+                                    {/* Direct Password Change Button for Main Account */}
+                                    {supabaseAdmin && (
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDirectPasswordChangeUser(companyGroup.main_account);
+                                          setShowPasswordChangeModal(true);
+                                        }}
+                                        className="p-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300 rounded-lg transition-colors border border-orange-500/30 hover:border-orange-500/50"
+                                        title="Change Password Directly"
+                                      >
+                                        <KeyRound className="w-4 h-4" />
+                                      </motion.button>
+                                    )}
+                                    <UserCircle className="w-4 h-4 text-gray-400" />
+                                  </div>
                                 </div>
                               </motion.div>
                             </div>
@@ -827,7 +944,44 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
                                               {subUser.email}
                                             </p>
                                           </div>
-                                          <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                          <div className="flex items-center gap-2">
+                                            {/* Password Reset Button */}
+                                            <motion.button
+                                              whileHover={{ scale: 1.05 }}
+                                              whileTap={{ scale: 0.95 }}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSendPasswordReset(subUser);
+                                              }}
+                                              disabled={passwordResetLoading.has(subUser.id)}
+                                              className="p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 rounded-lg transition-colors border border-blue-500/30 hover:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                              title="Send Password Reset Email"
+                                            >
+                                              {passwordResetLoading.has(subUser.id) ? (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                              ) : (
+                                                <Mail className="w-3 h-3" />
+                                              )}
+                                            </motion.button>
+                                            
+                                            {/* Direct Password Change Button */}
+                                            {supabaseAdmin && (
+                                              <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setDirectPasswordChangeUser(subUser);
+                                                  setShowPasswordChangeModal(true);
+                                                }}
+                                                className="p-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300 rounded-lg transition-colors border border-orange-500/30 hover:border-orange-500/50"
+                                                title="Change Password Directly"
+                                              >
+                                                <KeyRound className="w-3 h-3" />
+                                              </motion.button>
+                                            )}
+                                            <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                          </div>
                                         </div>
                                       </motion.div>
                                     );
@@ -1424,6 +1578,17 @@ export function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
         isVisible={showNotificationCenter}
         onClose={() => setShowNotificationCenter(false)}
       />
+
+      {/* Direct Password Change Modal */}
+      <DirectPasswordChangeModal
+        isOpen={showPasswordChangeModal}
+        user={directPasswordChangeUser}
+        onClose={() => {
+          setShowPasswordChangeModal(false);
+          setDirectPasswordChangeUser(null);
+        }}
+        onPasswordChange={handleDirectPasswordChange}
+      />
     </div>
   );
 }
@@ -1653,6 +1818,201 @@ const UserArticlesModal = ({ user, companyGroup, isOpen, onClose, onEditArticle 
         </div>
       </motion.div>
     </div>
+  );
+};
+
+// Direct Password Change Modal Component
+const DirectPasswordChangeModal = ({ 
+  isOpen, 
+  user, 
+  onClose, 
+  onPasswordChange 
+}: {
+  isOpen: boolean;
+  user: UserProfile | null;
+  onClose: () => void;
+  onPasswordChange: (user: UserProfile, newPassword: string) => Promise<boolean>;
+}) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChanging, setIsChanging] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (!user) return;
+
+    setIsChanging(true);
+    const success = await onPasswordChange(user, newPassword);
+    setIsChanging(false);
+
+    if (success) {
+      setNewPassword('');
+      setConfirmPassword('');
+      onClose();
+    }
+  };
+
+  const handleClose = () => {
+    setNewPassword('');
+    setConfirmPassword('');
+    onClose();
+  };
+
+  const generateSecurePassword = () => {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    setNewPassword(password);
+    setConfirmPassword(password);
+  };
+
+  if (!user || !isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={handleClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 p-6 w-full max-w-md"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <KeyRound className="h-5 w-5 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Change Password</h3>
+                <p className="text-sm text-gray-400">{user.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <X className="h-4 w-4 text-gray-400" />
+            </button>
+          </div>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-yellow-300 font-medium">Direct Password Change</p>
+                <p className="text-xs text-yellow-200/80 mt-1">
+                  This will immediately change the user's password. The user will need to use the new password to log in.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500"
+                  placeholder="Enter new password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Confirm Password
+              </label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500"
+                placeholder="Confirm new password"
+                required
+              />
+            </div>
+
+            <motion.button
+              type="button"
+              onClick={generateSecurePassword}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full px-4 py-2 bg-gray-600/50 hover:bg-gray-600/70 text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-600/50 hover:border-gray-500/50"
+            >
+              Generate Secure Password
+            </motion.button>
+
+            <div className="flex gap-3 pt-4">
+              <motion.button
+                type="button"
+                onClick={handleClose}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex-1 px-4 py-3 bg-gray-600/50 hover:bg-gray-600/70 text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                type="submit"
+                disabled={isChanging}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isChanging ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Changing...
+                  </>
+                ) : (
+                  'Change Password'
+                )}
+              </motion.button>
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 };
 

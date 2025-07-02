@@ -22,6 +22,7 @@ import {
 import { motion } from 'framer-motion';
 import { Edit3, ArrowLeft, Package, FileText, AlertCircle } from 'lucide-react';
 import { useBriefAutoSave } from '../hooks/useBriefAutoSave';
+import { supabase } from '../lib/supabase';
 
 export default function EditContentBrief() {
   const { id } = useParams<{ id: string }>();
@@ -90,6 +91,8 @@ export default function EditContentBrief() {
         brief_content: cleanedContent,
         internal_links: newLinks,
         possible_article_titles: newTitles,
+        titlesLength: newTitles.length,
+        titlesIsEmpty: newTitles.length === 0,
       });
       handleAutoSave({
         brief_content: cleanedContent,
@@ -150,8 +153,7 @@ export default function EditContentBrief() {
   };
 
   // Load brief data
-  useEffect(() => {
-    async function loadBrief() {
+  const loadBrief = useCallback(async () => {
       if (!id) {
         console.log('No brief ID provided');
         return;
@@ -173,7 +175,9 @@ export default function EditContentBrief() {
           internal_links: data.internal_links,
           suggested_links: data.suggested_links,
           possible_article_titles: data.possible_article_titles,
-          suggested_titles: data.suggested_titles
+          suggested_titles: data.suggested_titles,
+          possible_article_titles_type: Array.isArray(data.possible_article_titles) ? 'array' : typeof data.possible_article_titles,
+          possible_article_titles_length: Array.isArray(data.possible_article_titles) ? data.possible_article_titles.length : 'N/A'
         });
         
         // Use the already-parsed and transformed data from getBriefById
@@ -207,10 +211,49 @@ export default function EditContentBrief() {
       } finally {
         setLoading(false);
       }
-    }
-
-    loadBrief();
   }, [id, navigate, editor]);
+
+  useEffect(() => {
+    loadBrief();
+  }, [loadBrief]);
+
+  // Real-time subscription for content brief updates
+  useEffect(() => {
+    if (!id) return;
+
+    console.log('🔄 Setting up real-time subscription for content brief:', id);
+    
+    const subscription = supabase
+      .channel(`content_brief_${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'content_briefs',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('🔄 Real-time update detected for content brief:', payload);
+          
+          // Reload the brief data to get the latest changes
+          loadBrief();
+          
+          // Show a notification that the content was updated
+          toast.success('Content brief updated', {
+            duration: 2000,
+            position: 'bottom-right'
+          });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🔄 Cleaning up real-time subscription for content brief:', id);
+      subscription.unsubscribe();
+    };
+  }, [id, loadBrief]);
 
   // Set initial content when editor is ready and brief is loaded
   useEffect(() => {
@@ -397,6 +440,7 @@ export default function EditContentBrief() {
                     <ContentBriefEditorSimple
                       initialContent={brief?.brief_content_text || brief?.brief_content || ''}
                       onUpdate={(content: string, links: string[], titles: string[]) => {
+                        console.log('ContentBriefEditorSimple onUpdate called with titles:', titles, 'isEmpty:', titles.length === 0);
                         setBrief(prev => prev ? { ...prev, brief_content: content, internal_links: links, possible_article_titles: titles } : null);
                         handleAutoSave({ brief_content: content, internal_links: links, possible_article_titles: titles });
                       }}

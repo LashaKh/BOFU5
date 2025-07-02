@@ -1422,45 +1422,74 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                       </div>
                     </div>
                     
-                    <div className="p-6">
-                      {brief.brief_content && Object.keys(brief.brief_content).length > 0 ? (
-                        <div className="space-y-6">
-                          {/* Editable Content Brief Display */}
-                          <div className="bg-gray-700/20 rounded-lg p-4 border border-gray-600/30">
-                            <h5 className="text-white font-medium mb-3 flex items-center gap-2">
-                              <Edit className="w-4 h-4" />
-                              Edit Content Brief
-                            </h5>
-                            <ContentBriefDisplay 
-                              content={JSON.stringify(brief.brief_content)}
-                              readOnly={false}
-                              researchResultId={brief.research_result_id}
-                              onContentChange={(updatedContent: string) => {
-                                try {
-                                  const parsedContent = JSON.parse(updatedContent);
-                                  handleContentBriefUpdate(brief.id, parsedContent);
-                                } catch (error) {
-                                  console.error('Error parsing updated content:', error);
-                                  toast.error('Invalid content format');
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500 bg-gray-600/20 rounded-lg border border-gray-600/30">
-                          <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                          <h5 className="font-medium text-gray-300 mb-2">Empty Content Brief</h5>
-                          <p className="text-sm text-gray-400 mb-4">
-                            This content brief doesn't contain any structured content yet.
-                          </p>
-                          <div className="text-xs text-gray-500 space-y-1 bg-gray-700/30 rounded p-3 max-w-sm mx-auto">
-                            <p><span className="font-medium">Brief Content:</span> {brief.brief_content ? 'Present but empty' : 'null'}</p>
-                            <p><span className="font-medium">Product Name:</span> {brief.product_name || 'Not specified'}</p>
-                            <p className="text-yellow-400 mt-2">💡 Content briefs are generated when users send products to AirOps</p>
-                          </div>
-                        </div>
-                      )}
+                                        <div className="p-6">
+                      {(() => {
+                        // Check if brief_content exists and has valid content
+                        let hasValidContent = false;
+                        let contentToPass = '';
+                        
+                        if (brief.brief_content) {
+                          try {
+                            // If brief_content is already a string (JSON), use it directly
+                            if (typeof brief.brief_content === 'string') {
+                              const parsed = JSON.parse(brief.brief_content);
+                              hasValidContent = parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0;
+                              contentToPass = brief.brief_content;
+                            } 
+                            // If brief_content is already an object, stringify it
+                            else if (typeof brief.brief_content === 'object') {
+                              hasValidContent = Object.keys(brief.brief_content).length > 0;
+                              contentToPass = JSON.stringify(brief.brief_content);
+                            }
+                          } catch (error) {
+                            console.error('Error parsing brief_content:', error);
+                            hasValidContent = false;
+                          }
+                        }
+                        
+                        if (hasValidContent) {
+                          return (
+                            <div className="space-y-6">
+                              {/* Editable Content Brief Display */}
+                              <div className="bg-gray-700/20 rounded-lg p-4 border border-gray-600/30">
+                                <h5 className="text-white font-medium mb-3 flex items-center gap-2">
+                                  <Edit className="w-4 h-4" />
+                                  Edit Content Brief
+                                </h5>
+                                <ContentBriefDisplay 
+                                  content={contentToPass}
+                                  readOnly={false}
+                                  researchResultId={brief.research_result_id}
+                                  onContentChange={(updatedContent: string) => {
+                                    try {
+                                      const parsedContent = JSON.parse(updatedContent);
+                                      handleContentBriefUpdate(brief.id, parsedContent);
+                                    } catch (error) {
+                                      console.error('Error parsing updated content:', error);
+                                      toast.error('Invalid content format');
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="text-center py-8 text-gray-500 bg-gray-600/20 rounded-lg border border-gray-600/30">
+                              <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                              <h5 className="font-medium text-gray-300 mb-2">Empty Content Brief</h5>
+                              <p className="text-sm text-gray-400 mb-4">
+                                This content brief doesn't contain any structured content yet.
+                              </p>
+                              <div className="text-xs text-gray-500 space-y-1 bg-gray-700/30 rounded p-3 max-w-sm mx-auto">
+                                <p><span className="font-medium">Brief Content:</span> {brief.brief_content ? 'Present but empty' : 'null'}</p>
+                                <p><span className="font-medium">Product Name:</span> {brief.product_name || 'Not specified'}</p>
+                                <p className="text-yellow-400 mt-2">💡 Content briefs are generated when users send products to AirOps</p>
+                              </div>
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
                   </div>
                 );

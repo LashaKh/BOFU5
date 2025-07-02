@@ -140,11 +140,12 @@ export const ContentBriefDisplay: React.FC<ContentBriefDisplayProps> = ({
     }
     
     // Trigger specific callbacks for links and titles
-    if (onInternalLinksChange && newSections.internal_links) {
+    // Always call callbacks even for empty arrays to ensure deletions are propagated
+    if (onInternalLinksChange && newSections.internal_links !== undefined) {
       onInternalLinksChange(newSections.internal_links);
     }
     
-    if (onSuggestedTitlesChange && newSections.possible_article_titles) {
+    if (onSuggestedTitlesChange && newSections.possible_article_titles !== undefined) {
       onSuggestedTitlesChange(newSections.possible_article_titles);
     }
   }, [onContentChange, onInternalLinksChange, onSuggestedTitlesChange]);

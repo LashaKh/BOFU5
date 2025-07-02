@@ -120,7 +120,7 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
   // Critical refs to break update cycles
   const isProcessingExternalUpdate = useRef(false);
   const updatesInitiatedByUser = useRef(false);
-  const skipNextSave = useRef(false);
+
 
   // Sample template structure for when content is empty
   const emptyContentTemplate = JSON.stringify({
@@ -410,10 +410,11 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
       if (briefObject) {
         // These fields will be re-embedded by the parent if needed by its save logic.
         // For now, ensure they are correctly formatted if part of the main content object.
-        if (typeof briefObject.internal_links === 'string' || currentInternalLinks?.length) {
+        // IMPORTANT: Check for array existence, not length, to allow empty arrays
+        if (typeof briefObject.internal_links === 'string' || Array.isArray(currentInternalLinks)) {
             briefObject.internal_links = (currentInternalLinks || []).join('\n');
         }
-        if (typeof briefObject.possible_article_titles === 'string' || currentSuggestedTitles?.length) {
+        if (typeof briefObject.possible_article_titles === 'string' || Array.isArray(currentSuggestedTitles)) {
             briefObject.possible_article_titles = (currentSuggestedTitles || []).join('\n');
         }
         cleanedContent = JSON.stringify(briefObject, null, 2);
@@ -455,15 +456,9 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
 
   // Handle content updates from the display component
   const handleContentUpdate = useCallback((updatedContent: string) => {
-    // Prevent update cycles
-    isProcessingExternalUpdate.current = true;
-    
     // Ensure content is clean before saving
     const cleanedContent = cleanContent(updatedContent);
     setContent(cleanedContent);
-    
-    // Mark that we should skip the next save from onInternalLinksChange/onSuggestedTitlesChange
-    skipNextSave.current = true;
     
     // Only trigger debouncedSave if the update wasn't initiated by our own save
     if (updatesInitiatedByUser.current) {
@@ -473,11 +468,6 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
     }
     
     console.log('Content updated - current internal links:', internalLinks);
-    
-    // Reset the flag after a brief delay to allow updates to propagate
-    setTimeout(() => {
-      isProcessingExternalUpdate.current = false;
-    }, 50);
   }, [debouncedSave, internalLinks]);
 
   // Add more debug info before rendering
@@ -537,13 +527,21 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
     // Extract internal links if needed
     if (shouldLoadLinks && contentObj.internal_links && Array.isArray(contentObj.internal_links)) {
       console.log('Setting internal links from JSON content:', contentObj.internal_links);
+      // Set flag to prevent callback loops when loading from external source
+      isProcessingExternalUpdate.current = true;
       setInternalLinks(contentObj.internal_links);
+      // Clear flag after state update
+      setTimeout(() => { isProcessingExternalUpdate.current = false; }, 10);
     }
     
     // Extract article titles if needed
     if (shouldLoadTitles && contentObj.possible_article_titles && Array.isArray(contentObj.possible_article_titles)) {
       console.log('Setting suggested titles from JSON content:', contentObj.possible_article_titles);
+      // Set flag to prevent callback loops when loading from external source
+      isProcessingExternalUpdate.current = true;
       setSuggestedTitles(contentObj.possible_article_titles);
+      // Clear flag after state update
+      setTimeout(() => { isProcessingExternalUpdate.current = false; }, 10);
     }
   }, [content]); // Only depend on content, not the state we're updating
 
@@ -606,9 +604,9 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
           onInternalLinksChange={(links) => {
             console.log('Links changed in ContentBriefDisplay:', links);
             
-            // CRITICAL: Break the update cycle by ignoring changes initiated by our own save
+            // Only ignore updates during initial JSON content loading
             if (isProcessingExternalUpdate.current) {
-              console.log('Ignoring internal links change during external update');
+              console.log('Ignoring internal links change during external JSON content loading');
               return;
             }
             
@@ -635,19 +633,17 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
             setInternalLinks(links);
             
             // Only save if we're not already saving
-            if (!saveInProgress.current && !skipNextSave.current) {
+            if (!saveInProgress.current) {
               console.log('User changed links, triggering API save');
               debouncedSave();
             }
-            
-            skipNextSave.current = false;
           }}
           onSuggestedTitlesChange={(titles) => {
             console.log('Titles changed in ContentBriefDisplay:', titles);
             
-            // CRITICAL: Break the update cycle by ignoring changes initiated by our own save
+            // Only ignore updates during initial JSON content loading
             if (isProcessingExternalUpdate.current) {
-              console.log('Ignoring suggested titles change during external update');
+              console.log('Ignoring suggested titles change during external JSON content loading');
               return;
             }
             
@@ -674,12 +670,10 @@ export function ContentBriefEditorSimple({ initialContent, onUpdate, briefId, re
             setSuggestedTitles(titles);
             
             // Only save if we're not already saving
-            if (!saveInProgress.current && !skipNextSave.current) {
+            if (!saveInProgress.current) {
               console.log('User changed titles, triggering API save');
               debouncedSave();
             }
-            
-            skipNextSave.current = false;
           }}
         />
       </div>
