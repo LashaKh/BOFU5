@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Eye, Search, Filter, BookOpen, FileText, Edit, X, M
 import { toast } from 'react-hot-toast';
 import { ProductAnalysis } from '../../types/product/types';
 import { ContentBriefEditorSimple } from '../content-brief/ContentBriefEditorSimple';
+import { updateBrief } from '../../lib/contentBriefs';
 import { ProductCard } from '../product/ProductCard';
 import { ResponsiveApprovalButton } from '../common/ResponsiveApprovalButton';
 import { ContentBrief } from '../../types/contentBrief';
@@ -70,6 +71,7 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
   const [error, setError] = useState<string | null>(null);
   const [approvedProducts, setApprovedProducts] = useState<any[]>([]);
   const [isLoadingApproved, setIsLoadingApproved] = useState(true);
+  const [autoSaving, setAutoSaving] = useState<{ [key: string]: boolean }>({});
 
   // Fetch all users with enhanced company and profile data using admin permissions
   const fetchUsers = async () => {
@@ -1460,15 +1462,24 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                             <div className="space-y-6">
                               {/* Editable Content Brief Display */}
                               <div className="bg-gray-700/20 rounded-lg p-4 border border-gray-600/30">
-                                <h5 className="text-white font-medium mb-3 flex items-center gap-2">
-                                  <Edit className="w-4 h-4" />
-                                  Edit Content Brief
-                                </h5>
+                                <div className="flex items-center justify-between mb-3">
+                                  <h5 className="text-white font-medium flex items-center gap-2">
+                                    <Edit className="w-4 h-4" />
+                                    Edit Content Brief
+                                  </h5>
+                                  {/* Auto-save indicator */}
+                                  {autoSaving[brief.id] && (
+                                    <div className="flex items-center space-x-2 px-3 py-1 bg-green-50/90 text-green-700 rounded-full text-sm font-medium border border-green-200/50 backdrop-blur-sm">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                      <span>Auto-saving...</span>
+                                    </div>
+                                  )}
+                                </div>
                                 <ContentBriefEditorSimple 
                                   initialContent={contentToPass}
                                   briefId={brief.id}
                                   researchResultId={brief.research_result_id}
-                                  onUpdate={(content: string, links: string[], titles: string[]) => {
+                                  onUpdate={async (content: string, links: string[], titles: string[]) => {
                                     // Update local state immediately for responsiveness
                                     const updatedBrief = {
                                       ...brief,
@@ -1482,7 +1493,28 @@ export function ContentBriefManagement({ onBack }: ContentBriefManagementProps) 
                                       prev.map(b => b.id === brief.id ? updatedBrief : b)
                                     );
                                     
-                                    // The ContentBriefEditorSimple component handles database saving automatically
+                                    // Auto-save to database using the same reliable function as user dashboard
+                                    try {
+                                      console.log('Admin dashboard: Auto-saving content brief changes');
+                                      
+                                      // Set auto-saving state
+                                      setAutoSaving(prev => ({ ...prev, [brief.id]: true }));
+                                      
+                                      // Use the same updateBrief function as user dashboard for consistency
+                                      await updateBrief(brief.id, {
+                                        brief_content: content,
+                                        internal_links: links,
+                                        possible_article_titles: titles
+                                      });
+                                      
+                                      console.log('✅ Admin dashboard: Content brief auto-saved successfully');
+                                    } catch (error) {
+                                      console.error('Auto-save error:', error);
+                                      toast.error('Failed to auto-save changes');
+                                    } finally {
+                                      // Clear auto-saving state
+                                      setAutoSaving(prev => ({ ...prev, [brief.id]: false }));
+                                    }
                                   }}
                                 />
                               </div>
